@@ -77,6 +77,23 @@ Future<dynamic> _handleResponse(http.Response response) async {
     throw Exception("Erreur API (${response.statusCode})");
   }
 }
+// ================= REGISTER =================
+Future<dynamic> register(String username, String password) async {
+  final response = await http.post(
+    Uri.parse("$baseUrl/register/"),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode({
+      "username": username,
+      "password": password,
+    }),
+  );
+
+  print("REGISTER RESPONSE: ${response.body}");
+
+  return await _handleResponse(response);
+}
   // ================= LOGIN =================
 Future<bool> login(String username, String password) async {
   final response = await http.post(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/screens/dashboard_screen.dart';
+import 'package:app_elevage/screens/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiService apiService; // ✅ injection
@@ -79,10 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
               decoration: const InputDecoration(labelText: "Password"),
             ),
             const SizedBox(height: 20),
-
             if (errorMessage.isNotEmpty)
               Text(errorMessage, style: const TextStyle(color: Colors.red)),
-
             ElevatedButton(
               onPressed: isLoading ? null : handleLogin,
               child: isLoading
@@ -92,6 +91,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text("Login"),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RegisterScreen(
+                            apiService: widget.apiService,
+                          ),
+                        ),
+                      );
+                    },
+              child: const Text("Créer un compte"),
             ),
           ],
         ),
