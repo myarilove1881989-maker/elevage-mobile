@@ -118,6 +118,7 @@ Future<bool> login(String username, String password) async {
   globalToken = token;
 
   await prefs.setString("token", token!);
+  await prefs.setString("username", username);
 
   return true;
 }
@@ -365,9 +366,14 @@ Future<List<dynamic>> getClientVentes(int clientId) async {
   return res;
 }
 
-Future<bool> createPayment(int clientId, double montant) async {
+Future<bool> createPayment(
+  int clientId,
+  int venteId,
+  double montant,
+) async {
   final res = await post("/payments/create/", {
     "client": clientId,
+    "vente": venteId,
     "montant": montant,
   });
 
