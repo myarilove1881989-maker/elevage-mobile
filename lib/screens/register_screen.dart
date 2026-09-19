@@ -37,6 +37,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (!RegExp(r'^[a-zA-Z0-9_@.+-]+$').hasMatch(username)) {
+      setState(() {
+        errorMessage =
+            "Format non accepté : utilisez uniquement des lettres, chiffres ou @ . + - _.";
+      });
+      return;
+    }
+
     if (password.isEmpty) {
       setState(() {
         errorMessage = "Le mot de passe est obligatoire.";
@@ -76,7 +84,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       setState(() {
         isLoading = false;
-        errorMessage = e.toString();
+        errorMessage =
+            "Impossible de créer le compte. Vérifiez le format du nom d'utilisateur et choisissez-en un autre s'il est déjà utilisé.";
       });
     }
   }

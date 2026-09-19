@@ -57,7 +57,8 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() {
         isLoading = false;
-        errorMessage = "Erreur : ${e.toString()}";
+        errorMessage =
+            "Nom d'utilisateur ou mot de passe incorrect. Vérifiez vos identifiants.";
       });
     }
   }
