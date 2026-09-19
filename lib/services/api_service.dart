@@ -35,7 +35,10 @@ class ApiService {
   }
 
   // ================= HELPER RESPONSE =================
-Future<dynamic> _handleResponse(http.Response response) async {
+Future<dynamic> _handleResponse(
+  http.Response response, {
+  bool clearSessionOnUnauthorized = true,
+}) async {
   print("📥 STATUS: ${response.statusCode}");
   print("📥 RESPONSE: ${response.body}");
 
@@ -46,7 +49,7 @@ Future<dynamic> _handleResponse(http.Response response) async {
   }
 
   // 🔒 TOKEN EXPIRÉ
-  if (response.statusCode == 401) {
+  if (response.statusCode == 401 && clearSessionOnUnauthorized) {
     token = null;
     globalToken = null;
 
@@ -56,24 +59,23 @@ Future<dynamic> _handleResponse(http.Response response) async {
     throw Exception("Session expirée, reconnectez-vous 🔒");
   }
 
-  // 🔥 🔥 🔥 ERREUR AVEC MESSAGE BACKEND
+  // Message retourné par le backend, lorsqu'il est disponible.
   try {
     final data = jsonDecode(response.body);
 
     if (data is Map) {
       if (data.containsKey("error")) {
-        throw Exception(data["error"]);
+        return Future.error(Exception(data["error"]));
       }
 
       if (data.containsKey("errors")) {
-        throw Exception(data["errors"].toString());
+        return Future.error(Exception(data["errors"].toString()));
       }
     }
 
-    throw Exception(data.toString());
-
-  } catch (e) {
-    // fallback si body non JSON
+    return Future.error(Exception(data.toString()));
+  } on FormatException {
+    // Réponse non JSON : message générique mais compréhensible.
     throw Exception("Erreur API (${response.statusCode})");
   }
 }
@@ -107,7 +109,10 @@ Future<bool> login(String username, String password) async {
 
   print("LOGIN RESPONSE: ${response.body}");
 
-  final data = await _handleResponse(response);
+  final data = await _handleResponse(
+    response,
+    clearSessionOnUnauthorized: false,
+  );
 
   // 🔥 Nettoyage ancien token
   final prefs = await SharedPreferences.getInstance();
