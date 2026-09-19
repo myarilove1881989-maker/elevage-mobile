@@ -21,6 +21,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
 import 'package:app_elevage/screens/performance_screen.dart';
+import 'package:app_elevage/screens/login_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
@@ -69,6 +70,23 @@ String getDateKey(DateTime date) {
     username = prefs.getString("username") ?? '';
   });
 }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove("token");
+    await prefs.remove("username");
+    ApiService.token = null;
+    globalToken = null;
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(apiService: apiService),
+      ),
+      (route) => false,
+    );
+  }
 
   @override
   void initState() {
@@ -940,6 +958,34 @@ void _addTask() {
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 18),
+
+                  // DÉCONNEXION
+                  InkWell(
+                    onTap: _logout,
+                    child: const SizedBox(
+                      width: 82,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.logout,
+                            color: Colors.white70,
+                            size: 25,
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            "Quitter",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
                             ),
                           ),
                         ],
