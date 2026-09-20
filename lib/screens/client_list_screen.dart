@@ -3,6 +3,7 @@ import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import 'client_detail_screen.dart';
+import '../theme/terre_et_or_theme.dart';
 
 class ClientListScreen extends StatefulWidget {
   final ApiService apiService;
@@ -158,7 +159,9 @@ class _ClientListScreenState extends State<ClientListScreen> {
           pays.contains(search);
     }).toList();
 
-    return Scaffold(
+    return Theme(
+      data: terreEtOrTheme(context),
+      child: Scaffold(
       appBar: AppBar(title: Text(context.tr('customers'))),
 
       floatingActionButton: FloatingActionButton(
@@ -170,10 +173,20 @@ class _ClientListScreenState extends State<ClientListScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                  child: TerreEtOrHeader(
+                    icon: Icons.people_alt_outlined,
+                    title: context.tr('customers'),
+                    subtitle: AppSettings.instance.languageCode == 'en'
+                        ? 'Find your customers and their contact details'
+                        : 'Retrouvez vos clients et leurs coordonnées',
+                  ),
+                ),
 
                 // 🔍 BARRE DE RECHERCHE
                 Padding(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: TextField(
                 decoration: InputDecoration(
                       hintText: context.tr('search_customer'),
@@ -191,7 +204,27 @@ class _ClientListScreenState extends State<ClientListScreen> {
                 // 📋 LISTE
                 Expanded(
                   child: filteredClients.isEmpty
-                      ? Center(child: Text(context.tr('no_customer')))
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(18),
+                                decoration: const BoxDecoration(
+                                  color: TerreEtOrColors.paleGold,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.people_outline,
+                                  color: TerreEtOrColors.gold,
+                                  size: 36,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(context.tr('no_customer')),
+                            ],
+                          ),
+                        )
                       : ListView.builder(
                           itemCount: filteredClients.length,
                           itemBuilder: (_, i) {
@@ -199,8 +232,16 @@ class _ClientListScreenState extends State<ClientListScreen> {
                                 filteredClients[i] as Map<String, dynamic>;
 
                             return Card(
-                              margin: const EdgeInsets.all(8),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
                               child: ListTile(
+                                leading: const CircleAvatar(
+                                  backgroundColor: TerreEtOrColors.paleGold,
+                                  foregroundColor: TerreEtOrColors.gold,
+                                  child: Icon(Icons.person_outline),
+                                ),
                                 title: Text(c["nom"] ?? ""),
                                 subtitle: Text(
                                   [
@@ -238,6 +279,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
                 ),
               ],
             ),
+      ),
     );
   }
 }
