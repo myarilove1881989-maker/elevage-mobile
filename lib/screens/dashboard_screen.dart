@@ -195,17 +195,29 @@ String getDateKey(DateTime date) {
 }
 
   Future<void> fetchDashboardByEspece(int? especeId) async {
-    setState(() => isLoading = true);
+    try {
+      setState(() => isLoading = true);
 
-    final result =
-        await widget.apiService.getDashboard(especeId: especeId);
+      final result =
+          await widget.apiService.getDashboard(especeId: especeId);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      data = result;
-      isLoading = false;
-    });
+      setState(() {
+        data = result;
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Erreur chargement des données de l'espèce"),
+        ),
+      );
+    }
   }
 
   Future<void> fetchLots() async {

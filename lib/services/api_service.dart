@@ -192,9 +192,15 @@ Future<void> loadToken() async {
   try {
     print("🌐 AVANT REQUETE");
 
+    final uri = Uri.parse("$baseUrl/dashboard/").replace(
+      queryParameters: especeId == null
+          ? null
+          : {"espece": especeId.toString()},
+    );
+
     final response = await http
         .get(
-          Uri.parse("$baseUrl/dashboard/"),
+          uri,
           headers: _headers(),
         )
         .timeout(const Duration(seconds: 30));
