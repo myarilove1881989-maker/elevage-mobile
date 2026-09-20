@@ -13,6 +13,20 @@ class AddAchatScreen extends StatefulWidget {
 }
 
 class _AddAchatScreenState extends State<AddAchatScreen> {
+  static const speciesCatalog = <String>[
+    'Poulet',
+    'Dinde',
+    'Canard',
+    'Pintade',
+    'Porc',
+    'Bovin',
+    'Mouton',
+    'Chèvre',
+    'Lapin',
+    'Poisson',
+    'Œufs',
+  ];
+
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController nomLotController = TextEditingController();
@@ -35,25 +49,60 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
   }
 
   // ================= LOAD ESPECES =================
-Future<void> loadEspeces() async {
-  setState(() => isLoading = true);
+  Future<void> loadEspeces() async {
+    setState(() => isLoading = true);
 
-  try {
-    final data = await widget.apiService.getEspeces();
+    try {
+      var data = await widget.apiService.getEspeces();
+      final existingNames = data
+          .map((item) => item['nom'].toString().toLowerCase())
+          .toSet();
+      final missing = speciesCatalog
+          .where((name) => !existingNames.contains(name.toLowerCase()))
+          .toList();
 
-    if (!mounted) return;
+      if (missing.isNotEmpty) {
+        await Future.wait(
+          missing.map((name) async {
+            try {
+              await widget.apiService.createEspece(name);
+            } catch (_) {
+              // Une autre requête peut avoir créé l'espèce entre-temps.
+            }
+          }),
+        );
+        data = await widget.apiService.getEspeces();
+      }
 
-    setState(() {
-      especes = data;
-      isLoading = false;
-    });
-  } catch (e) {
-    if (!mounted) return;
-
-    setState(() => isLoading = false);
-    showMessage(context.tr('loading_species_error'));
+      if (!mounted) return;
+      setState(() {
+        especes = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      showMessage(context.tr('loading_species_error'));
+    }
   }
-}
+
+  String speciesLabel(String name) {
+    if (AppSettings.instance.languageCode != 'en') return name;
+    const englishNames = <String, String>{
+      'Poulet': 'Chicken',
+      'Dinde': 'Turkey',
+      'Canard': 'Duck',
+      'Pintade': 'Guinea fowl',
+      'Porc': 'Pig',
+      'Bovin': 'Cattle',
+      'Mouton': 'Sheep',
+      'Chèvre': 'Goat',
+      'Lapin': 'Rabbit',
+      'Poisson': 'Fish',
+      'Œufs': 'Eggs',
+    };
+    return englishNames[name] ?? name;
+  }
 
   // ================= CALCUL PRIX =================
   void calculatePrixUnitaire() {
@@ -176,14 +225,14 @@ final success = await widget.apiService.createAchat(
               const SizedBox(height: 16),
 
               Autocomplete<Map<String, dynamic>>(
-                displayStringForOption: (option) => option['nom'].toString(),
+                displayStringForOption: (option) =>
+                    speciesLabel(option['nom'].toString()),
                 optionsBuilder: (textEditingValue) {
                   final query = textEditingValue.text.trim().toLowerCase();
                   final options = especes.cast<Map<String, dynamic>>();
                   if (query.isEmpty) return options;
                   return options.where(
-                    (item) => item['nom']
-                        .toString()
+                    (item) => speciesLabel(item['nom'].toString())
                         .toLowerCase()
                         .contains(query),
                   );
