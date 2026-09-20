@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import 'lot_detail_screen.dart';
 
@@ -52,7 +53,7 @@ class _LotListScreenState extends State<LotListScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Lots")),
+      appBar: AppBar(title: Text(context.tr('batches'))),
 
       body: RefreshIndicator(
         onRefresh: fetchLots,
@@ -65,7 +66,7 @@ class _LotListScreenState extends State<LotListScreen> {
               margin: const EdgeInsets.all(10),
               child: ListTile(
                 title: Text(lot["nom"]),
-                subtitle: Text("Stock: ${lot["stock"]}"),
+                subtitle: Text("${context.tr('stock')}: ${lot["stock"]}"),
 
                 // 🔥 CLICK = DETAIL
                 onTap: () async {
