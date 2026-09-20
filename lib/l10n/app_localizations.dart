@@ -56,6 +56,8 @@ class AppLocalizations {
       'monthly_sales': 'Ventes mensuelles',
       'best_month': 'Meilleur mois',
       'sold_units': 'unités vendues',
+      'no_performance_data':
+          "Aucune donnée de performance. Créez d’abord un lot et enregistrez des ventes.",
       'choose_lot': 'Choisissez un lot',
       'data_updated': 'Données mises à jour',
       'username': "Nom d'utilisateur",
@@ -178,6 +180,8 @@ class AppLocalizations {
       'monthly_sales': 'Monthly sales',
       'best_month': 'Best month',
       'sold_units': 'units sold',
+      'no_performance_data':
+          'No performance data yet. Create a batch and record some sales first.',
       'choose_lot': 'Choose a batch',
       'data_updated': 'Data updated',
       'username': 'Username',
