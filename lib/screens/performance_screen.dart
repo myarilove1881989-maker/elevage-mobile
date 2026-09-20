@@ -257,7 +257,10 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
                             child: Text(item['espece'].toString()),
                           )),
                         ],
-                        onChanged: (value) => setState(() => selectedSpeciesId = value),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => selectedSpeciesId = value);
+                        },
                       ),
                       const SizedBox(height: 18),
                       LayoutBuilder(builder: (context, constraints) {
