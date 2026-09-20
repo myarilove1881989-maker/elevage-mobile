@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/app_settings.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/api_service.dart';
 
@@ -127,7 +128,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "${totalMarge.toStringAsFixed(0)} FCFA",
+                    AppSettings.instance.formatMoney(totalMarge),
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
@@ -247,7 +248,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                               CrossAxisAlignment.end,
                           children: [
                             Text(
-                              "${marge.toStringAsFixed(0)} FCFA",
+                              AppSettings.instance.formatMoney(marge),
                               style: TextStyle(
                                 color: marge >= 0
                                     ? Colors.green
