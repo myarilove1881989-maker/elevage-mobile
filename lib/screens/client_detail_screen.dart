@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/app_settings.dart';
 import '../services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -105,7 +106,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   String formatMoney(dynamic value) {
     final number = (value ?? 0).toDouble();
 
-    return "${number.toStringAsFixed(2)} €";
+    return AppSettings.instance.formatMoney(number, decimals: 2);
   }
 
   // ================= PAIEMENT =================
