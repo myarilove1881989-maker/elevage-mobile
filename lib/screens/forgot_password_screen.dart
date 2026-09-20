@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:app_elevage/services/api_service.dart';
 
@@ -119,7 +120,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Mot de passe oublié")),
+      appBar: AppBar(title: Text(context.tr('forgot_password'))),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -165,8 +166,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: "Adresse e-mail",
+                decoration: InputDecoration(
+                        labelText: context.tr('email'),
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
                       ),
@@ -178,8 +179,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       textAlign: TextAlign.center,
                       maxLength: 6,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(
-                        labelText: "Code à 6 chiffres",
+                decoration: InputDecoration(
+                        labelText: context.tr('verification_code'),
                         counterText: "",
                         border: OutlineInputBorder(),
                       ),
@@ -187,7 +188,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: isLoading ? null : requestCode,
-                      child: const Text("Renvoyer le code"),
+                      child: Text(context.tr('resend_code')),
                     ),
                   ],
                   if (step == 2) ...[
@@ -195,7 +196,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       controller: passwordController,
                       obscureText: hidePassword,
                       decoration: InputDecoration(
-                        labelText: "Nouveau mot de passe",
+                        labelText: context.tr('new_password'),
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
@@ -213,7 +214,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       controller: confirmPasswordController,
                       obscureText: hideConfirmation,
                       decoration: InputDecoration(
-                        labelText: "Confirmer le mot de passe",
+                        labelText: context.tr('confirm_password'),
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
