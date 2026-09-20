@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/api_service.dart';
+import '../theme/terre_et_or_theme.dart';
 
 class AddAchatScreen extends StatefulWidget {
   final ApiService apiService;
@@ -201,7 +202,9 @@ final success = await widget.apiService.createAchat(
       );
     }
 
-    return Scaffold(
+    return Theme(
+      data: terreEtOrTheme(context),
+      child: Scaffold(
       appBar: AppBar(
         title: Text(context.tr('new_purchase')),
       ),
@@ -211,6 +214,16 @@ final success = await widget.apiService.createAchat(
           key: _formKey,
           child: ListView(
             children: [
+              TerreEtOrHeader(
+                icon: Icons.shopping_bag_outlined,
+                title: context.tr('new_purchase'),
+                subtitle: AppSettings.instance.languageCode == 'en'
+                    ? 'Create a batch and record its initial purchase'
+                    : 'Créez un lot et enregistrez son achat initial',
+              ),
+              TerreEtOrPanel(
+                child: Column(
+                  children: [
               // ================= NOM LOT =================
               TextFormField(
                 controller: nomLotController,
@@ -309,12 +322,8 @@ final success = await widget.apiService.createAchat(
               const SizedBox(height: 16),
 
               // ================= DATE =================
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                ),
-                trailing: const Icon(Icons.calendar_today),
+              TerreEtOrDateTile(
+                label: "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
                 onTap: () async {
                   final picked = await showDatePicker(
                     context: context,
@@ -342,9 +351,13 @@ final success = await widget.apiService.createAchat(
                       : Text(context.tr('create_lot')),
                 ),
               ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
+      ),
       ),
     );
   }
