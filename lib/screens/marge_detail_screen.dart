@@ -89,7 +89,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
     }
 
     if (data.isEmpty) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(child: Text(context.tr('no_data'))),
       );
     }
