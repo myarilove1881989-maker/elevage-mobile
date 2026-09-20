@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
+import '../services/app_settings.dart';
 import '../services/api_service.dart';
 
 class AddAchatScreen extends StatefulWidget {
@@ -49,7 +51,7 @@ Future<void> loadEspeces() async {
     if (!mounted) return;
 
     setState(() => isLoading = false);
-    showMessage("Erreur chargement espèces");
+    showMessage(context.tr('loading_species_error'));
   }
 }
 
@@ -73,66 +75,12 @@ Future<void> loadEspeces() async {
     );
   }
 
-  // ================= CREATE ESPECE =================
-  Future<void> openCreateEspeceDialog() async {
-    final TextEditingController controller = TextEditingController();
-
-    final result = await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Nouvelle espèce"),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: "Nom de l'espèce",
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Annuler"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final nom = controller.text.trim();
-
-                if (nom.isEmpty) return;
-
-                final espece =
-                    await widget.apiService.createEspece(nom);
-
-                Navigator.pop(context, espece);
-              },
-              child: const Text("Créer"),
-            ),
-          ],
-        );
-      },
-    );
-
-                if (result != null) {
-                final newId = result["id"];
-
-                    await loadEspeces();
-
-                if (!mounted) return;
-
-                setState(() {
-                  selectedEspece = newId;
-  });
-
-                showMessage("Espèce ajoutée ✅");
-}
-  }
-
   // ================= SUBMIT =================
   Future<void> submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (selectedEspece == null) {
-      showMessage("Choisir une espèce");
+      showMessage(context.tr('species_required'));
       return;
     }
 
@@ -173,7 +121,7 @@ final success = await widget.apiService.createAchat(
       if (!mounted) return;
 
       if (success) {
-        showMessage("Lot créé avec achat ✅");
+        showMessage(context.tr('purchase_created'));
         Navigator.pop(context, true);
       } else {
         showMessage("Erreur création ❌");
@@ -206,7 +154,7 @@ final success = await widget.apiService.createAchat(
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Nouvel Achat (Création Lot)"),
+        title: Text(context.tr('new_purchase')),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -217,54 +165,33 @@ final success = await widget.apiService.createAchat(
               // ================= NOM LOT =================
               TextFormField(
                 controller: nomLotController,
-                decoration: const InputDecoration(
-                  labelText: "Nom du lot",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: context.tr('lot_name'),
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (value) =>
-                    value == null || value.isEmpty ? "Champ requis" : null,
+                    value == null || value.isEmpty ? context.tr('required') : null,
               ),
 
               const SizedBox(height: 16),
 
-              // ================= ESPECE + BOUTON + =================
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      value: selectedEspece,
-                      hint: const Text("Choisir une espèce"),
-                      items:
-                          especes.map<DropdownMenuItem<int>>((e) {
-                        return DropdownMenuItem<int>(
-                          value: e["id"],
-                          child: Text(e["nom"]),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() => selectedEspece = value);
-                      },
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+              DropdownMenu<int>(
+                expandedInsets: EdgeInsets.zero,
+                enableFilter: true,
+                enableSearch: true,
+                requestFocusOnTap: true,
+                label: Text(context.tr('choose_species')),
+                hintText: context.tr('search_species'),
+                leadingIcon: const Icon(Icons.pets_outlined),
+                dropdownMenuEntries: especes
+                    .map<DropdownMenuEntry<int>>(
+                      (e) => DropdownMenuEntry<int>(
+                        value: e['id'] as int,
+                        label: e['nom'].toString(),
                       ),
-                      validator: (value) =>
-                          value == null ? "Champ requis" : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    height: 60,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: openCreateEspeceDialog,
-                    ),
-                  ),
-                ],
+                    )
+                    .toList(),
+                onSelected: (value) => setState(() => selectedEspece = value),
               ),
 
               const SizedBox(height: 16),
@@ -273,13 +200,13 @@ final success = await widget.apiService.createAchat(
               TextFormField(
                 controller: quantiteController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Quantité",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: context.tr('quantity'),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => calculatePrixUnitaire(),
                 validator: (value) =>
-                    value == null || value.isEmpty ? "Champ requis" : null,
+                    value == null || value.isEmpty ? context.tr('required') : null,
               ),
 
               const SizedBox(height: 16),
@@ -288,13 +215,13 @@ final success = await widget.apiService.createAchat(
               TextFormField(
                 controller: prixTotalController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Prix total",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: '${context.tr('total_price')} (${AppSettings.instance.currency.symbol})',
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => calculatePrixUnitaire(),
                 validator: (value) =>
-                    value == null || value.isEmpty ? "Champ requis" : null,
+                    value == null || value.isEmpty ? context.tr('required') : null,
               ),
 
               const SizedBox(height: 16),
@@ -303,9 +230,9 @@ final success = await widget.apiService.createAchat(
               TextFormField(
                 controller: prixUnitaireController,
                 readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: "Prix unitaire (auto)",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',
+                  border: const OutlineInputBorder(),
                 ),
               ),
 
@@ -315,7 +242,7 @@ final success = await widget.apiService.createAchat(
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(
-                  "Date : ${selectedDate.toLocal().toString().split(' ')[0]}",
+                  "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
                 ),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () async {
@@ -342,7 +269,7 @@ final success = await widget.apiService.createAchat(
                   child: isSubmitting
                       ? const CircularProgressIndicator(
                           color: Colors.white)
-                      : const Text("Créer le lot"),
+                      : Text(context.tr('create_lot')),
                 ),
               ),
             ],
