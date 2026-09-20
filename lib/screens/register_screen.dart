@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:app_elevage/services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -84,8 +85,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Compte créé avec succès."),
+        SnackBar(
+          content: Text(context.tr('account_created')),
         ),
       );
 
@@ -114,7 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Créer un compte"),
+        title: Text(context.tr('create_account')),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -122,8 +123,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             TextField(
               controller: usernameController,
-              decoration: const InputDecoration(
-                labelText: "Nom d'utilisateur",
+                decoration: InputDecoration(
+                labelText: context.tr('username'),
               ),
             ),
             const SizedBox(height: 12),
@@ -131,8 +132,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: "Adresse e-mail",
+                decoration: InputDecoration(
+                labelText: context.tr('email'),
               ),
             ),
             const SizedBox(height: 12),
@@ -140,7 +141,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: passwordController,
               obscureText: _obscurePassword,
               decoration: InputDecoration(
-                labelText: "Mot de passe",
+                labelText: context.tr('password'),
                 suffixIcon: IconButton(
                   tooltip: _obscurePassword
                       ? "Afficher le mot de passe"
@@ -161,7 +162,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: confirmPasswordController,
               obscureText: _obscureConfirmation,
               decoration: InputDecoration(
-                labelText: "Confirmer le mot de passe",
+                labelText: context.tr('confirm_password'),
                 suffixIcon: IconButton(
                   tooltip: _obscureConfirmation
                       ? "Afficher le mot de passe"
@@ -198,7 +199,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                  : const Text("Créer mon compte"),
+                  : Text(context.tr('create_my_account')),
             ),
           ],
         ),

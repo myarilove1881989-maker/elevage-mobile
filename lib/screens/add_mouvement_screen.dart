@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
+import '../services/app_settings.dart';
 import '../services/api_service.dart';
 import '../models/lot.dart';
+import '../theme/terre_et_or_theme.dart';
 
 class AddMouvementScreen extends StatefulWidget {
   final ApiService apiService;
@@ -36,6 +39,21 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     "DON",
     "VOL",
   ];
+
+  String movementLabel(String type) {
+    switch (type) {
+      case 'VENTE':
+        return context.tr('sale');
+      case 'MORTALITE':
+        return context.tr('mortality');
+      case 'DON':
+        return context.tr('donation');
+      case 'VOL':
+        return context.tr('theft');
+      default:
+        return type;
+    }
+  }
 
   @override
   void initState() {
@@ -93,28 +111,28 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
       context: context,
       builder: (_) {
         return AlertDialog(
-          title: const Text("Créer client"),
+          title: Text(context.tr('new_customer')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nomController,
-                decoration: const InputDecoration(labelText: "Nom"),
+                decoration: InputDecoration(labelText: context.tr('name')),
               ),
               TextField(
                 controller: telController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: "Téléphone"),
+                decoration: InputDecoration(labelText: context.tr('phone')),
               ),
             ],
           ),
           actions: [
             TextButton(
-              child: const Text("Annuler"),
+              child: Text(context.tr('cancel')),
               onPressed: () => Navigator.pop(context),
             ),
             ElevatedButton(
-              child: const Text("Créer"),
+              child: Text(context.tr('add')),
               onPressed: () async {
                 if (nomController.text.isEmpty ||
                     telController.text.isEmpty) {
@@ -229,15 +247,27 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
     return AbsorbPointer(
       absorbing: isSubmitting,
-      child: Scaffold(
+      child: Theme(
+        data: terreEtOrTheme(context),
+        child: Scaffold(
         appBar: AppBar(
-          title: const Text("Ajouter Mouvement"),
+          title: Text(context.tr('add_movement')),
         ),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: SingleChildScrollView(
             child: Column(
               children: [
+                TerreEtOrHeader(
+                  icon: Icons.swap_horiz_rounded,
+                  title: context.tr('add_movement'),
+                  subtitle: AppSettings.instance.languageCode == 'en'
+                      ? 'Record a sale, mortality, donation or theft'
+                      : 'Enregistrez une vente, mortalité, un don ou un vol',
+                ),
+                TerreEtOrPanel(
+                  child: Column(
+                    children: [
 
                 // TYPE
                 DropdownButtonFormField<String>(
@@ -245,7 +275,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                   items: types.map((t) {
                     return DropdownMenuItem(
                       value: t,
-                      child: Text(t),
+                      child: Text(movementLabel(t)),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -254,8 +284,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                       selectedClientId = null;
                     });
                   },
-                  decoration: const InputDecoration(
-                    labelText: "Type de mouvement",
+                decoration: InputDecoration(
+                    labelText: context.tr('movement_type'),
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -274,8 +304,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                   onChanged: (value) {
                     setState(() => selectedLotId = value);
                   },
-                  decoration: const InputDecoration(
-                    labelText: "Lot",
+                decoration: InputDecoration(
+                    labelText: context.tr('batch'),
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -303,8 +333,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                                   selectedClientId = value;
                                 });
                               },
-                              decoration: const InputDecoration(
-                                labelText: "Client",
+                decoration: InputDecoration(
+                                labelText: context.tr('customer'),
                                 border: OutlineInputBorder(),
                               ),
                             ),
@@ -336,12 +366,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                 const SizedBox(height: 16),
 
                 // DATE
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    "Date : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
+                TerreEtOrDateTile(
+                  label: "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
@@ -362,8 +388,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                 TextField(
                   controller: quantiteController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: "Quantité",
+                decoration: InputDecoration(
+                    labelText: context.tr('quantity'),
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -374,8 +400,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                 TextField(
                   controller: prixController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: "Prix unitaire",
+                decoration: InputDecoration(
+                    labelText: '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -389,12 +415,16 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                     onPressed: isSubmitting ? null : submit,
                     child: isSubmitting
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text("Valider"),
+                        : Text(context.tr('validate')),
+                  ),
+                ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
+        ),
         ),
       ),
     );

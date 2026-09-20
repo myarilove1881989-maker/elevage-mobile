@@ -22,6 +22,9 @@ import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
 import 'package:app_elevage/screens/performance_screen.dart';
 import 'package:app_elevage/screens/login_screen.dart';
+import 'package:app_elevage/screens/settings_screen.dart';
+import 'package:app_elevage/l10n/app_localizations.dart';
+import 'package:app_elevage/services/app_settings.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
@@ -310,24 +313,16 @@ String getDateKey(DateTime date) {
   );
 }
   Widget buildCard(
-  String title,
-  dynamic value,
-  IconData icon,
-  Color color,
-  VoidCallback? onTap,
-) {
-  String subtitle = "";
-
-  if (title == "Stock total") {
-    subtitle = "Unités";
-  } else if (title == "Chiffre d'affaires" ||
-      title == "Dépenses" ||
-      title == "Marge" ||
-      title == "Solde clients") {
-    subtitle = "FCFA";
-  } else if (title == "Performance") {
-    subtitle = "Marge / CA";
-  }
+    String title,
+    dynamic value,
+    IconData icon,
+    Color color,
+    VoidCallback? onTap, {
+    bool isMoney = false,
+    String? unit,
+  }) {
+    final subtitle =
+        unit ?? (isMoney ? AppSettings.instance.currency.symbol : '');
 
   return Material(
     color: Colors.white,
@@ -394,7 +389,12 @@ String getDateKey(DateTime date) {
                   const SizedBox(height: 4),
 
                   Text(
-                    value.toString(),
+                    isMoney
+                        ? AppSettings.instance.formatMoney(value).replaceAll(
+                              AppSettings.instance.currency.symbol,
+                              '',
+                            ).trim()
+                        : value.toString(),
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -492,9 +492,9 @@ List<Map<String, dynamic>> _getTasksForDay() {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: Text("Tâches du ${day.day}/${day.month}"),
+      title: Text("${context.tr('today_tasks')} ${day.day}/${day.month}"),
       content: tasks.isEmpty
-          ? const Text("Aucune tâche")
+          ? Text(context.tr('no_task'))
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: tasks
@@ -514,7 +514,7 @@ List<Map<String, dynamic>> _getTasksForDay() {
   } // ferme popup
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Tâche supprimée")),
+        SnackBar(content: Text(context.tr('task_deleted'))),
       );
     },
   ),
@@ -524,7 +524,7 @@ List<Map<String, dynamic>> _getTasksForDay() {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Fermer"),
+          child: Text(context.tr('close')),
         )
       ],
     ),
@@ -536,14 +536,14 @@ void _addTask() {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text("Nouvelle tâche"),
+      title: Text(context.tr('new_task')),
       content: TextField(
         onChanged: (value) => newTask = value,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Annuler"),
+          child: Text(context.tr('cancel')),
         ),
         ElevatedButton(
           onPressed: () async {
@@ -560,7 +560,7 @@ void _addTask() {
         Navigator.pop(context);
             await loadTasks();
           },
-          child: const Text("Ajouter"),
+          child: Text(context.tr('add')),
         ),
       ],
     ),
@@ -575,7 +575,7 @@ void _addTask() {
     if (!mounted) return;
     setState(() => isLoading = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Données mises à jour")),
+      SnackBar(content: Text(context.tr('data_updated'))),
     );
   }
 
@@ -616,6 +616,14 @@ void _addTask() {
       context,
       MaterialPageRoute(builder: (_) => ClientListScreen(apiService: apiService)),
     );
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    if (mounted) setState(() {});
   }
 
   Widget _brandTitle() {
@@ -665,18 +673,19 @@ void _addTask() {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: _brandTitle(),
             ),
-            item("Achats", Icons.shopping_bag_outlined, () => _openAchat()),
-            item("Dépenses", Icons.shopping_cart_outlined, () => _openDepense()),
+            item(context.tr('purchases'), Icons.shopping_bag_outlined, () => _openAchat()),
+            item(context.tr('expenses'), Icons.shopping_cart_outlined, () => _openDepense()),
             item(
-              "Mouvements",
+              context.tr('movements'),
               Icons.swap_horiz,
               () => _openMouvement(),
             ),
-            item("Facturation", Icons.receipt_long_outlined, _openClients),
-            item("Historique", Icons.history, () => _openLots()),
+            item(context.tr('billing'), Icons.receipt_long_outlined, _openClients),
+            item(context.tr('history'), Icons.history, () => _openLots()),
+            item(context.tr('settings'), Icons.settings_outlined, _openSettings),
             const Spacer(),
             const Divider(height: 1),
-            item("Quitter", Icons.logout, _logout),
+            item(context.tr('logout'), Icons.logout, _logout),
           ],
         ),
       ),
@@ -789,7 +798,7 @@ void _addTask() {
               children: [
                 Builder(
                   builder: (menuContext) => IconButton(
-                    tooltip: "Ouvrir le menu",
+                    tooltip: context.tr('open_menu'),
                     icon: const Icon(Icons.menu, size: 30),
                     onPressed: () => Scaffold.of(menuContext).openDrawer(),
                   ),
@@ -849,8 +858,8 @@ void _addTask() {
                           ),
                           if (screenWidth >= 700) ...[
                             const SizedBox(height: 2),
-                            const Text(
-                              "Actualiser",
+                            Text(
+                              context.tr('refresh'),
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
@@ -869,7 +878,7 @@ void _addTask() {
                   // ACHATS
                   InkWell(
                     onTap: _openAchat,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -881,7 +890,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Achats",
+                            context.tr('purchases'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -909,7 +918,7 @@ void _addTask() {
                         await refreshDashboard();
                       }
                     },
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 90,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -921,7 +930,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Dépenses",
+                            context.tr('expenses'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -949,7 +958,7 @@ void _addTask() {
                         await refreshDashboard();
                       }
                     },
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 105,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -961,7 +970,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Mouvements",
+                            context.tr('movements'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -977,7 +986,7 @@ void _addTask() {
                   // FACTURATION
                   InkWell(
                     onTap: _openClients,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 92,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -989,7 +998,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Facturation",
+                            context.tr('billing'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -1005,7 +1014,7 @@ void _addTask() {
                   // HISTORIQUE
                   InkWell(
                     onTap: _openLots,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1017,7 +1026,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Historique",
+                            context.tr('history'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -1047,8 +1056,8 @@ void _addTask() {
                           ),
                           if (screenWidth >= 700) ...[
                             const SizedBox(height: 2),
-                            const Text(
-                              "Quitter",
+                            Text(
+                              context.tr('logout'),
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 11,
@@ -1083,9 +1092,9 @@ Padding(
         textAlign: TextAlign.center,
         text: TextSpan(
           children: [
-            const TextSpan(
-              text: "Tableau de bord",
-              style: TextStyle(
+            TextSpan(
+              text: context.tr('dashboard'),
+              style: const TextStyle(
                 color: Color(0xFF063B63),
                 fontSize: 42,
                 fontWeight: FontWeight.bold,
@@ -1106,8 +1115,8 @@ Padding(
 
       const SizedBox(height: 4),
 
-      const Text(
-        "Vue d’ensemble de votre exploitation",
+      Text(
+        context.tr('overview'),
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Color(0xFF607080),
@@ -1126,7 +1135,7 @@ LayoutBuilder(
       return DropdownButtonFormField<int>(
         value: selectedEspeceId ?? 0,
         decoration: InputDecoration(
-          labelText: "Espèce",
+          labelText: context.tr('species'),
           prefixIcon: const Icon(
             Icons.pets,
             color: Colors.green,
@@ -1156,9 +1165,9 @@ LayoutBuilder(
           ),
         ),
         items: [
-          const DropdownMenuItem<int>(
+          DropdownMenuItem<int>(
             value: 0,
-            child: Text("Toutes les espèces"),
+            child: Text(context.tr('all_species')),
           ),
           ...especes.map<DropdownMenuItem<int>>((e) {
             return DropdownMenuItem<int>(
@@ -1184,7 +1193,7 @@ LayoutBuilder(
       return DropdownButtonFormField<int?>(
         value: selectedLotId,
         decoration: InputDecoration(
-          labelText: "Lot",
+          labelText: context.tr('batch'),
           prefixIcon: const Icon(
             Icons.inventory_2_outlined,
             color: Color(0xFF0B4F7C),
@@ -1214,9 +1223,9 @@ LayoutBuilder(
           ),
         ),
         items: [
-          const DropdownMenuItem<int?>(
+          DropdownMenuItem<int?>(
             value: null,
-            child: Text("Tous les lots"),
+            child: Text(context.tr('all_lots')),
           ),
           ...filteredLots.map((lot) {
             return DropdownMenuItem<int?>(
@@ -1304,13 +1313,13 @@ if (constraints.maxWidth >= 1400) {
       childAspectRatio: cardRatio,
       children: [
         buildCard(
-          "Stock total",
+          context.tr('stock_total'),
           kpis["stock"] ?? kpis["stock_total"] ?? 0,
           Icons.inventory_2,
           Colors.green,
           () {
             if (selectedLotId == null) {
-              showError("Choisis un lot");
+              showError(context.tr('choose_lot'));
               return;
             }
 
@@ -1324,16 +1333,17 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          unit: context.tr('units'),
         ),
 
         buildCard(
-          "Chiffre d'affaires",
+          context.tr('revenue'),
           kpis["chiffre_affaires"] ?? 0,
           Icons.trending_up,
           Colors.blue,
           () {
             if (selectedEspeceId == null) {
-              showError("Choisis une espèce");
+              showError(context.tr('species_required'));
               return;
             }
 
@@ -1347,16 +1357,17 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          isMoney: true,
         ),
 
         buildCard(
-          "Dépenses",
+          context.tr('expenses'),
           kpis["depenses"] ?? 0,
           Icons.account_balance_wallet,
           Colors.orange,
           () {
             if (selectedLotId == null) {
-              showError("Choisis un lot");
+              showError(context.tr('choose_lot'));
               return;
             }
 
@@ -1370,10 +1381,11 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          isMoney: true,
         ),
 
         buildCard(
-          "Performance",
+          context.tr('performance'),
           kpis["performance"] ?? 0,
           Icons.pie_chart,
           Colors.deepPurple,
@@ -1387,10 +1399,11 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          unit: context.tr('margin_revenue'),
         ),
 
         buildCard(
-          "Solde clients",
+          context.tr('client_balance'),
           totalDettes,
           Icons.credit_card,
           Colors.teal,
@@ -1404,6 +1417,7 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          isMoney: true,
         ),
       ],
     );
@@ -1442,8 +1456,8 @@ LayoutBuilder(
                 size: 22,
               ),
               const SizedBox(width: 8),
-              const Text(
-                "Calendrier des tâches",
+              Text(
+                context.tr('task_calendar'),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -1455,7 +1469,7 @@ LayoutBuilder(
                 ElevatedButton.icon(
                   onPressed: _addTask,
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text("Ajouter"),
+                  label: Text(context.tr('add')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE8F5E9),
                     foregroundColor: const Color(0xFF168A45),
@@ -1629,8 +1643,8 @@ Widget tasksCard = Container(
           ),
           const SizedBox(width: 8),
 
-          const Text(
-            "Tâches du jour",
+          Text(
+            context.tr('today_tasks'),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -1643,7 +1657,7 @@ Widget tasksCard = Container(
           // ================= NAVIGATION TÂCHES =================
           if (tasksForDay.length > 3) ...[
             IconButton(
-              tooltip: "Monter",
+              tooltip: context.tr('up'),
               icon: const Icon(
                 Icons.keyboard_arrow_up,
                 color: Color(0xFF0B4F7C),
@@ -1671,7 +1685,7 @@ Widget tasksCard = Container(
             ),
 
             IconButton(
-              tooltip: "Descendre",
+              tooltip: context.tr('down'),
               icon: const Icon(
                 Icons.keyboard_arrow_down,
                 color: Color(0xFF0B4F7C),
@@ -1702,7 +1716,7 @@ Widget tasksCard = Container(
           // ================= AJOUT SUR PETIT ÉCRAN =================
           if (!isLargeScreen)
             IconButton(
-              tooltip: "Ajouter une tâche",
+              tooltip: context.tr('add_task'),
               onPressed: _addTask,
               icon: const Icon(
                 Icons.add_circle,
@@ -1726,32 +1740,32 @@ Widget tasksCard = Container(
                 color: const Color(0xFFE5EAF0),
               ),
             ),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.event_available,
                   size: 34,
                   color: Color(0xFF90A4AE),
                 ),
 
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
 
                 Text(
-                  "Aucune tâche prévue",
-                  style: TextStyle(
+                  context.tr('no_task_planned'),
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF607D8B),
                   ),
                 ),
 
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
 
                 Text(
-                  "Profitez de cette journée libre.",
+                  context.tr('free_day'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF90A4AE),
                   ),

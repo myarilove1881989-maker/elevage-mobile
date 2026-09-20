@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/app_settings.dart';
+import '../l10n/app_localizations.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/api_service.dart';
 
@@ -74,28 +76,28 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Erreur")),
+        appBar: AppBar(title: Text(context.tr('error'))),
         body: Center(child: Text(error!)),
       );
     }
 
     if (data.isEmpty) {
-      return const Scaffold(
-        body: Center(child: Text("Aucune donnée")),
+      return Scaffold(
+        body: Center(child: Text(context.tr('no_data'))),
       );
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text("Marge & Rentabilité"),
+        title: Text(context.tr('margin')),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,
@@ -127,7 +129,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "${totalMarge.toStringAsFixed(0)} FCFA",
+                    AppSettings.instance.formatMoney(totalMarge),
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
@@ -247,7 +249,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                               CrossAxisAlignment.end,
                           children: [
                             Text(
-                              "${marge.toStringAsFixed(0)} FCFA",
+                              AppSettings.instance.formatMoney(marge),
                               style: TextStyle(
                                 color: marge >= 0
                                     ? Colors.green

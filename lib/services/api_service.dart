@@ -399,13 +399,20 @@ Future<List<dynamic>> getClients() async {
   return await _handleResponse(response);
 }
 
-Future<void> createClient(String nom, String telephone) async {
+Future<void> createClient(
+  String nom,
+  String telephone, {
+  String pays = '',
+  String ville = '',
+}) async {
   final response = await http.post(
     Uri.parse("$baseUrl/clients/create/"),
     headers: _headers(),
     body: jsonEncode({
       "nom": nom,
       "telephone": telephone,
+      "pays": pays,
+      "ville": ville,
     }),
   );
 

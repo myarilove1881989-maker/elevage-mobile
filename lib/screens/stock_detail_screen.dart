@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 
 class StockDetailScreen extends StatefulWidget {
@@ -105,7 +106,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     // 🔥 ERREUR
     if (error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Erreur")),
+        appBar: AppBar(title: Text(context.tr('error'))),
         body: Center(child: Text(error!)),
       );
     }
@@ -121,7 +122,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Analyse Stock"),
+        title: Text(context.tr('stock')),
       ),
 
       body: SingleChildScrollView(

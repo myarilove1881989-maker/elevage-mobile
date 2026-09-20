@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/app_settings.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 
 class LotDetailScreen extends StatefulWidget {
@@ -47,16 +49,16 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
     return await showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Text("Confirmation"),
-            content: const Text("Supprimer cet élément ?"),
+            title: Text(context.tr('confirmation')),
+            content: Text(context.tr('delete_item')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text("Annuler"),
+                child: Text(context.tr('cancel')),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text("Supprimer"),
+                child: Text(context.tr('delete')),
               ),
             ],
           ),
@@ -117,9 +119,9 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
 
               const SizedBox(height: 8),
 
-              Text("Espèce : ${lot!["espece_nom"] ?? ""}"),
-              Text("Date début : ${lot!["date_debut"] ?? ""}"),
-              Text("Créé le : ${lot!["date_creation"] ?? ""}"),
+              Text("${context.tr('species')} : ${lot!["espece_nom"] ?? ""}"),
+              Text("${context.tr('start_date')} : ${lot!["date_debut"] ?? ""}"),
+              Text("${context.tr('created_on')} : ${lot!["date_creation"] ?? ""}"),
               Text(
                 "Stock actuel : ${lot!["stock"] ?? 0}",
                 style: const TextStyle(fontWeight: FontWeight.bold),
@@ -136,7 +138,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
               const SizedBox(height: 10),
 
               if (achats.isEmpty)
-                const Text("Aucun achat"),
+                Text(context.tr('no_purchase')),
 
               ...achats.map<Widget>((a) {
   final int? achatId = a["id"];
@@ -146,16 +148,16 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
     child: ListTile(
       leading: const Icon(Icons.shopping_bag, color: Colors.blue),
 
-      title: const Text("Achat"),
+      title: Text(context.tr('purchase')),
 
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Quantité: ${a["quantite"]}"),
+          Text("${context.tr('quantity')}: ${a["quantite"]}"),
 
           if (a["prix_unitaire"] != null)
             Text(
-              "PU: ${a["prix_unitaire"]} FCFA",
+              "PU: ${AppSettings.instance.formatMoney(a["prix_unitaire"], decimals: 2)}",
               style: const TextStyle(
                 fontSize: 12,
                 color: Colors.blue,
@@ -164,7 +166,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
 
           if (a["prix_total"] != null)
             Text(
-              "Total: ${a["prix_total"]} FCFA",
+              "Total: ${AppSettings.instance.formatMoney(a["prix_total"], decimals: 2)}",
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.green,
@@ -219,7 +221,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
               const SizedBox(height: 10),
 
               if (mouvements.isEmpty)
-                const Text("Aucun mouvement"),
+                Text(context.tr('no_movement')),
 
               ...mouvements.map<Widget>((m) {
                 final int? id = m["id"];
@@ -232,11 +234,11 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Quantité: ${m["quantite"]}"),
+                        Text("${context.tr('quantity')}: ${m["quantite"]}"),
 
                         if (m["prix_unitaire"] != null)
                           Text(
-                            "PU: ${m["prix_unitaire"]} FCFA",
+                            "PU: ${AppSettings.instance.formatMoney(m["prix_unitaire"], decimals: 2)}",
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.blue,
@@ -281,7 +283,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
               const SizedBox(height: 10),
 
               if (depenses.isEmpty)
-                const Text("Aucune dépense"),
+                Text(context.tr('no_expense')),
 
               ...depenses.map<Widget>((d) {
                 final int? id = d["id"];
@@ -291,7 +293,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                   child: ListTile(
                     leading: const Icon(Icons.money_off),
                     title: Text(d["categorie_nom"] ?? "Autre"),
-                    subtitle: Text("Montant: ${d["montant"]}"),
+                    subtitle: Text("${context.tr('amount')}: ${d["montant"]}"),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [

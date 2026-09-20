@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/screens/login_screen.dart';
+import 'package:app_elevage/services/app_settings.dart';
 
 // 🔥 TIMEZONE (OBLIGATOIRE POUR NOTIFS)
 import 'package:timezone/timezone.dart' as tz;
@@ -38,6 +40,7 @@ void main() async {
 
   final apiService = ApiService();
   await apiService.loadToken();
+  await AppSettings.instance.load();
 
   runApp(ElevageApp(apiService: apiService));
 }
@@ -49,13 +52,23 @@ class ElevageApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Élevage Mobile',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.green,
+    return AnimatedBuilder(
+      animation: AppSettings.instance,
+      builder: (context, _) => MaterialApp(
+        title: 'Élevage Mobile',
+        debugShowCheckedModeBanner: false,
+        locale: Locale(AppSettings.instance.languageCode),
+        supportedLocales: const [Locale('fr'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: ThemeData(
+          primarySwatch: Colors.green,
+        ),
+        home: LoginScreen(apiService: apiService),
       ),
-      home: LoginScreen(apiService: apiService),
     );
   }
 }

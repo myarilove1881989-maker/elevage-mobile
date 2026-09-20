@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
+import '../services/app_settings.dart';
 import '../services/api_service.dart';
+import '../theme/terre_et_or_theme.dart';
 
 class AddDepenseScreen extends StatefulWidget {
   final ApiService apiService;
@@ -154,9 +157,11 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
       );
     }
 
-    return Scaffold(
+    return Theme(
+      data: terreEtOrTheme(context),
+      child: Scaffold(
       appBar: AppBar(
-        title: const Text("Ajouter dépense"),
+        title: Text(context.tr('add_expense')),
       ),
 
       body: Padding(
@@ -164,11 +169,21 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
+              TerreEtOrHeader(
+                icon: Icons.account_balance_wallet_outlined,
+                title: context.tr('add_expense'),
+                subtitle: AppSettings.instance.languageCode == 'en'
+                    ? 'Record an expense linked to a batch'
+                    : 'Enregistrez une charge liée à un lot',
+              ),
+              TerreEtOrPanel(
+                child: Column(
+                  children: [
 
               // ================= LOT =================
               DropdownButtonFormField<int>(
                 value: selectedLotId,
-                hint: const Text("Choisir un lot"),
+                hint: Text(context.tr('choose_batch')),
                 items: lots.map<DropdownMenuItem<int>>((lot) {
                   return DropdownMenuItem(
                     value: lot["id"],
@@ -178,8 +193,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                 onChanged: (value) {
                   setState(() => selectedLotId = value);
                 },
-                decoration: const InputDecoration(
-                  labelText: "Lot",
+                decoration: InputDecoration(
+                  labelText: context.tr('batch'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -189,7 +204,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
               // ================= CATEGORIE =================
               DropdownButtonFormField<int>(
                 value: selectedCategorieId,
-                hint: const Text("Choisir une catégorie"),
+                hint: Text(context.tr('choose_category')),
                 items: categories.map<DropdownMenuItem<int>>((c) {
                   return DropdownMenuItem(
                     value: c["id"],
@@ -199,8 +214,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                 onChanged: (value) {
                   setState(() => selectedCategorieId = value);
                 },
-                decoration: const InputDecoration(
-                  labelText: "Catégorie",
+                decoration: InputDecoration(
+                  labelText: context.tr('category'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -208,12 +223,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
               const SizedBox(height: 16),
 
               // ================= DATE =================
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  "Date : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                ),
-                trailing: const Icon(Icons.calendar_today),
+              TerreEtOrDateTile(
+                label: "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
                 onTap: pickDate,
               ),
 
@@ -223,8 +234,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
               TextField(
                 controller: montantController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Montant",
+                decoration: InputDecoration(
+                  labelText: '${context.tr('amount')} (${AppSettings.instance.currency.symbol})',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -234,8 +245,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
               // ================= NOTE =================
               TextField(
                 controller: noteController,
-                decoration: const InputDecoration(
-                  labelText: "Note (optionnel)",
+                decoration: InputDecoration(
+                  labelText: context.tr('optional_note'),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -256,12 +267,16 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text("Enregistrer"),
+                      : Text(context.tr('save')),
+                ),
+              ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../models/dette_client.dart';
 
@@ -102,7 +103,7 @@ class _DettesScreenState extends State<DettesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Dettes clients"),
+        title: Text(context.tr('customer_debts')),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -115,7 +116,7 @@ class _DettesScreenState extends State<DettesScreen> {
                     padding: const EdgeInsets.all(8),
                     child: TextField(
                       decoration: InputDecoration(
-                        hintText: "Rechercher client (nom ou téléphone)",
+                        hintText: context.tr('search_name_phone'),
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
