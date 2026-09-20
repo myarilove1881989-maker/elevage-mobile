@@ -39,6 +39,21 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     "VOL",
   ];
 
+  String movementLabel(String type) {
+    switch (type) {
+      case 'VENTE':
+        return context.tr('sale');
+      case 'MORTALITE':
+        return context.tr('mortality');
+      case 'DON':
+        return context.tr('donation');
+      case 'VOL':
+        return context.tr('theft');
+      default:
+        return type;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -247,7 +262,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                   items: types.map((t) {
                     return DropdownMenuItem(
                       value: t,
-                      child: Text(t),
+                      child: Text(movementLabel(t)),
                     );
                   }).toList(),
                   onChanged: (value) {
