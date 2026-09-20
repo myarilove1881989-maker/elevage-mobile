@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/app_settings.dart';
 import '../services/api_service.dart';
 
 class LotDetailScreen extends StatefulWidget {
@@ -155,7 +156,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
 
           if (a["prix_unitaire"] != null)
             Text(
-              "PU: ${a["prix_unitaire"]} FCFA",
+              "PU: ${AppSettings.instance.formatMoney(a["prix_unitaire"], decimals: 2)}",
               style: const TextStyle(
                 fontSize: 12,
                 color: Colors.blue,
@@ -164,7 +165,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
 
           if (a["prix_total"] != null)
             Text(
-              "Total: ${a["prix_total"]} FCFA",
+              "Total: ${AppSettings.instance.formatMoney(a["prix_total"], decimals: 2)}",
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.green,
@@ -236,7 +237,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
 
                         if (m["prix_unitaire"] != null)
                           Text(
-                            "PU: ${m["prix_unitaire"]} FCFA",
+                            "PU: ${AppSettings.instance.formatMoney(m["prix_unitaire"], decimals: 2)}",
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.blue,
