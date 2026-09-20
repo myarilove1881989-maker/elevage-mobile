@@ -464,8 +464,10 @@ Future<bool> createPayment(
 
   // ================= GENERIC GET =================
 Future<dynamic> get(String endpoint) async {
+  final normalizedBase = baseUrl.replaceFirst(RegExp(r'/+$'), '');
+  final normalizedEndpoint = endpoint.replaceFirst(RegExp(r'^/+'), '');
   final response = await http.get(
-    Uri.parse("$baseUrl$endpoint"),
+    Uri.parse("$normalizedBase/$normalizedEndpoint"),
     headers: _headers(),
   );
 
@@ -474,8 +476,10 @@ Future<dynamic> get(String endpoint) async {
 
 // ================= GENERIC POST =================
 Future<dynamic> post(String endpoint, Map<String, dynamic> data) async {
+  final normalizedBase = baseUrl.replaceFirst(RegExp(r'/+$'), '');
+  final normalizedEndpoint = endpoint.replaceFirst(RegExp(r'^/+'), '');
   final response = await http.post(
-    Uri.parse("$baseUrl$endpoint"),
+    Uri.parse("$normalizedBase/$normalizedEndpoint"),
     headers: _headers(),
     body: jsonEncode(data),
   );
