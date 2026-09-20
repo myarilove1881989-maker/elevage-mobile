@@ -665,15 +665,15 @@ void _addTask() {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: _brandTitle(),
             ),
-            item("Lots", Icons.inventory_2_outlined, () => _openLots()),
-            item("Dépense", Icons.shopping_cart_outlined, () => _openDepense()),
+            item("Achats", Icons.shopping_bag_outlined, () => _openAchat()),
+            item("Dépenses", Icons.shopping_cart_outlined, () => _openDepense()),
             item(
-              "Mouvement",
+              "Mouvements",
               Icons.swap_horiz,
               () => _openMouvement(),
             ),
-            item("Achat", Icons.shopping_bag_outlined, () => _openAchat()),
-            item("Clients", Icons.people_outline, _openClients),
+            item("Facturation", Icons.receipt_long_outlined, _openClients),
+            item("Historique", Icons.history, () => _openLots()),
             const Spacer(),
             const Divider(height: 1),
             item("Quitter", Icons.logout, _logout),
@@ -866,34 +866,22 @@ void _addTask() {
                   if (showNavActions) ...[
                   const SizedBox(width: 8),
 
-                  // LOTS
+                  // ACHATS
                   InkWell(
-                    onTap: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              LotListScreen(apiService: apiService),
-                        ),
-                      );
-
-                      if (result == true) {
-                        await refreshDashboard();
-                      }
-                    },
+                    onTap: _openAchat,
                     child: const SizedBox(
                       width: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.inventory_2_outlined,
+                            Icons.shopping_bag_outlined,
                             color: Colors.white,
                             size: 30,
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Lots",
+                            "Achats",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -906,7 +894,7 @@ void _addTask() {
 
                   const SizedBox(width: 18),
 
-                  // DÉPENSE
+                  // DÉPENSES
                   InkWell(
                     onTap: () async {
                       final result = await Navigator.push(
@@ -933,7 +921,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Dépense",
+                            "Dépenses",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -946,7 +934,7 @@ void _addTask() {
 
                   const SizedBox(width: 18),
 
-                  // MOUVEMENT
+                  // MOUVEMENTS
                   InkWell(
                     onTap: () async {
                       final result = await Navigator.push(
@@ -973,7 +961,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Mouvement",
+                            "Mouvements",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -986,34 +974,22 @@ void _addTask() {
 
                   const SizedBox(width: 18),
 
-                  // ACHAT
+                  // FACTURATION
                   InkWell(
-                    onTap: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              AddAchatScreen(apiService: apiService),
-                        ),
-                      );
-
-                      if (result == true) {
-                        await refreshDashboard();
-                      }
-                    },
+                    onTap: _openClients,
                     child: const SizedBox(
-                      width: 80,
+                      width: 92,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.shopping_bag_outlined,
+                            Icons.receipt_long_outlined,
                             color: Colors.white,
                             size: 30,
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Achat",
+                            "Facturation",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -1026,30 +1002,22 @@ void _addTask() {
 
                   const SizedBox(width: 18),
                   
-                  // CLIENTS
+                  // HISTORIQUE
                   InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ClientListScreen(apiService: apiService),
-                        ),
-                      );
-                    },
+                    onTap: _openLots,
                     child: const SizedBox(
                       width: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            Icons.people_outline,
+                            Icons.history,
                             color: Colors.white,
                             size: 30,
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Clients",
+                            "Historique",
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
