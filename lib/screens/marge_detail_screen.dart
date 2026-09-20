@@ -76,7 +76,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
