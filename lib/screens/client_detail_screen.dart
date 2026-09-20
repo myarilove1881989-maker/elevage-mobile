@@ -120,10 +120,10 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     builder: (_) => StatefulBuilder(
       builder: (context, setStateDialog) {
         return AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.payment),
-              SizedBox(width: 10),
+              const Icon(Icons.payment),
+              const SizedBox(width: 10),
               Text(context.tr('save_payment')),
             ],
           ),
