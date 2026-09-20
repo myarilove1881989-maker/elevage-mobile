@@ -11,7 +11,10 @@ class ApiService {
 
   // ✅ URL API centralisée (compatible local + Render)
   static String get baseUrl {
-    return Config.apiUrl;
+    final configuredUrl = Config.apiUrl.trim();
+    return configuredUrl.endsWith('/')
+        ? configuredUrl.substring(0, configuredUrl.length - 1)
+        : configuredUrl;
   }
 
   static String? token;
@@ -74,6 +77,17 @@ Future<dynamic> _handleResponse(
 
       if (data.containsKey("errors")) {
         return Future.error(Exception(data["errors"].toString()));
+      }
+
+      // Les validations Django utilisent directement le nom du champ
+      // (username, email, password...). On restitue leur message précis.
+      for (final value in data.values) {
+        if (value is List && value.isNotEmpty) {
+          return Future.error(Exception(value.join(' ')));
+        }
+        if (value is String && value.trim().isNotEmpty) {
+          return Future.error(Exception(value));
+        }
       }
     }
 
