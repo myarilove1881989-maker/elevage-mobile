@@ -3,6 +3,7 @@ import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/screens/dashboard_screen.dart';
 import 'package:app_elevage/screens/register_screen.dart';
 import 'package:app_elevage/screens/forgot_password_screen.dart';
+import 'package:app_elevage/l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiService apiService;
@@ -53,14 +54,13 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         setState(() {
-          errorMessage = "Identifiants invalides";
+          errorMessage = context.tr('invalid_credentials');
         });
       }
     } catch (e) {
       setState(() {
         isLoading = false;
-        errorMessage =
-            "Nom d'utilisateur ou mot de passe incorrect. Vérifiez vos identifiants.";
+        errorMessage = context.tr('invalid_credentials');
       });
     }
   }
@@ -93,7 +93,7 @@ const SizedBox(height: 40),
                   TextField(
                     controller: usernameController,
                     decoration: InputDecoration(
-                      labelText: "Nom d'utilisateur",
+                      labelText: context.tr('username'),
                       prefixIcon: const Icon(Icons.person_outline),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -107,12 +107,12 @@ const SizedBox(height: 40),
                     controller: passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: "Mot de passe",
+                      labelText: context.tr('password'),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         tooltip: _obscurePassword
-                            ? "Afficher le mot de passe"
-                            : "Masquer le mot de passe",
+                            ? context.tr('show_password')
+                            : context.tr('hide_password'),
                         onPressed: () => setState(
                           () => _obscurePassword = !_obscurePassword,
                         ),
@@ -143,7 +143,7 @@ const SizedBox(height: 40),
                                 ),
                               );
                             },
-                      child: const Text("Mot de passe oublié ?"),
+                      child: Text(context.tr('forgot_password')),
                     ),
                   ),
 
@@ -180,9 +180,9 @@ const SizedBox(height: 40),
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              "Se connecter",
-                              style: TextStyle(
+                          : Text(
+                              context.tr('login'),
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -205,9 +205,9 @@ const SizedBox(height: 40),
                               ),
                             );
                           },
-                    child: const Text(
-                      "Créer un compte",
-                      style: TextStyle(
+                    child: Text(
+                      context.tr('create_account'),
+                      style: const TextStyle(
                         color: Color(0xFF063B63),
                         fontWeight: FontWeight.bold,
                       ),
