@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/screens/dashboard_screen.dart';
 import 'package:app_elevage/screens/register_screen.dart';
+import 'package:app_elevage/screens/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiService apiService;
@@ -113,7 +114,24 @@ const SizedBox(height: 40),
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: isLoading
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ForgotPasswordScreen(
+                                    apiService: widget.apiService,
+                                  ),
+                                ),
+                              );
+                            },
+                      child: const Text("Mot de passe oublié ?"),
+                    ),
+                  ),
 
                   if (errorMessage.isNotEmpty)
                     Padding(
