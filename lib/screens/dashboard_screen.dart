@@ -858,8 +858,8 @@ void _addTask() {
                           ),
                           if (screenWidth >= 700) ...[
                             const SizedBox(height: 2),
-                            const Text(
-                              "Actualiser",
+                            Text(
+                              context.tr('refresh'),
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
@@ -878,7 +878,7 @@ void _addTask() {
                   // ACHATS
                   InkWell(
                     onTap: _openAchat,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -890,7 +890,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Achats",
+                            context.tr('purchases'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -918,7 +918,7 @@ void _addTask() {
                         await refreshDashboard();
                       }
                     },
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 90,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -930,7 +930,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Dépenses",
+                            context.tr('expenses'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -958,7 +958,7 @@ void _addTask() {
                         await refreshDashboard();
                       }
                     },
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 105,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -970,7 +970,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Mouvements",
+                            context.tr('movements'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -986,7 +986,7 @@ void _addTask() {
                   // FACTURATION
                   InkWell(
                     onTap: _openClients,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 92,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -998,7 +998,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Facturation",
+                            context.tr('billing'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -1014,7 +1014,7 @@ void _addTask() {
                   // HISTORIQUE
                   InkWell(
                     onTap: _openLots,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1026,7 +1026,7 @@ void _addTask() {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            "Historique",
+                            context.tr('history'),
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -1056,8 +1056,8 @@ void _addTask() {
                           ),
                           if (screenWidth >= 700) ...[
                             const SizedBox(height: 2),
-                            const Text(
-                              "Quitter",
+                            Text(
+                              context.tr('logout'),
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 11,
@@ -1092,9 +1092,9 @@ Padding(
         textAlign: TextAlign.center,
         text: TextSpan(
           children: [
-            const TextSpan(
-              text: "Tableau de bord",
-              style: TextStyle(
+            TextSpan(
+              text: context.tr('dashboard'),
+              style: const TextStyle(
                 color: Color(0xFF063B63),
                 fontSize: 42,
                 fontWeight: FontWeight.bold,
@@ -1115,8 +1115,8 @@ Padding(
 
       const SizedBox(height: 4),
 
-      const Text(
-        "Vue d’ensemble de votre exploitation",
+      Text(
+        context.tr('overview'),
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Color(0xFF607080),
@@ -1135,7 +1135,7 @@ LayoutBuilder(
       return DropdownButtonFormField<int>(
         value: selectedEspeceId ?? 0,
         decoration: InputDecoration(
-          labelText: "Espèce",
+          labelText: context.tr('species'),
           prefixIcon: const Icon(
             Icons.pets,
             color: Colors.green,
@@ -1165,9 +1165,9 @@ LayoutBuilder(
           ),
         ),
         items: [
-          const DropdownMenuItem<int>(
+          DropdownMenuItem<int>(
             value: 0,
-            child: Text("Toutes les espèces"),
+            child: Text(context.tr('all_species')),
           ),
           ...especes.map<DropdownMenuItem<int>>((e) {
             return DropdownMenuItem<int>(
@@ -1193,7 +1193,7 @@ LayoutBuilder(
       return DropdownButtonFormField<int?>(
         value: selectedLotId,
         decoration: InputDecoration(
-          labelText: "Lot",
+          labelText: context.tr('batch'),
           prefixIcon: const Icon(
             Icons.inventory_2_outlined,
             color: Color(0xFF0B4F7C),
@@ -1223,9 +1223,9 @@ LayoutBuilder(
           ),
         ),
         items: [
-          const DropdownMenuItem<int?>(
+          DropdownMenuItem<int?>(
             value: null,
-            child: Text("Tous les lots"),
+            child: Text(context.tr('all_lots')),
           ),
           ...filteredLots.map((lot) {
             return DropdownMenuItem<int?>(
@@ -1456,8 +1456,8 @@ LayoutBuilder(
                 size: 22,
               ),
               const SizedBox(width: 8),
-              const Text(
-                "Calendrier des tâches",
+              Text(
+                context.tr('task_calendar'),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -1469,7 +1469,7 @@ LayoutBuilder(
                 ElevatedButton.icon(
                   onPressed: _addTask,
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text("Ajouter"),
+                  label: Text(context.tr('add')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE8F5E9),
                     foregroundColor: const Color(0xFF168A45),
