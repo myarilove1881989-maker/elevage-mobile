@@ -175,23 +175,43 @@ final success = await widget.apiService.createAchat(
 
               const SizedBox(height: 16),
 
-              DropdownMenu<int>(
-                expandedInsets: EdgeInsets.zero,
-                enableFilter: true,
-                enableSearch: true,
-                requestFocusOnTap: true,
-                label: Text(context.tr('choose_species')),
-                hintText: context.tr('search_species'),
-                leadingIcon: const Icon(Icons.pets_outlined),
-                dropdownMenuEntries: especes
-                    .map<DropdownMenuEntry<int>>(
-                      (e) => DropdownMenuEntry<int>(
-                        value: e['id'] as int,
-                        label: e['nom'].toString(),
-                      ),
-                    )
-                    .toList(),
-                onSelected: (value) => setState(() => selectedEspece = value),
+              Autocomplete<dynamic>(
+                displayStringForOption: (option) => option['nom'].toString(),
+                optionsBuilder: (textEditingValue) {
+                  final query = textEditingValue.text.trim().toLowerCase();
+                  if (query.isEmpty) return especes;
+                  return especes.where(
+                    (item) => item['nom']
+                        .toString()
+                        .toLowerCase()
+                        .contains(query),
+                  );
+                },
+                onSelected: (option) {
+                  setState(() => selectedEspece = option['id'] as int);
+                },
+                fieldViewBuilder: (
+                  context,
+                  textEditingController,
+                  focusNode,
+                  onFieldSubmitted,
+                ) {
+                  return TextFormField(
+                    controller: textEditingController,
+                    focusNode: focusNode,
+                    onChanged: (_) => setState(() => selectedEspece = null),
+                    decoration: InputDecoration(
+                      labelText: context.tr('choose_species'),
+                      hintText: context.tr('search_species'),
+                      prefixIcon: const Icon(Icons.pets_outlined),
+                      suffixIcon: const Icon(Icons.arrow_drop_down),
+                      border: const OutlineInputBorder(),
+                    ),
+                    validator: (_) => selectedEspece == null
+                        ? context.tr('species_required')
+                        : null,
+                  );
+                },
               ),
 
               const SizedBox(height: 16),
