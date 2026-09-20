@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/api_service.dart';
 
@@ -122,21 +123,21 @@ class _CADetailScreenState extends State<CADetailScreen> {
 
     if (error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text("Erreur")),
+        appBar: AppBar(title: Text(context.tr('error'))),
         body: Center(child: Text(error!)),
       );
     }
 
     if (data.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text("CA par lot")),
-        body: const Center(child: Text("Aucune donnée")),
+        appBar: AppBar(title: Text(context.tr('revenue'))),
+        body: Center(child: Text(context.tr('no_data'))),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("CA vs Investissement"),
+        title: Text(context.tr('revenue')),
       ),
       body: Padding(
         padding: const EdgeInsets.all(12),
