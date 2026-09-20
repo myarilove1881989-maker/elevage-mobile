@@ -15,23 +15,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController cityController;
   late String language;
   late String currency;
-  late String country;
-
-  static const countries = <String>[
-    '',
-    'Cameroun',
-    'France',
-    'Ghana',
-    'Nigeria',
-    'Autre',
-  ];
+  late String countryCode;
 
   @override
   void initState() {
     super.initState();
     language = settings.languageCode;
     currency = settings.currencyCode;
-    country = countries.contains(settings.country) ? settings.country : 'Autre';
+    countryCode = settings.countryCode;
     cityController = TextEditingController(text: settings.city);
   }
 
@@ -45,7 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await settings.save(
       language: language,
       currency: currency,
-      selectedCountry: country == 'Autre' ? '' : country,
+      selectedCountryCode: countryCode,
       selectedCity: cityController.text,
     );
     if (!mounted) return;
@@ -63,20 +54,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           DropdownButtonFormField<String>(
-            value: country,
+            value: countryCode,
             decoration: InputDecoration(
               labelText: '${context.tr('country')} (${context.tr('optional')})',
               border: const OutlineInputBorder(),
             ),
-            items: countries
+            items: [
+              const CountryOption('', '—', '—', 'XAF'),
+              ...AppSettings.countries,
+            ]
                 .map(
-                  (value) => DropdownMenuItem(
-                    value: value,
-                    child: Text(value.isEmpty ? '—' : value),
+                  (item) => DropdownMenuItem(
+                    value: item.code,
+                    child: Text(item.label(language)),
                   ),
                 )
                 .toList(),
-            onChanged: (value) => setState(() => country = value ?? ''),
+            onChanged: (value) {
+              setState(() {
+                countryCode = value ?? '';
+                if (countryCode.isNotEmpty) {
+                  currency = AppSettings.countries
+                      .firstWhere((item) => item.code == countryCode)
+                      .currencyCode;
+                }
+              });
+            },
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -110,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 .map(
                   (item) => DropdownMenuItem(
                     value: item.code,
-                    child: Text('${item.label} (${item.symbol})'),
+                    child: Text('${item.label(language)} (${item.symbol})'),
                   ),
                 )
                 .toList(),
