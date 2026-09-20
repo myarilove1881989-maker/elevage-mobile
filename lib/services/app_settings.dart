@@ -79,6 +79,17 @@ class AppSettings extends ChangeNotifier {
     CountryOption('GB', 'Angleterre', 'England', 'GBP'),
   ];
 
+  static List<CountryOption> sortedCountries(String languageCode) {
+    final result = List<CountryOption>.of(countries);
+    result.sort(
+      (a, b) => a
+          .label(languageCode)
+          .toLowerCase()
+          .compareTo(b.label(languageCode).toLowerCase()),
+    );
+    return result;
+  }
+
   String languageCode = 'fr';
   String currencyCode = 'XAF';
   String countryCode = '';
