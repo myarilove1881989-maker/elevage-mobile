@@ -15,6 +15,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final usernameController = TextEditingController();
+  final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
 
@@ -23,6 +24,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> handleRegister() async {
     final username = usernameController.text.trim();
+    final email = emailController.text.trim().toLowerCase();
     final password = passwordController.text;
     final confirmPassword = confirmPasswordController.text;
 
@@ -41,6 +43,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         errorMessage =
             "Format non accepté : utilisez uniquement des lettres, chiffres ou @ . + - _.";
+      });
+      return;
+    }
+
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      setState(() {
+        errorMessage = "Saisissez une adresse e-mail valide.";
       });
       return;
     }
@@ -64,7 +73,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      await widget.apiService.register(username, password);
+      await widget.apiService.register(username, email, password);
 
       if (!mounted) return;
 
@@ -93,6 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     usernameController.dispose();
+    emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
@@ -112,6 +122,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: usernameController,
               decoration: const InputDecoration(
                 labelText: "Nom d'utilisateur",
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: const InputDecoration(
+                labelText: "Adresse e-mail",
               ),
             ),
             const SizedBox(height: 12),

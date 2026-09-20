@@ -64,6 +64,10 @@ Future<dynamic> _handleResponse(
     final data = jsonDecode(response.body);
 
     if (data is Map) {
+      if (data.containsKey("message")) {
+        return Future.error(Exception(data["message"]));
+      }
+
       if (data.containsKey("error")) {
         return Future.error(Exception(data["error"]));
       }
@@ -80,7 +84,7 @@ Future<dynamic> _handleResponse(
   }
 }
 // ================= REGISTER =================
-Future<dynamic> register(String username, String password) async {
+Future<dynamic> register(String username, String email, String password) async {
   final response = await http.post(
     Uri.parse("$baseUrl/register/"),
     headers: {
@@ -88,6 +92,7 @@ Future<dynamic> register(String username, String password) async {
     },
     body: jsonEncode({
       "username": username,
+      "email": email,
       "password": password,
     }),
   );
@@ -96,6 +101,46 @@ Future<dynamic> register(String username, String password) async {
 
   return await _handleResponse(response);
 }
+  // ================= PASSWORD RESET =================
+Future<void> requestPasswordReset(String email) async {
+  final response = await http.post(
+    Uri.parse("$baseUrl/password-reset/request/"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({"email": email}),
+  );
+  await _handleResponse(response, clearSessionOnUnauthorized: false);
+}
+
+Future<String> verifyPasswordReset(String email, String code) async {
+  final response = await http.post(
+    Uri.parse("$baseUrl/password-reset/verify/"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({"email": email, "code": code}),
+  );
+  final data = await _handleResponse(
+    response,
+    clearSessionOnUnauthorized: false,
+  );
+  return data["reset_token"] as String;
+}
+
+Future<void> confirmPasswordReset(
+  String email,
+  String resetToken,
+  String newPassword,
+) async {
+  final response = await http.post(
+    Uri.parse("$baseUrl/password-reset/confirm/"),
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "email": email,
+      "reset_token": resetToken,
+      "new_password": newPassword,
+    }),
+  );
+  await _handleResponse(response, clearSessionOnUnauthorized: false);
+}
+
   // ================= LOGIN =================
 Future<bool> login(String username, String password) async {
   final response = await http.post(
