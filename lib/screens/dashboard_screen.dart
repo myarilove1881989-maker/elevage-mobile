@@ -492,9 +492,9 @@ List<Map<String, dynamic>> _getTasksForDay() {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: Text("Tâches du ${day.day}/${day.month}"),
+      title: Text("${context.tr('today_tasks')} ${day.day}/${day.month}"),
       content: tasks.isEmpty
-          ? const Text("Aucune tâche")
+          ? Text(context.tr('no_task'))
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: tasks
@@ -514,7 +514,7 @@ List<Map<String, dynamic>> _getTasksForDay() {
   } // ferme popup
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Tâche supprimée")),
+        SnackBar(content: Text(context.tr('task_deleted'))),
       );
     },
   ),
@@ -524,7 +524,7 @@ List<Map<String, dynamic>> _getTasksForDay() {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Fermer"),
+          child: Text(context.tr('close')),
         )
       ],
     ),
@@ -536,14 +536,14 @@ void _addTask() {
   showDialog(
     context: context,
     builder: (_) => AlertDialog(
-      title: const Text("Nouvelle tâche"),
+      title: Text(context.tr('new_task')),
       content: TextField(
         onChanged: (value) => newTask = value,
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Annuler"),
+          child: Text(context.tr('cancel')),
         ),
         ElevatedButton(
           onPressed: () async {
@@ -560,7 +560,7 @@ void _addTask() {
         Navigator.pop(context);
             await loadTasks();
           },
-          child: const Text("Ajouter"),
+          child: Text(context.tr('add')),
         ),
       ],
     ),
@@ -1643,8 +1643,8 @@ Widget tasksCard = Container(
           ),
           const SizedBox(width: 8),
 
-          const Text(
-            "Tâches du jour",
+          Text(
+            context.tr('today_tasks'),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
@@ -1657,7 +1657,7 @@ Widget tasksCard = Container(
           // ================= NAVIGATION TÂCHES =================
           if (tasksForDay.length > 3) ...[
             IconButton(
-              tooltip: "Monter",
+              tooltip: context.tr('up'),
               icon: const Icon(
                 Icons.keyboard_arrow_up,
                 color: Color(0xFF0B4F7C),
@@ -1685,7 +1685,7 @@ Widget tasksCard = Container(
             ),
 
             IconButton(
-              tooltip: "Descendre",
+              tooltip: context.tr('down'),
               icon: const Icon(
                 Icons.keyboard_arrow_down,
                 color: Color(0xFF0B4F7C),
@@ -1716,7 +1716,7 @@ Widget tasksCard = Container(
           // ================= AJOUT SUR PETIT ÉCRAN =================
           if (!isLargeScreen)
             IconButton(
-              tooltip: "Ajouter une tâche",
+              tooltip: context.tr('add_task'),
               onPressed: _addTask,
               icon: const Icon(
                 Icons.add_circle,
@@ -1740,32 +1740,32 @@ Widget tasksCard = Container(
                 color: const Color(0xFFE5EAF0),
               ),
             ),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.event_available,
                   size: 34,
                   color: Color(0xFF90A4AE),
                 ),
 
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
 
                 Text(
-                  "Aucune tâche prévue",
-                  style: TextStyle(
+                  context.tr('no_task_planned'),
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF607D8B),
                   ),
                 ),
 
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
 
                 Text(
-                  "Profitez de cette journée libre.",
+                  context.tr('free_day'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF90A4AE),
                   ),
