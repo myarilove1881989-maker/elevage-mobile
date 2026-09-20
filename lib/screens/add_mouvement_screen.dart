@@ -3,6 +3,7 @@ import '../l10n/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/api_service.dart';
 import '../models/lot.dart';
+import '../theme/terre_et_or_theme.dart';
 
 class AddMouvementScreen extends StatefulWidget {
   final ApiService apiService;
@@ -246,7 +247,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
     return AbsorbPointer(
       absorbing: isSubmitting,
-      child: Scaffold(
+      child: Theme(
+        data: terreEtOrTheme(context),
+        child: Scaffold(
         appBar: AppBar(
           title: Text(context.tr('add_movement')),
         ),
@@ -255,6 +258,16 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                TerreEtOrHeader(
+                  icon: Icons.swap_horiz_rounded,
+                  title: context.tr('add_movement'),
+                  subtitle: AppSettings.instance.languageCode == 'en'
+                      ? 'Record a sale, mortality, donation or theft'
+                      : 'Enregistrez une vente, mortalité, un don ou un vol',
+                ),
+                TerreEtOrPanel(
+                  child: Column(
+                    children: [
 
                 // TYPE
                 DropdownButtonFormField<String>(
@@ -353,12 +366,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                 const SizedBox(height: 16),
 
                 // DATE
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    "Date : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
+                TerreEtOrDateTile(
+                  label: "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
@@ -409,9 +418,13 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                         : Text(context.tr('validate')),
                   ),
                 ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
+        ),
         ),
       ),
     );
