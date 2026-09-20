@@ -230,7 +230,32 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
           ? const Center(child: CircularProgressIndicator())
           : error != null
               ? Center(child: Text('${context.tr('error')}: $error'))
-              : RefreshIndicator(
+              : allRanking.isEmpty
+                  ? RefreshIndicator(
+                      onRefresh: loadData,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(24),
+                        children: [
+                          const SizedBox(height: 100),
+                          const Icon(
+                            Icons.insights_outlined,
+                            size: 64,
+                            color: TerreEtOrColors.gold,
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            context.tr('no_performance_data'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: TerreEtOrColors.muted,
+                              fontSize: 17,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
                   onRefresh: loadData,
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
