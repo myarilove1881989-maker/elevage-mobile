@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import 'client_detail_screen.dart';
 
@@ -50,17 +51,17 @@ class _ClientListScreenState extends State<ClientListScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Nouveau client"),
+        title: Text(context.tr('new_customer')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nomController,
-              decoration: const InputDecoration(hintText: "Nom"),
+              decoration: InputDecoration(hintText: context.tr('name')),
             ),
             TextField(
               controller: telController,
-              decoration: const InputDecoration(hintText: "Téléphone"),
+              decoration: InputDecoration(hintText: context.tr('phone')),
             ),
           ],
         ),
@@ -77,7 +78,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
               Navigator.pop(context);
               loadClients();
             },
-            child: const Text("Ajouter"),
+            child: Text(context.tr('add')),
           )
         ],
       ),
@@ -96,7 +97,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Clients")),
+      appBar: AppBar(title: Text(context.tr('customers'))),
 
       floatingActionButton: FloatingActionButton(
         onPressed: addClient,
@@ -112,8 +113,8 @@ class _ClientListScreenState extends State<ClientListScreen> {
                 Padding(
                   padding: const EdgeInsets.all(8),
                   child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: "Rechercher un client...",
+                decoration: InputDecoration(
+                      hintText: context.tr('search_customer'),
                       prefixIcon: Icon(Icons.search),
                       border: OutlineInputBorder(),
                     ),
@@ -128,7 +129,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
                 // 📋 LISTE
                 Expanded(
                   child: filteredClients.isEmpty
-                      ? const Center(child: Text("Aucun client trouvé"))
+                      ? Center(child: Text(context.tr('no_customer')))
                       : ListView.builder(
                           itemCount: filteredClients.length,
                           itemBuilder: (_, i) {
