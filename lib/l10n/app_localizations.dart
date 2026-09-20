@@ -121,6 +121,10 @@ class AppLocalizations {
       'close': 'Fermer',
       'up': 'Monter',
       'down': 'Descendre',
+      'sale': 'Vente',
+      'mortality': 'Mortalité',
+      'donation': 'Don',
+      'theft': 'Vol',
     },
     'en': {
       'refresh': 'Refresh',
@@ -234,6 +238,10 @@ class AppLocalizations {
       'close': 'Close',
       'up': 'Scroll up',
       'down': 'Scroll down',
+      'sale': 'Sale',
+      'mortality': 'Mortality',
+      'donation': 'Donation',
+      'theft': 'Theft',
     },
   };
 
