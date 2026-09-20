@@ -114,6 +114,13 @@ class AppLocalizations {
       'start_date': 'Date de début',
       'created_on': 'Créé le',
       'total': 'Total',
+      'no_task': 'Aucune tâche',
+      'no_task_planned': 'Aucune tâche prévue',
+      'free_day': 'Profitez de cette journée libre.',
+      'new_task': 'Nouvelle tâche',
+      'close': 'Fermer',
+      'up': 'Monter',
+      'down': 'Descendre',
     },
     'en': {
       'refresh': 'Refresh',
@@ -220,6 +227,13 @@ class AppLocalizations {
       'start_date': 'Start date',
       'created_on': 'Created on',
       'total': 'Total',
+      'no_task': 'No task',
+      'no_task_planned': 'No task planned',
+      'free_day': 'Enjoy your free day.',
+      'new_task': 'New task',
+      'close': 'Close',
+      'up': 'Scroll up',
+      'down': 'Scroll down',
     },
   };
 
