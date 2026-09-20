@@ -20,6 +20,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final confirmPasswordController = TextEditingController();
 
   bool isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmation = true;
   String errorMessage = '';
 
   Future<void> handleRegister() async {
@@ -136,17 +138,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
                 labelText: "Mot de passe",
+                suffixIcon: IconButton(
+                  tooltip: _obscurePassword
+                      ? "Afficher le mot de passe"
+                      : "Masquer le mot de passe",
+                  onPressed: () => setState(
+                    () => _obscurePassword = !_obscurePassword,
+                  ),
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: confirmPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
+              obscureText: _obscureConfirmation,
+              decoration: InputDecoration(
                 labelText: "Confirmer le mot de passe",
+                suffixIcon: IconButton(
+                  tooltip: _obscureConfirmation
+                      ? "Afficher le mot de passe"
+                      : "Masquer le mot de passe",
+                  onPressed: () => setState(
+                    () => _obscureConfirmation = !_obscureConfirmation,
+                  ),
+                  icon: Icon(
+                    _obscureConfirmation
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 20),

@@ -555,6 +555,122 @@ void _addTask() {
   );
 }
 
+  Future<void> _refreshAll() async {
+    setState(() => isLoading = true);
+    await refreshDashboard();
+    await fetchEspeces();
+    await loadTasks();
+    if (!mounted) return;
+    setState(() => isLoading = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Données mises à jour")),
+    );
+  }
+
+  Future<void> _openLots() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LotListScreen(apiService: apiService)),
+    );
+    if (result == true) await refreshDashboard();
+  }
+
+  Future<void> _openDepense() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddDepenseScreen(apiService: apiService)),
+    );
+    if (result == true) await refreshDashboard();
+  }
+
+  Future<void> _openMouvement() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddMouvementScreen(apiService: apiService)),
+    );
+    if (result == true) await refreshDashboard();
+  }
+
+  Future<void> _openAchat() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => AddAchatScreen(apiService: apiService)),
+    );
+    if (result == true) await refreshDashboard();
+  }
+
+  void _openClients() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ClientListScreen(apiService: apiService)),
+    );
+  }
+
+  Widget _brandTitle() {
+    return RichText(
+      text: const TextSpan(
+        children: [
+          TextSpan(
+            text: "Elev'",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+          ),
+          TextSpan(
+            text: "Age",
+            style: TextStyle(
+              color: Color(0xFF4CAF50),
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navigationDrawer() {
+    Widget item(String label, IconData icon, VoidCallback action) {
+      return ListTile(
+        leading: Icon(icon, color: const Color(0xFF063B63)),
+        title: Text(label),
+        onTap: () {
+          Navigator.pop(context);
+          action();
+        },
+      );
+    }
+
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              color: const Color(0xFF063B63),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+              child: _brandTitle(),
+            ),
+            item("Lots", Icons.inventory_2_outlined, () => _openLots()),
+            item("Dépense", Icons.shopping_cart_outlined, () => _openDepense()),
+            item(
+              "Mouvement",
+              Icons.swap_horiz,
+              () => _openMouvement(),
+            ),
+            item("Achat", Icons.shopping_bag_outlined, () => _openAchat()),
+            item("Clients", Icons.people_outline, _openClients),
+            const Spacer(),
+            const Divider(height: 1),
+            item("Quitter", Icons.logout, _logout),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _tasksScrollController.dispose();
@@ -638,9 +754,13 @@ void _addTask() {
 
     final kpis = data?["kpis"] ?? {};
     final filteredLots = getFilteredLots();
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final showNavActions = screenWidth >= 1100;
 
     return Scaffold(
+      drawer: _navigationDrawer(),
       appBar: AppBar(
+  automaticallyImplyLeading: false,
   backgroundColor: const Color(0xFF063B63),
   foregroundColor: Colors.white,
   elevation: 0,
@@ -655,41 +775,15 @@ void _addTask() {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Trois barres décoratives
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 22,
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Container(
-                      width: 22,
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Container(
-                      width: 22,
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ],
+                Builder(
+                  builder: (menuContext) => IconButton(
+                    tooltip: "Ouvrir le menu",
+                    icon: const Icon(Icons.menu, size: 30),
+                    onPressed: () => Scaffold.of(menuContext).openDrawer(),
+                  ),
                 ),
 
-                const SizedBox(width: 16),
+                const SizedBox(width: 6),
 
                 RichText(
                   text: const TextSpan(
@@ -717,7 +811,7 @@ void _addTask() {
             ),
 
             // Espace entre le logo et les boutons
-            const SizedBox(width: 40),
+            const SizedBox(width: 8),
 
             // =========================
             // NAVIGATION
@@ -730,46 +824,35 @@ void _addTask() {
 
                   // ACTUALISER
                   InkWell(
-                    onTap: () async {
-                      setState(() => isLoading = true);
-
-                      await refreshDashboard();
-                      await fetchEspeces();
-                      await loadTasks();
-
-                      setState(() => isLoading = false);
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Données mises à jour"),
-                        ),
-                      );
-                    },
-                    child: const SizedBox(
-                      width: 95,
+                    onTap: _refreshAll,
+                    child: SizedBox(
+                      width: screenWidth < 700 ? 44 : 76,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.refresh,
                             color: Colors.white,
-                            size: 30,
+                            size: 27,
                           ),
-                          SizedBox(height: 3),
-                          Text(
-                            "Actualiser",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
+                          if (screenWidth >= 700) ...[
+                            const SizedBox(height: 2),
+                            const Text(
+                              "Actualiser",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
+                          ],
                         ],
                       ),
                     ),
                   ),
 
-                  const SizedBox(width: 18),
+                  if (showNavActions) ...[
+                  const SizedBox(width: 8),
 
                   // LOTS
                   InkWell(
@@ -965,29 +1048,33 @@ void _addTask() {
                     ),
                   ),
 
-                  const SizedBox(width: 18),
+                  ],
+
+                  const SizedBox(width: 4),
 
                   // DÉCONNEXION
                   InkWell(
                     onTap: _logout,
-                    child: const SizedBox(
-                      width: 82,
+                    child: SizedBox(
+                      width: screenWidth < 700 ? 44 : 64,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.logout,
                             color: Colors.white70,
                             size: 25,
                           ),
-                          SizedBox(height: 3),
-                          Text(
-                            "Quitter",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+                          if (screenWidth >= 700) ...[
+                            const SizedBox(height: 2),
+                            const Text(
+                              "Quitter",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
