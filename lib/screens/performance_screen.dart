@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 
 class PerformanceScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Performance des lots")),
+      appBar: AppBar(title: Text(context.tr('performance'))),
       body: ListView.builder(
         itemCount: data.length,
         itemBuilder: (context, index) {
@@ -62,7 +63,7 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
                 ),
               ),
               title: Text(lot["nom"]),
-              subtitle: Text("Marge: ${lot["marge"]}"),
+              subtitle: Text("${context.tr('margin')}: ${lot["marge"]}"),
               trailing: Text(
                 "${r.toStringAsFixed(1)} %",
                 style: TextStyle(
