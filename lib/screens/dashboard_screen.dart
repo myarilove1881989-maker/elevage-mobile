@@ -22,6 +22,9 @@ import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
 import 'package:app_elevage/screens/performance_screen.dart';
 import 'package:app_elevage/screens/login_screen.dart';
+import 'package:app_elevage/screens/settings_screen.dart';
+import 'package:app_elevage/l10n/app_localizations.dart';
+import 'package:app_elevage/services/app_settings.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
@@ -310,24 +313,16 @@ String getDateKey(DateTime date) {
   );
 }
   Widget buildCard(
-  String title,
-  dynamic value,
-  IconData icon,
-  Color color,
-  VoidCallback? onTap,
-) {
-  String subtitle = "";
-
-  if (title == "Stock total") {
-    subtitle = "Unités";
-  } else if (title == "Chiffre d'affaires" ||
-      title == "Dépenses" ||
-      title == "Marge" ||
-      title == "Solde clients") {
-    subtitle = "FCFA";
-  } else if (title == "Performance") {
-    subtitle = "Marge / CA";
-  }
+    String title,
+    dynamic value,
+    IconData icon,
+    Color color,
+    VoidCallback? onTap, {
+    bool isMoney = false,
+    String? unit,
+  }) {
+    final subtitle =
+        unit ?? (isMoney ? AppSettings.instance.currency.symbol : '');
 
   return Material(
     color: Colors.white,
@@ -394,7 +389,12 @@ String getDateKey(DateTime date) {
                   const SizedBox(height: 4),
 
                   Text(
-                    value.toString(),
+                    isMoney
+                        ? AppSettings.instance.formatMoney(value).replaceAll(
+                              AppSettings.instance.currency.symbol,
+                              '',
+                            ).trim()
+                        : value.toString(),
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -575,7 +575,7 @@ void _addTask() {
     if (!mounted) return;
     setState(() => isLoading = false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Données mises à jour")),
+      SnackBar(content: Text(context.tr('data_updated'))),
     );
   }
 
@@ -616,6 +616,14 @@ void _addTask() {
       context,
       MaterialPageRoute(builder: (_) => ClientListScreen(apiService: apiService)),
     );
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    if (mounted) setState(() {});
   }
 
   Widget _brandTitle() {
@@ -665,18 +673,19 @@ void _addTask() {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: _brandTitle(),
             ),
-            item("Achats", Icons.shopping_bag_outlined, () => _openAchat()),
-            item("Dépenses", Icons.shopping_cart_outlined, () => _openDepense()),
+            item(context.tr('purchases'), Icons.shopping_bag_outlined, () => _openAchat()),
+            item(context.tr('expenses'), Icons.shopping_cart_outlined, () => _openDepense()),
             item(
-              "Mouvements",
+              context.tr('movements'),
               Icons.swap_horiz,
               () => _openMouvement(),
             ),
-            item("Facturation", Icons.receipt_long_outlined, _openClients),
-            item("Historique", Icons.history, () => _openLots()),
+            item(context.tr('billing'), Icons.receipt_long_outlined, _openClients),
+            item(context.tr('history'), Icons.history, () => _openLots()),
+            item(context.tr('settings'), Icons.settings_outlined, _openSettings),
             const Spacer(),
             const Divider(height: 1),
-            item("Quitter", Icons.logout, _logout),
+            item(context.tr('logout'), Icons.logout, _logout),
           ],
         ),
       ),
@@ -789,7 +798,7 @@ void _addTask() {
               children: [
                 Builder(
                   builder: (menuContext) => IconButton(
-                    tooltip: "Ouvrir le menu",
+                    tooltip: context.tr('open_menu'),
                     icon: const Icon(Icons.menu, size: 30),
                     onPressed: () => Scaffold.of(menuContext).openDrawer(),
                   ),
@@ -1304,13 +1313,13 @@ if (constraints.maxWidth >= 1400) {
       childAspectRatio: cardRatio,
       children: [
         buildCard(
-          "Stock total",
+          context.tr('stock_total'),
           kpis["stock"] ?? kpis["stock_total"] ?? 0,
           Icons.inventory_2,
           Colors.green,
           () {
             if (selectedLotId == null) {
-              showError("Choisis un lot");
+              showError(context.tr('choose_lot'));
               return;
             }
 
@@ -1324,16 +1333,17 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          unit: context.tr('units'),
         ),
 
         buildCard(
-          "Chiffre d'affaires",
+          context.tr('revenue'),
           kpis["chiffre_affaires"] ?? 0,
           Icons.trending_up,
           Colors.blue,
           () {
             if (selectedEspeceId == null) {
-              showError("Choisis une espèce");
+              showError(context.tr('species_required'));
               return;
             }
 
@@ -1347,16 +1357,17 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          isMoney: true,
         ),
 
         buildCard(
-          "Dépenses",
+          context.tr('expenses'),
           kpis["depenses"] ?? 0,
           Icons.account_balance_wallet,
           Colors.orange,
           () {
             if (selectedLotId == null) {
-              showError("Choisis un lot");
+              showError(context.tr('choose_lot'));
               return;
             }
 
@@ -1370,10 +1381,11 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          isMoney: true,
         ),
 
         buildCard(
-          "Performance",
+          context.tr('performance'),
           kpis["performance"] ?? 0,
           Icons.pie_chart,
           Colors.deepPurple,
@@ -1387,10 +1399,11 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          unit: context.tr('margin_revenue'),
         ),
 
         buildCard(
-          "Solde clients",
+          context.tr('client_balance'),
           totalDettes,
           Icons.credit_card,
           Colors.teal,
@@ -1404,6 +1417,7 @@ if (constraints.maxWidth >= 1400) {
               ),
             );
           },
+          isMoney: true,
         ),
       ],
     );
