@@ -512,6 +512,12 @@ Future<dynamic> post(String endpoint, Map<String, dynamic> data) async {
   return res;
 }
 
+  Future<Map<String, dynamic>> getSpeciesPerformance({int? speciesId}) async {
+    final suffix = speciesId == null ? '' : '?espece=$speciesId';
+    final res = await get('/performance-especes/$suffix');
+    return Map<String, dynamic>.from(res as Map);
+  }
+
   Future<List<dynamic>> getTasks() async {
   final response = await http.get(
     Uri.parse("$baseUrl/tasks/"),
