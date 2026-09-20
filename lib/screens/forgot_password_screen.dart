@@ -23,6 +23,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   int step = 0;
   bool isLoading = false;
   bool hidePassword = true;
+  bool hideConfirmation = true;
   String errorMessage = '';
   String? resetToken;
 
@@ -210,11 +211,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const SizedBox(height: 14),
                     TextField(
                       controller: confirmPasswordController,
-                      obscureText: hidePassword,
-                      decoration: const InputDecoration(
+                      obscureText: hideConfirmation,
+                      decoration: InputDecoration(
                         labelText: "Confirmer le mot de passe",
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          tooltip: hideConfirmation
+                              ? "Afficher le mot de passe"
+                              : "Masquer le mot de passe",
+                          onPressed: () => setState(
+                            () => hideConfirmation = !hideConfirmation,
+                          ),
+                          icon: Icon(
+                            hideConfirmation
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                        ),
                       ),
                     ),
                   ],
