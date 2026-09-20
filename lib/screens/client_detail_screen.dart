@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -123,7 +124,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             children: [
               Icon(Icons.payment),
               SizedBox(width: 10),
-              Text("Enregistrer un paiement"),
+              Text(context.tr('save_payment')),
             ],
           ),
           content: Column(
@@ -165,8 +166,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: const InputDecoration(
-                  labelText: "Montant",
+                decoration: InputDecoration(
+                  labelText: context.tr('amount'),
                   hintText: "Ex : 50000",
                   prefixIcon: Icon(Icons.euro),
                   border: OutlineInputBorder(),
@@ -185,7 +186,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                               resteVente.toStringAsFixed(2);
                         },
                   icon: const Icon(Icons.flash_on),
-                  label: const Text("Payer le reste"),
+                  label: Text(context.tr('pay_balance')),
                 ),
               ),
             ],
@@ -197,7 +198,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                   : () {
                       Navigator.pop(context);
                     },
-              child: const Text("Annuler"),
+              child: Text(context.tr('cancel')),
             ),
 
             ElevatedButton(
@@ -209,7 +210,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
                       if (montant == null || montant <= 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
+                          SnackBar(
                             content: Text(
                               "Veuillez saisir un montant valide",
                             ),
@@ -251,8 +252,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                         if (!mounted) return;
 
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Paiement enregistré"),
+                          SnackBar(
+                            content: Text(context.tr('payment_saved')),
                           ),
                         );
                       } catch (e) {
@@ -281,7 +282,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                         strokeWidth: 2,
                       ),
                     )
-                  : const Text("Valider"),
+                  : Text(context.tr('validate')),
             ),
           ],
         );
@@ -393,7 +394,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
               OutlinedButton.icon(
                 onPressed: appeler,
                 icon: const Icon(Icons.phone, size: 18),
-                label: const Text("Appeler"),
+                label: Text(context.tr('call')),
               ),
               const SizedBox(width: 10),
               OutlinedButton.icon(
@@ -690,7 +691,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         reste,
       ),
       icon: const Icon(Icons.payment, size: 18),
-      label: const Text("Payer"),
+      label: Text(context.tr('pay')),
     ),
   ),
 ],
