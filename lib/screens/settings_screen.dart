@@ -61,7 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             items: [
               const CountryOption('', '—', '—', 'XAF'),
-              ...AppSettings.countries,
+              ...AppSettings.sortedCountries(language),
             ]
                 .map(
                   (item) => DropdownMenuItem(
