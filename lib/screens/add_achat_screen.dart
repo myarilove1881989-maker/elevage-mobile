@@ -175,12 +175,13 @@ final success = await widget.apiService.createAchat(
 
               const SizedBox(height: 16),
 
-              Autocomplete<dynamic>(
+              Autocomplete<Map<String, dynamic>>(
                 displayStringForOption: (option) => option['nom'].toString(),
                 optionsBuilder: (textEditingValue) {
                   final query = textEditingValue.text.trim().toLowerCase();
-                  if (query.isEmpty) return especes;
-                  return especes.where(
+                  final options = especes.cast<Map<String, dynamic>>();
+                  if (query.isEmpty) return options;
+                  return options.where(
                     (item) => item['nom']
                         .toString()
                         .toLowerCase()
