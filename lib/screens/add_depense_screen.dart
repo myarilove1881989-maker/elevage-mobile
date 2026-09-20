@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/api_service.dart';
+import '../theme/terre_et_or_theme.dart';
 
 class AddDepenseScreen extends StatefulWidget {
   final ApiService apiService;
@@ -156,7 +157,9 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
       );
     }
 
-    return Scaffold(
+    return Theme(
+      data: terreEtOrTheme(context),
+      child: Scaffold(
       appBar: AppBar(
         title: Text(context.tr('add_expense')),
       ),
@@ -166,6 +169,16 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
         child: SingleChildScrollView(
           child: Column(
             children: [
+              TerreEtOrHeader(
+                icon: Icons.account_balance_wallet_outlined,
+                title: context.tr('add_expense'),
+                subtitle: AppSettings.instance.languageCode == 'en'
+                    ? 'Record an expense linked to a batch'
+                    : 'Enregistrez une charge liée à un lot',
+              ),
+              TerreEtOrPanel(
+                child: Column(
+                  children: [
 
               // ================= LOT =================
               DropdownButtonFormField<int>(
@@ -210,12 +223,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
               const SizedBox(height: 16),
 
               // ================= DATE =================
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  "Date : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                ),
-                trailing: const Icon(Icons.calendar_today),
+              TerreEtOrDateTile(
+                label: "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
                 onTap: pickDate,
               ),
 
@@ -261,9 +270,13 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                       : Text(context.tr('save')),
                 ),
               ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
+      ),
       ),
     );
   }
