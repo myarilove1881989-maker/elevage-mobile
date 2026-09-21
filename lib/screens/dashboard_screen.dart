@@ -651,9 +651,12 @@ void _addTask() {
     if (mounted) setState(() {});
   }
 
-  Future<void> _openTutorial() async {
+  Future<void> _openTutorial(String languageCode) async {
+    final fileName = languageCode == 'en'
+        ? 'elevage-user-guide-en.pdf'
+        : 'guide-utilisateur-elevage.pdf';
     final tutorialUrl = Uri.parse(
-      'https://elevage-mobile.onrender.com/guide-utilisateur-elevage.pdf',
+      'https://elevage-mobile.onrender.com/$fileName',
     );
 
     final opened = await launchUrl(
@@ -665,6 +668,50 @@ void _addTask() {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.tr('tutorial_open_error'))),
       );
+    }
+  }
+
+  Future<void> _chooseTutorialLanguage() async {
+    final languageCode = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+                child: Text(
+                  context.tr('choose_tutorial_language'),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: const Color(0xFF063B63),
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+              ListTile(
+                leading: const CircleAvatar(child: Text('FR')),
+                title: Text(context.tr('tutorial_french')),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => Navigator.pop(sheetContext, 'fr'),
+              ),
+              ListTile(
+                leading: const CircleAvatar(child: Text('EN')),
+                title: Text(context.tr('tutorial_english')),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => Navigator.pop(sheetContext, 'en'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (languageCode != null && mounted) {
+      await _openTutorial(languageCode);
     }
   }
 
@@ -725,7 +772,11 @@ void _addTask() {
             item(context.tr('billing'), Icons.receipt_long_outlined, _openClients),
             item(context.tr('history'), Icons.history, () => _openLots()),
             item(context.tr('settings'), Icons.settings_outlined, _openSettings),
-            item(context.tr('tutorial'), Icons.menu_book_outlined, _openTutorial),
+            item(
+              context.tr('tutorial'),
+              Icons.menu_book_outlined,
+              _chooseTutorialLanguage,
+            ),
             const Spacer(),
             const Divider(height: 1),
             item(context.tr('logout'), Icons.logout, _logout),
