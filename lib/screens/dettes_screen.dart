@@ -41,6 +41,117 @@ class _DettesScreenState extends State<DettesScreen> {
     ]))));
   }
 
-  Widget _clientCard(DetteClient c){final statusColor=color(c.statut);return Card(margin:const EdgeInsets.only(bottom:10),elevation:0,child:InkWell(borderRadius:BorderRadius.circular(16),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ClientDetailScreen(clientId:c.id,nom:c.nom,telephone:c.telephone??''))),child:Padding(padding:const EdgeInsets.all(14),child:LayoutBuilder(builder:(context,constraints){final compact=constraints.maxWidth<600;final identity=Row(children:[CircleAvatar(backgroundColor:statusColor.withValues(alpha:.13),child:Icon(Icons.person_outline,color:statusColor)),const SizedBox(width:11),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(c.nom,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:16)),if((c.telephone??'').isNotEmpty)Text(c.telephone??'',style:const TextStyle(color:TerreEtOrColors.muted,fontSize:12))]))]);final amounts=Row(children:[Expanded(child:_amount('Facturé',c.totalFacture,const Color(0xFF3D7FA1))),Expanded(child:_amount('Payé',c.totalPaye,TerreEtOrColors.green)),Expanded(child:_amount('Reste',c.reste,statusColor)),Container(padding:const EdgeInsets.symmetric(horizontal:9,vertical:5),decoration:BoxDecoration(color:statusColor.withValues(alpha:.12),borderRadius:BorderRadius.circular(20)),child:Text(c.statut,style:TextStyle(color:statusColor,fontWeight:FontWeight.bold,fontSize:11)))]);return compact?Column(children:[identity,const SizedBox(height:12),amounts]):Row(children:[SizedBox(width:230,child:identity),const SizedBox(width:16),Expanded(child:amounts)]);})))));}
+  Widget _clientCard(DetteClient client) {
+    final statusColor = color(client.statut);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ClientDetailScreen(
+              clientId: client.id,
+              nom: client.nom,
+              telephone: client.telephone ?? '',
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 600;
+              final identity = Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: statusColor.withValues(alpha: .13),
+                    child: Icon(Icons.person_outline, color: statusColor),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          client.nom,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if ((client.telephone ?? '').isNotEmpty)
+                          Text(
+                            client.telephone ?? '',
+                            style: const TextStyle(
+                              color: TerreEtOrColors.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+              final amounts = Row(
+                children: [
+                  Expanded(
+                    child: _amount(
+                      'Facturé',
+                      client.totalFacture,
+                      const Color(0xFF3D7FA1),
+                    ),
+                  ),
+                  Expanded(
+                    child: _amount(
+                      'Payé',
+                      client.totalPaye,
+                      TerreEtOrColors.green,
+                    ),
+                  ),
+                  Expanded(
+                    child: _amount('Reste', client.reste, statusColor),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      client.statut,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+
+              if (compact) {
+                return Column(
+                  children: [identity, const SizedBox(height: 12), amounts],
+                );
+              }
+              return Row(
+                children: [
+                  SizedBox(width: 230, child: identity),
+                  const SizedBox(width: 16),
+                  Expanded(child: amounts),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
   Widget _amount(String label,double value,Color color)=>Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(label,style:const TextStyle(color:TerreEtOrColors.muted,fontSize:11)),const SizedBox(height:3),FittedBox(fit:BoxFit.scaleDown,alignment:Alignment.centerLeft,child:Text(money(value),style:TextStyle(color:color,fontWeight:FontWeight.bold)))]);
 }
