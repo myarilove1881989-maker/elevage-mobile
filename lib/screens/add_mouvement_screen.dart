@@ -106,55 +106,100 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   Future<void> showCreateClientDialog() async {
     final nomController = TextEditingController();
     final telController = TextEditingController();
+    final villeController = TextEditingController();
+    var pays = AppSettings.instance.countryCode;
 
-    showDialog(
+    await showDialog(
       context: context,
-      builder: (_) {
-        return AlertDialog(
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(context.tr('new_customer')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nomController,
-                decoration: InputDecoration(labelText: context.tr('name')),
-              ),
-              TextField(
-                controller: telController,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(labelText: context.tr('phone')),
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nomController,
+                  decoration: InputDecoration(labelText: context.tr('name')),
+                ),
+                TextField(
+                  controller: telController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(labelText: context.tr('phone')),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: pays.isEmpty ? null : pays,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText:
+                        '${context.tr('country')} (${context.tr('optional')})',
+                  ),
+                  items: AppSettings.sortedCountries(
+                    AppSettings.instance.languageCode,
+                  )
+                      .map(
+                        (country) => DropdownMenuItem<String>(
+                          value: country.code,
+                          child: Text(
+                            country.label(AppSettings.instance.languageCode),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setDialogState(() => pays = value ?? '');
+                  },
+                ),
+                TextField(
+                  controller: villeController,
+                  decoration: InputDecoration(
+                    labelText:
+                        '${context.tr('city')} (${context.tr('optional')})',
+                  ),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
               child: Text(context.tr('cancel')),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
             ),
             ElevatedButton(
               child: Text(context.tr('add')),
               onPressed: () async {
-                if (nomController.text.isEmpty ||
-                    telController.text.isEmpty) {
+                final nom = nomController.text.trim();
+                final telephone = telController.text.trim();
+
+                if (nom.isEmpty || telephone.isEmpty) {
                   showMessage("Tous les champs sont obligatoires");
                   return;
                 }
 
                 await widget.apiService.createClient(
-                  nomController.text,
-                  telController.text,
+                  nom,
+                  telephone,
+                  pays: pays,
+                  ville: villeController.text.trim(),
                 );
 
-                Navigator.pop(context);
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
                 await fetchData();
 
+                if (!mounted) return;
                 showMessage("Client créé");
               },
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
+
+    nomController.dispose();
+    telController.dispose();
+    villeController.dispose();
   }
 
   // ================= SUBMIT =================
