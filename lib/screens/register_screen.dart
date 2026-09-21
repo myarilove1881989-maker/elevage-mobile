@@ -96,8 +96,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       setState(() {
         isLoading = false;
-        errorMessage =
-            "Impossible de créer le compte. Vérifiez le format du nom d'utilisateur et choisissez-en un autre s'il est déjà utilisé.";
+        errorMessage = e
+            .toString()
+            .replaceFirst('Exception: ', '')
+            .replaceFirst(RegExp(r'^\[|\]$'), '');
       });
     }
   }

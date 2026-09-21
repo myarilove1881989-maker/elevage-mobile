@@ -45,6 +45,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List lots = [];
   List especes = [];
 
+  int? _intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  List _createdSpecies(List allSpecies, List currentLots) {
+    final createdIds = currentLots
+        .map((lot) => _intValue(lot['espece']))
+        .whereType<int>()
+        .toSet();
+
+    return allSpecies
+        .where((species) => createdIds.contains(_intValue(species['id'])))
+        .toList();
+  }
+
   int? selectedLotId;
   int? selectedEspeceId;
 
@@ -146,7 +163,7 @@ String getDateKey(DateTime date) {
     setState(() {
       data = results[0] as Map<String, dynamic>;
       lots = results[1] as List;
-      especes = results[2] as List;
+      especes = _createdSpecies(results[2] as List, lots);
     
       // ?? tasks
       final rawTasks = results[3] as List;
@@ -250,7 +267,14 @@ String getDateKey(DateTime date) {
     if (!mounted) return;
 
     setState(() {
-      especes = result;
+      especes = _createdSpecies(result, lots);
+
+      if (selectedEspeceId != null &&
+          !especes.any((species) =>
+              _intValue(species['id']) == selectedEspeceId)) {
+        selectedEspeceId = null;
+        selectedLotId = null;
+      }
     });
   } catch (e) {
     print("? especes error: $e");
@@ -448,7 +472,7 @@ String getDateKey(DateTime date) {
     if (selectedEspeceId == null) return lots;
 
     return lots.where((lot) {
-      return lot["espece"] == selectedEspeceId;
+      return _intValue(lot["espece"]) == selectedEspeceId;
     }).toList();
   }
 
@@ -1171,7 +1195,7 @@ LayoutBuilder(
           ),
           ...especes.map<DropdownMenuItem<int>>((e) {
             return DropdownMenuItem<int>(
-              value: e["id"] as int,
+              value: _intValue(e["id"])!,
               child: Text(e["nom"].toString()),
             );
           }),
