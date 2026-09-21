@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../services/invoice_pdf_service.dart';
 import '../theme/terre_et_or_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -398,6 +399,45 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     );
   }
 
+  Future<void> openInvoice(dynamic sale) async {
+    final languageCode = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Choisir la langue de la facture', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ListTile(
+              leading: const CircleAvatar(child: Text('FR')),
+              title: const Text('Facture en français'),
+              trailing: const Icon(Icons.picture_as_pdf_outlined),
+              onTap: () => Navigator.pop(sheetContext, 'fr'),
+            ),
+            ListTile(
+              leading: const CircleAvatar(child: Text('EN')),
+              title: const Text('Invoice in English'),
+              trailing: const Icon(Icons.picture_as_pdf_outlined),
+              onTap: () => Navigator.pop(sheetContext, 'en'),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+
+    if (languageCode == null || !mounted) return;
+
+    await InvoicePdfService.openInvoice(
+      sale: Map<String, dynamic>.from(sale as Map),
+      customerName: widget.nom,
+      customerPhone: widget.telephone,
+      languageCode: languageCode,
+    );
+  }
+
   Widget buildSummaryCard({
     required String title,
     required double value,
@@ -634,6 +674,17 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 ),
               ],
             ),
+            if (montantPaye > 0) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => openInvoice(v),
+                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                  label: Text(status == 'PAYE' ? 'Facture payée' : 'Facture partielle'),
+                ),
+              ),
+            ],
             if (reste > 0) ...[
   const SizedBox(height: 12),
 
