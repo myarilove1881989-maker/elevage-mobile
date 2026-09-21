@@ -18,7 +18,20 @@ class _LotDetailScreenState extends State<LotDetailScreen>{
   Future<void> fetchLot() async{try{final result=await widget.apiService.getLotDetail(widget.lotId);if(!mounted)return;setState((){lot=result;isLoading=false;});}catch(_){if(mounted)setState(()=>isLoading=false);}}
   Future<bool> confirmDelete() async=>await showDialog<bool>(context:context,builder:(_)=>AlertDialog(title:Text(context.tr('confirmation')),content:Text(context.tr('delete_item')),actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:Text(context.tr('cancel'))),TextButton(onPressed:()=>Navigator.pop(context,true),child:Text(context.tr('delete')))]))??false;
   void message(String value)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(value)));
-  double numValue(dynamic v)=>(v as num?)?.toDouble()??0;
+  double numValue(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value.replaceAll(',', '.').trim()) ?? 0;
+    }
+    return 0;
+  }
+
+  int? intValue(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
+  }
   String money(dynamic v)=>AppSettings.instance.formatMoney(numValue(v),decimals:0);
 
   @override Widget build(BuildContext context){
@@ -42,9 +55,9 @@ class _LotDetailScreenState extends State<LotDetailScreen>{
       const SizedBox(height:14),
       DetailSection(title:'Historique du lot',subtitle:'Achats, mouvements et dépenses',child:Column(children:[
         if(purchases.isEmpty&&movements.isEmpty&&expenses.isEmpty)Text(context.tr('no_data')),
-        ...purchases.map((a)=>_event(icon:Icons.shopping_bag_outlined,color:TerreEtOrColors.gold,title:context.tr('purchase'),subtitle:'${a['quantite']??0} unités · ${money(a['prix_total'])}',date:a['date']?.toString()??'',onDelete:()async{if(!await confirmDelete())return;final id=a['id'];if(id==null)return;if(await widget.apiService.deleteAchat((id as num).toInt())){if(mounted){message('Lot supprimé');Navigator.pop(context,true);}}})),
-        ...movements.map((m)=>_event(icon:Icons.swap_horiz,color:_movementColor(m['type_mouvement']?.toString()),title:m['type_mouvement']?.toString()??'Mouvement',subtitle:'${m['quantite']??0} unités${m['prix_unitaire']!=null?' · PU ${money(m['prix_unitaire'])}':''}',date:m['date']?.toString()??'',onDelete:()async{if(!await confirmDelete())return;final id=m['id'];if(id!=null&&await widget.apiService.deleteMouvement((id as num).toInt())){message('Supprimé');fetchLot();}})),
-        ...expenses.map((d)=>_event(icon:Icons.receipt_long_outlined,color:const Color(0xFFD85B4B),title:d['categorie_nom']?.toString()??'Dépense',subtitle:money(d['montant']),date:d['date']?.toString()??'',onDelete:()async{if(!await confirmDelete())return;final id=d['id'];if(id!=null&&await widget.apiService.deleteDepense((id as num).toInt())){message('Supprimé');fetchLot();}})),
+        ...purchases.map((a)=>_event(icon:Icons.shopping_bag_outlined,color:TerreEtOrColors.gold,title:context.tr('purchase'),subtitle:'${a['quantite']??0} unités · ${money(a['prix_total'])}',date:a['date']?.toString()??'',onDelete:()async{if(!await confirmDelete())return;final id=intValue(a['id']);if(id==null)return;if(await widget.apiService.deleteAchat(id)){if(mounted){message('Lot supprimé');Navigator.pop(context,true);}}})),
+        ...movements.map((m)=>_event(icon:Icons.swap_horiz,color:_movementColor(m['type_mouvement']?.toString()),title:m['type_mouvement']?.toString()??'Mouvement',subtitle:'${m['quantite']??0} unités${m['prix_unitaire']!=null?' · PU ${money(m['prix_unitaire'])}':''}',date:m['date']?.toString()??'',onDelete:()async{if(!await confirmDelete())return;final id=intValue(m['id']);if(id!=null&&await widget.apiService.deleteMouvement(id)){message('Supprimé');fetchLot();}})),
+        ...expenses.map((d)=>_event(icon:Icons.receipt_long_outlined,color:const Color(0xFFD85B4B),title:d['categorie_nom']?.toString()??'Dépense',subtitle:money(d['montant']),date:d['date']?.toString()??'',onDelete:()async{if(!await confirmDelete())return;final id=intValue(d['id']);if(id!=null&&await widget.apiService.deleteDepense(id)){message('Supprimé');fetchLot();}})),
       ])),
     ]))));
   }
