@@ -25,6 +25,7 @@ import 'package:app_elevage/screens/login_screen.dart';
 import 'package:app_elevage/screens/settings_screen.dart';
 import 'package:app_elevage/l10n/app_localizations.dart';
 import 'package:app_elevage/services/app_settings.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
@@ -650,6 +651,23 @@ void _addTask() {
     if (mounted) setState(() {});
   }
 
+  Future<void> _openTutorial() async {
+    final tutorialUrl = Uri.parse(
+      'https://elevage-mobile.onrender.com/guide-utilisateur-elevage.pdf',
+    );
+
+    final opened = await launchUrl(
+      tutorialUrl,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.tr('tutorial_open_error'))),
+      );
+    }
+  }
+
   Widget _brandTitle() {
     return RichText(
       text: const TextSpan(
@@ -707,6 +725,7 @@ void _addTask() {
             item(context.tr('billing'), Icons.receipt_long_outlined, _openClients),
             item(context.tr('history'), Icons.history, () => _openLots()),
             item(context.tr('settings'), Icons.settings_outlined, _openSettings),
+            item(context.tr('tutorial'), Icons.menu_book_outlined, _openTutorial),
             const Spacer(),
             const Divider(height: 1),
             item(context.tr('logout'), Icons.logout, _logout),
