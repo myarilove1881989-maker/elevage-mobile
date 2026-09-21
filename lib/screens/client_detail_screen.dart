@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../theme/terre_et_or_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ClientDetailScreen extends StatefulWidget {
@@ -322,74 +323,34 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+      margin: const EdgeInsets.fromLTRB(12, 14, 12, 0),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blueGrey.shade50,
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.grey.shade200,
-          ),
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: const Border(left: BorderSide(color: TerreEtOrColors.gold, width: 5)),
+        boxShadow: [BoxShadow(color: TerreEtOrColors.navy.withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 6))],
       ),
-      child: Column(
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 18,
+        runSpacing: 14,
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor:
-                hasDebt ? Colors.orange.shade100 : Colors.green.shade100,
-            child: Icon(
-              Icons.person,
-              size: 32,
-              color: hasDebt ? Colors.orange.shade800 : Colors.green.shade700,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          Text(
-            widget.nom,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          if (widget.telephone.trim().isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              widget.telephone,
-              style: TextStyle(
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 16),
-
-          Text(
-            "Reste à payer",
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 13,
-            ),
-          ),
-
-          const SizedBox(height: 3),
-
-          Text(
-            formatMoney(balance),
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: hasDebt ? Colors.red : Colors.green,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            CircleAvatar(radius: 27, backgroundColor: (hasDebt ? TerreEtOrColors.gold : TerreEtOrColors.green).withValues(alpha: .14), child: Icon(Icons.person_outline, size: 29, color: hasDebt ? TerreEtOrColors.gold : TerreEtOrColors.green)),
+            const SizedBox(width: 12),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(widget.nom, style: const TextStyle(color: TerreEtOrColors.ink, fontSize: 20, fontWeight: FontWeight.bold)),
+              if (widget.telephone.trim().isNotEmpty) Text(widget.telephone, style: const TextStyle(color: TerreEtOrColors.muted)),
+            ]),
+          ]),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            const Text('Reste à payer', style: TextStyle(color: TerreEtOrColors.muted, fontSize: 12)),
+            const SizedBox(height: 3),
+            Text(formatMoney(balance), style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold, color: hasDebt ? const Color(0xFFD85B4B) : TerreEtOrColors.green)),
+          ]),
+          Row(mainAxisSize: MainAxisSize.min,
             children: [
               OutlinedButton.icon(
                 onPressed: appeler,
@@ -414,33 +375,26 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   Widget buildFinancialSummary() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: buildSummaryCard(
+      child: LayoutBuilder(builder: (context, constraints) {
+        final cards = [
+          buildSummaryCard(
               title: "FACTURÉ",
               value: totalFacture,
-              color: Colors.blue,
+              color: const Color(0xFF3D7FA1),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: buildSummaryCard(
+          buildSummaryCard(
               title: "PAYÉ",
               value: totalPaye,
-              color: Colors.green,
+              color: TerreEtOrColors.green,
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: buildSummaryCard(
+          buildSummaryCard(
               title: "RESTE",
               value: balance,
-              color: balance > 0 ? Colors.red : Colors.green,
+              color: balance > 0 ? const Color(0xFFD85B4B) : TerreEtOrColors.green,
             ),
-          ),
-        ],
-      ),
+        ];
+        return GridView.count(crossAxisCount: 3, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: constraints.maxWidth < 500 ? 1.15 : 2.2, children: cards);
+      }),
     );
   }
 
@@ -456,15 +410,15 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFFE4E8EC),
+          color: TerreEtOrColors.border,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 5,
-            offset: const Offset(0, 2),
+            color: TerreEtOrColors.navy.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -475,7 +429,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
+              color: TerreEtOrColors.muted,
             ),
           ),
           const SizedBox(height: 5),
