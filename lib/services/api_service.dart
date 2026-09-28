@@ -397,7 +397,9 @@ class ApiService {
   Future<Map<String, dynamic>> createEggCollection({
     required int lotId,
     required DateTime collectedAt,
-    required int total,
+    int? total,
+    int? fullTrays,
+    int? remainingEggs,
     int broken = 0,
     int downgraded = 0,
     int consumedOrDonated = 0,
@@ -409,7 +411,9 @@ class ApiService {
       body: jsonEncode({
         "lot": lotId,
         "collecte_at": collectedAt.toIso8601String(),
-        "nombre_collecte": total,
+        if (total != null) "nombre_collecte": total,
+        if (fullTrays != null) "nombre_alveoles": fullTrays,
+        if (remainingEggs != null) "oeufs_restants": remainingEggs,
         "nombre_casses": broken,
         "nombre_declasses": downgraded,
         "nombre_consommes_donnes": consumedOrDonated,

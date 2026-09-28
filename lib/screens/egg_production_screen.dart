@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../theme/terre_et_or_theme.dart';
@@ -22,6 +23,25 @@ class EggProductionScreen extends StatefulWidget {
 }
 
 class _EggProductionScreenState extends State<EggProductionScreen> {
+  static const int eggsPerTray = 30;
+
+  String trayCount(dynamic value) {
+    final count = (number(value)).toInt();
+    return '${count ~/ eggsPerTray} ${context.tr('egg_trays_short')} + '
+        '${count % eggsPerTray} ${context.tr('egg_eggs_short')}';
+  }
+
+  Map<String, List<Map<String, dynamic>>> get collectionsByDay {
+    final days = <String, List<Map<String, dynamic>>>{};
+    for (final raw in collections) {
+      final item = Map<String, dynamic>.from(raw as Map);
+      final at = DateTime.tryParse(item['collecte_at']?.toString() ?? '')?.toLocal();
+      if (at == null) continue;
+      final day = MaterialLocalizations.of(context).formatMediumDate(at);
+      days.putIfAbsent(day, () => []).add(item);
+    }
+    return days;
+  }
   Map<String, dynamic>? stats;
   List<dynamic> collections = [];
   bool loading = true;
@@ -91,70 +111,174 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
   }
 
   Future<void> showCollectionDialog() async {
-    final total = TextEditingController();
+    final trays = TextEditingController(text: '0');
+    final remainder = TextEditingController(text: '0');
     final broken = TextEditingController(text: '0');
     final downgraded = TextEditingController(text: '0');
     final consumed = TextEditingController(text: '0');
     final note = TextEditingController();
+    final now = DateTime.now();
+    DateTime selectedDate = now;
+    TimeOfDay selectedTime = TimeOfDay.fromDateTime(now);
+    bool submitting = false;
     final dialogRoute = DialogRoute<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Nouvelle collecte'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _numberField(total, 'Œufs collectés'),
-              _numberField(broken, 'Œufs cassés'),
-              _numberField(downgraded, 'Sales ou déclassés'),
-              _numberField(consumed, 'Consommés ou donnés'),
-              TextField(
-                controller: note,
-                decoration: const InputDecoration(
-                  labelText: 'Note facultative',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final trayNumber = int.tryParse(trays.text.trim()) ?? 0;
+          final remaining = int.tryParse(remainder.text.trim()) ?? 0;
+          final collected = trayNumber * eggsPerTray + remaining;
+          final losses = (int.tryParse(broken.text.trim()) ?? 0) +
+              (int.tryParse(downgraded.text.trim()) ?? 0) +
+              (int.tryParse(consumed.text.trim()) ?? 0);
+          return AlertDialog(
+            title: Text(dialogContext.tr('egg_new_collection')),
+            content: SizedBox(
+              width: 450,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 12,
+                      children: [
+                        TextButton.icon(
+                          key: const Key('eggCollectionDate'),
+                          icon: const Icon(Icons.calendar_today_outlined),
+                          label: Text(MaterialLocalizations.of(dialogContext)
+                              .formatMediumDate(selectedDate)),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: dialogContext,
+                              initialDate: selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null && dialogContext.mounted) {
+                              setDialogState(() => selectedDate = picked);
+                            }
+                          },
+                        ),
+                        TextButton.icon(
+                          key: const Key('eggCollectionTime'),
+                          icon: const Icon(Icons.access_time),
+                          label: Text(MaterialLocalizations.of(dialogContext)
+                              .formatTimeOfDay(selectedTime)),
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: dialogContext,
+                              initialTime: selectedTime,
+                            );
+                            if (picked != null && dialogContext.mounted) {
+                              setDialogState(() => selectedTime = picked);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(dialogContext.tr('egg_production_section')),
+                    TextField(
+                      key: const Key('eggFullTrays'),
+                      controller: trays,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: dialogContext.tr('egg_full_trays')),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    TextField(
+                      key: const Key('eggRemaining'),
+                      controller: remainder,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: dialogContext.tr('egg_remaining')),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('${dialogContext.tr('egg_collected_total')}: $collected'),
+                    const SizedBox(height: 14),
+                    Text(dialogContext.tr('egg_losses_section')),
+                    TextField(
+                      key: const Key('eggBroken'),
+                      controller: broken,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: dialogContext.tr('egg_broken')),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    TextField(
+                      key: const Key('eggDowngraded'),
+                      controller: downgraded,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: dialogContext.tr('egg_downgraded')),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    TextField(
+                      key: const Key('eggConsumed'),
+                      controller: consumed,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: dialogContext.tr('egg_consumed')),
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('${dialogContext.tr('egg_commercializable')}: ${collected - losses}'),
+                    TextField(
+                      key: const Key('eggNote'),
+                      controller: note,
+                      decoration: InputDecoration(labelText: dialogContext.tr('egg_optional_note')),
+                    ),
+                  ],
                 ),
               ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting ? null : () => Navigator.pop(dialogContext, false),
+                child: Text(dialogContext.tr('egg_cancel')),
+              ),
+              ElevatedButton(
+                onPressed: submitting ? null : () async {
+                  final values = [trays, remainder, broken, downgraded, consumed]
+                      .map((controller) => int.tryParse(controller.text.trim())).toList();
+                  if (values.any((value) => value == null || value < 0) ||
+                      values[1]! >= eggsPerTray || collected == 0 || losses > collected) {
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text(dialogContext.tr('egg_invalid_collection'))),
+                    );
+                    return;
+                  }
+                  setDialogState(() => submitting = true);
+                  try {
+                    await widget.apiService.createEggCollection(
+                      lotId: widget.lotId,
+                      collectedAt: DateTime(selectedDate.year, selectedDate.month,
+                          selectedDate.day, selectedTime.hour, selectedTime.minute),
+                      fullTrays: values[0]!,
+                      remainingEggs: values[1]!,
+                      broken: values[2]!,
+                      downgraded: values[3]!,
+                      consumedOrDonated: values[4]!,
+                      note: note.text.trim(),
+                    );
+                    if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                  } catch (error) {
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        SnackBar(content: Text(error.toString())),
+                      );
+                      setDialogState(() => submitting = false);
+                    }
+                  }
+                },
+                child: Text(dialogContext.tr('egg_save_collection')),
+              ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (saving) return;
-              saving = true;
-              try {
-                await widget.apiService.createEggCollection(
-                  lotId: widget.lotId,
-                  collectedAt: DateTime.now(),
-                  total: int.parse(total.text),
-                  broken: int.tryParse(broken.text) ?? 0,
-                  downgraded: int.tryParse(downgraded.text) ?? 0,
-                  consumedOrDonated: int.tryParse(consumed.text) ?? 0,
-                  note: note.text.trim(),
-                );
-                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-              } catch (error) {
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(
-                    dialogContext,
-                  ).showSnackBar(SnackBar(content: Text(error.toString())));
-                }
-              } finally {
-                saving = false;
-              }
-            },
-            child: const Text('Enregistrer'),
-          ),
-        ],
+          );
+        },
       ),
     );
     final saved = await Navigator.of(context).push(dialogRoute);
     await dialogRoute.completed;
-    total.dispose();
+    trays.dispose();
+    remainder.dispose();
     broken.dispose();
     downgraded.dispose();
     consumed.dispose();
@@ -395,8 +519,8 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                       Icons.inventory_2_outlined,
                     ),
                     _metric(
-                      'Plateaux',
-                      number(stats!['equivalent_plateaux']).toStringAsFixed(2),
+                      context.tr('egg_tray_equivalent'),
+                      trayCount(stats!['stock_oeufs']),
                       Icons.grid_view,
                     ),
                     _metric(
@@ -497,32 +621,43 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                     child: Text('Aucune collecte sur cette période.'),
                   ),
                 ),
-              ...collections.map(
-                (item) => Card(
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: TerreEtOrColors.paleGold,
-                      child: Icon(
-                        Icons.egg_outlined,
-                        color: TerreEtOrColors.gold,
+              ...collectionsByDay.entries.expand((day) => [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 14, 8, 6),
+                      child: Text(day.key,
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ),
+                    ...day.value.map((item) {
+                      final at = DateTime.parse(item['collecte_at'].toString()).toLocal();
+                      return Card(
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: TerreEtOrColors.paleGold,
+                            child: Icon(Icons.egg_outlined, color: TerreEtOrColors.gold),
+                          ),
+                          title: Text(trayCount(item['nombre_collecte'])),
+                          subtitle: Text(
+                            '${context.tr('egg_collected_total')}: ${item['nombre_collecte']} · '
+                            '${context.tr('egg_commercializable')}: ${item['nombre_commercialisable']}\n'
+                            '${context.tr('egg_broken')}: ${item['nombre_casses']} · '
+                            '${context.tr('egg_downgraded')}: ${item['nombre_declasses']} · '
+                            '${context.tr('egg_consumed')}: ${item['nombre_consommes_donnes']}',
+                          ),
+                          trailing: Text(MaterialLocalizations.of(context)
+                              .formatTimeOfDay(TimeOfDay.fromDateTime(at))),
+                        ),
+                      );
+                    }),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+                      child: Text(
+                        '${context.tr('egg_daily_total')}: '
+                        '${day.value.fold<int>(0, (sum, item) => sum + number(item['nombre_collecte']).toInt())} · '
+                        '${context.tr('egg_commercializable')}: '
+                        '${day.value.fold<int>(0, (sum, item) => sum + number(item['nombre_commercialisable']).toInt())}',
                       ),
                     ),
-                    title: Text('${item['nombre_collecte']} œufs collectés'),
-                    subtitle: Text(
-                      '${item['nombre_commercialisable']} commercialisables · '
-                      '${item['nombre_casses']} cassés · ${item['nombre_declasses']} déclassés',
-                    ),
-                    trailing: Text(
-                      item['collecte_at']
-                              ?.toString()
-                              .replaceFirst('T', ' ')
-                              .substring(0, 16) ??
-                          '',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ),
-                ),
-              ),
+                  ]),
             ],
           ),
         ),
