@@ -450,6 +450,21 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> getEggKpis(
+    int lotId, {
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    final query = <String, String>{"lot": lotId.toString()};
+    if (start != null && end != null) {
+      query["date_debut"] = start.toIso8601String().split("T")[0];
+      query["date_fin"] = end.toIso8601String().split("T")[0];
+    }
+    final uri = Uri.parse("$baseUrl/oeufs/kpi/").replace(queryParameters: query);
+    final response = await http.get(uri, headers: _headers());
+    return await _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> createEggSale({
     required int lotId,
     required int clientId,

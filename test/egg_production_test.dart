@@ -13,8 +13,11 @@ class EggApiFake extends ApiService {
   DateTime? lastCollectedAt;
   List<dynamic> sampleCollections = [];
   Map<String, dynamic>? sampleStock;
+  Map<String, dynamic>? sampleKpis;
   bool stockFails = false;
+  bool kpiFails = false;
   int stockLoads = 0;
+  int kpiLoads = 0;
   int? linkedExpense;
   @override
   Future<Map<String, dynamic>> getEggStatistics(
@@ -47,6 +50,34 @@ class EggApiFake extends ApiService {
       'sorties_non_attribuees': 0,
       'entrees_hors_collecte': 0,
       'collectes': [],
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> getEggKpis(int lotId, {
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    kpiLoads++;
+    if (kpiFails) throw Exception('KPI indisponibles');
+    final today = DateTime.now();
+    final date = '${today.year.toString().padLeft(4, '0')}-'
+        '${today.month.toString().padLeft(2, '0')}-'
+        '${today.day.toString().padLeft(2, '0')}';
+    return sampleKpis ?? {
+      'date': date,
+      'effectif_actuel': 100,
+      'collectes_enregistrees': true,
+      'production_jour': 90,
+      'commercialisable_jour': 88,
+      'taux_ponte': 90.0,
+      'taux_casse': 2.2,
+      'stock_disponible': 30,
+      'aliment_enregistre': true,
+      'aliment_jour_kg': 5.0,
+      'consommation_par_poule_g': 50.0,
+      'taux_ponte_inhabituel': false,
+      'evolution': <Map<String, dynamic>>[],
     };
   }
   @override
@@ -92,6 +123,17 @@ class EggApiFake extends ApiService {
   }
 }
 
+Widget eggTestApp(EggApiFake api) => MaterialApp(
+  locale: const Locale('fr'),
+  supportedLocales: const [Locale('fr'), Locale('en')],
+  localizationsDelegates: const [
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
+  home: EggProductionScreen(apiService: api, lotId: 1, lotName: 'Ponte'),
+);
+
 void main() {
   testWidgets('Affiche les indicateurs et recharge après une collecte', (
     tester,
@@ -110,7 +152,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Poules vivantes'), findsOneWidget);
+    expect(find.text('Effectif actuel'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Nouvelle collecte'),
       300,
@@ -130,6 +172,7 @@ void main() {
     expect(api.lastCollectedAt, isNotNull);
     expect(api.loads, 2);
     expect(api.stockLoads, 2);
+    expect(api.kpiLoads, 2);
     expect(tester.takeException(), isNull);
   });
   testWidgets('Refuse 30 œufs restants avant l’envoi', (tester) async {
@@ -357,6 +400,183 @@ void main() {
         250, scrollable: find.byType(Scrollable).first);
     expect(find.text('Impossible de charger le stock par collecte.'), findsOneWidget);
     expect(api.stockLoads, greaterThanOrEqualTo(2));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Montre les KPI du jour indépendamment de la période',
+      (tester) async {
+    final api = EggApiFake();
+    await tester.pumpWidget(eggTestApp(api));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('layingCount'))).data, '100');
+    expect(tester.widget<Text>(find.byKey(const Key('layingProduction'))).data,
+        '90 œufs');
+    expect(tester.widget<Text>(find.byKey(const Key('layingMarketable'))).data,
+        '88 œufs');
+    expect(tester.widget<Text>(find.byKey(const Key('layingRate'))).data,
+        '90.0 %');
+    expect(tester.widget<Text>(find.byKey(const Key('layingBreakage'))).data,
+        '2.2 %');
+    expect(tester.widget<Text>(find.byKey(const Key('layingStock'))).data,
+        '30 œufs');
+    expect(tester.widget<Text>(find.byKey(const Key('layingFeed'))).data,
+        '5 kg');
+    expect(tester.widget<Text>(find.byKey(const Key('layingFeedPerHen'))).data,
+        '50.0 g/poule');
+    await tester.tap(find.text('30 jours'));
+    await tester.pumpAndSettle();
+    expect(api.kpiLoads, 2);
+    expect(tester.widget<Text>(find.byKey(const Key('layingProduction'))).data,
+        '90 œufs');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Sépare absence de collecte, zéro poule et absence d aliment',
+      (tester) async {
+    final api = EggApiFake();
+    api.sampleKpis = {
+      'date': '2026-09-28',
+      'effectif_actuel': 0,
+      'collectes_enregistrees': false,
+      'production_jour': null,
+      'commercialisable_jour': null,
+      'taux_ponte': null,
+      'taux_casse': null,
+      'stock_disponible': 0,
+      'aliment_enregistre': false,
+      'consommation_par_poule_g': null,
+      'evolution': <dynamic>[],
+    };
+    await tester.pumpWidget(eggTestApp(api));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('layingProduction'))).data,
+        'Aucune collecte enregistrée');
+    expect(tester.widget<Text>(find.byKey(const Key('layingRate'))).data, '—');
+    expect(tester.widget<Text>(find.byKey(const Key('layingFeed'))).data,
+        'Aucune distribution enregistrée');
+    expect(tester.widget<Text>(find.byKey(const Key('layingFeedPerHen'))).data,
+        '—');
+    await tester.scrollUntilVisible(find.byKey(const Key('layingEvolutionEmpty')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.byKey(const Key('layingEvolutionEmpty')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Signale un taux de ponte inhabituel sans le masquer',
+      (tester) async {
+    final api = EggApiFake();
+    api.sampleKpis = {
+      'date': '2026-09-28',
+      'effectif_actuel': 100,
+      'collectes_enregistrees': true,
+      'production_jour': 120,
+      'commercialisable_jour': 115,
+      'taux_ponte': 120.0,
+      'taux_casse': 4.2,
+      'taux_ponte_inhabituel': true,
+      'stock_disponible': 115,
+      'aliment_enregistre': true,
+      'aliment_jour_kg': 11.0,
+      'consommation_par_poule_g': 110.0,
+      'evolution': <dynamic>[],
+    };
+    await tester.pumpWidget(eggTestApp(api));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('layingRate'))).data,
+        '120.0 %');
+    expect(find.byKey(const Key('layingUnusualRate')), findsOneWidget);
+  });
+
+  testWidgets('Distingue les journées sans collecte des journées à zéro',
+      (tester) async {
+    final api = EggApiFake();
+    api.sampleKpis = {
+      'date': '2026-09-28',
+      'effectif_actuel': 100,
+      'collectes_enregistrees': true,
+      'production_jour': 0,
+      'commercialisable_jour': 0,
+      'taux_ponte': 0.0,
+      'taux_casse': null,
+      'stock_disponible': 0,
+      'aliment_enregistre': false,
+      'evolution': [
+        {'date': '2026-09-26', 'production': 100},
+        {'date': '2026-09-27', 'production': null},
+        {'date': '2026-09-28', 'production': 0},
+      ],
+    };
+    await tester.pumpWidget(eggTestApp(api));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('layingDay-2026-09-27')),
+      250, scrollable: find.byType(Scrollable).first,
+    );
+    final missing = find.byKey(const Key('layingDay-2026-09-27'));
+    final zero = find.byKey(const Key('layingDay-2026-09-28'));
+    expect(find.descendant(of: missing, matching: find.text('—')),
+        findsOneWidget);
+    expect(find.descendant(of: zero, matching: find.text('0')),
+        findsOneWidget);
+    expect(find.text('26/9'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Isole erreur API des KPI et permet de réessayer',
+      (tester) async {
+    final api = EggApiFake()..kpiFails = true;
+    await tester.pumpWidget(eggTestApp(api));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('layingKpiError')), findsOneWidget);
+    expect(find.text('Nouvelle collecte'), findsOneWidget);
+    api.kpiFails = false;
+    await tester.tap(find.text('Réessayer'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('layingKpiError')), findsNothing);
+    expect(tester.widget<Text>(find.byKey(const Key('layingRate'))).data,
+        '90.0 %');
+    expect(api.kpiLoads, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Actualise le stock du jour après rafraîchissement',
+      (tester) async {
+    final api = EggApiFake();
+    await tester.pumpWidget(eggTestApp(api));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('layingStock'))).data,
+        '30 œufs');
+    api.sampleKpis = {
+      'date': '2026-09-28',
+      'effectif_actuel': 100,
+      'collectes_enregistrees': false,
+      'stock_disponible': 40,
+      'aliment_enregistre': false,
+      'evolution': <dynamic>[],
+    };
+    await tester.widget<RefreshIndicator>(find.byType(RefreshIndicator))
+        .onRefresh();
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('layingStock'))).data,
+        '40 œufs');
+    expect(api.kpiLoads, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Dispose les indicateurs sur écran étroit sans débordement',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final api = EggApiFake();
+    await tester.pumpWidget(eggTestApp(api));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('layingCount')), findsOneWidget);
+    expect(find.byKey(const Key('layingRate')), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Alimentation'), 200,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Alimentation'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

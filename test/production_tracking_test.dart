@@ -91,6 +91,34 @@ class ProductionTrackingApiFake extends ApiService {
   }) async => [];
 
   @override
+  Future<Map<String, dynamic>> getDatedEggStock(int lotId) async => {
+    'stock_global': 0,
+    'origines_completes': true,
+    'sorties_non_attribuees': 0,
+    'entrees_hors_collecte': 0,
+    'collectes': <dynamic>[],
+  };
+
+  @override
+  Future<Map<String, dynamic>> getEggKpis(int lotId, {
+    DateTime? start,
+    DateTime? end,
+  }) async => {
+    'date': '2026-09-28',
+    'effectif_actuel': 100,
+    'collectes_enregistrees': false,
+    'production_jour': null,
+    'commercialisable_jour': null,
+    'taux_ponte': null,
+    'taux_casse': null,
+    'stock_disponible': 0,
+    'aliment_enregistre': false,
+    'aliment_jour_kg': null,
+    'consommation_par_poule_g': null,
+    'evolution': <dynamic>[],
+  };
+
+  @override
   Future<Map<String, dynamic>> getProductionWeights(int lotId) async => {
     'lot': lotId,
     'lot_nom': 'Poulets de chair',

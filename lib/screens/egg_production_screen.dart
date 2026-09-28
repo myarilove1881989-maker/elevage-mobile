@@ -43,6 +43,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
     return days;
   }
   Map<String, dynamic>? stats;
+  Map<String, dynamic>? kpis;
   Map<String, dynamic>? datedStock;
   String? datedStockError;
   List<dynamic> collections = [];
@@ -70,46 +71,60 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
   String money(dynamic value) =>
       AppSettings.instance.formatMoney(number(value), decimals: 0);
 
+  Future<Object?> _capture(Future<Object?> request) async {
+    try {
+      return await request;
+    } catch (error) {
+      return error;
+    }
+  }
+
   Future<void> loadData() async {
-    if (mounted) setState(() {
+    if (!mounted) return;
+    setState(() {
       loading = true;
       datedStock = null;
       datedStockError = null;
+      kpis = null;
     });
-    try {
-      final results = await Future.wait([
-        widget.apiService.getEggStatistics(
+    final results = await Future.wait<Object?>([
+      _capture(widget.apiService.getEggStatistics(
           widget.lotId,
           start: periodStart,
           end: periodEnd,
-        ),
-        widget.apiService.getEggCollections(
+        )),
+      _capture(widget.apiService.getEggCollections(
           widget.lotId,
           start: periodStart,
           end: periodEnd,
-        ),
-      ]);
-      Map<String, dynamic>? stock;
-      String? stockError;
-      try {
-        stock = await widget.apiService.getDatedEggStock(widget.lotId);
-      } catch (error) {
-        stockError = error.toString();
-      }
-      if (!mounted) return;
-      setState(() {
-        stats = results[0] as Map<String, dynamic>;
-        collections = results[1] as List<dynamic>;
-        datedStock = stock;
-        datedStockError = stockError;
-        loading = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => loading = false);
+        )),
+      _capture(widget.apiService.getDatedEggStock(widget.lotId)),
+      _capture(widget.apiService.getEggKpis(
+        widget.lotId,
+        start: periodStart,
+        end: periodEnd,
+      )),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      stats = results[0] is Map<String, dynamic>
+          ? results[0] as Map<String, dynamic> : null;
+      collections = results[1] is List<dynamic>
+          ? results[1] as List<dynamic> : [];
+      datedStock = results[2] is Map<String, dynamic>
+          ? results[2] as Map<String, dynamic> : null;
+      datedStockError = datedStock == null ? results[2].toString() : null;
+      kpis = results[3] is Map<String, dynamic>
+          ? results[3] as Map<String, dynamic> : null;
+      loading = false;
+    });
+    if (results[0] is! Map<String, dynamic> || results[1] is! List<dynamic>) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ).showSnackBar(SnackBar(content: Text(
+        results[0] is! Map<String, dynamic>
+            ? results[0].toString() : results[1].toString(),
+      )));
     }
   }
 
@@ -511,6 +526,184 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
     );
   }
 
+  String _oneDecimal(dynamic value) => value == null
+      ? context.tr('laying_not_calculable')
+      : number(value).toStringAsFixed(1);
+
+  String _kilograms(dynamic value) =>
+      number(value).toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '');
+
+  Widget _todayMetric(String label, String value, IconData icon,
+      {String? subtitle, Key? valueKey}) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: TerreEtOrColors.gold),
+            const SizedBox(height: 4),
+            Text(value, key: valueKey,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold,
+                    color: TerreEtOrColors.ink)),
+            Text(label, style: const TextStyle(fontSize: 11,
+                color: TerreEtOrColors.muted)),
+            if (subtitle != null)
+              Text(subtitle, style: const TextStyle(fontSize: 10,
+                  color: TerreEtOrColors.muted)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _todayPanel() {
+    final data = kpis!;
+    final date = DateTime.tryParse(data['date']?.toString() ?? '');
+    final dateLabel = date == null ? ''
+        : ' · ${MaterialLocalizations.of(context).formatMediumDate(date)}';
+    final values = <Widget>[
+      _todayMetric(context.tr('laying_current_count'),
+          '${data['effectif_actuel']}', Icons.pets,
+          valueKey: const Key('layingCount')),
+      _todayMetric(context.tr('laying_production_today'),
+          data['collectes_enregistrees'] == true
+              ? '${data['production_jour']} ${context.tr('egg_eggs_short')}'
+              : context.tr('laying_no_collection'), Icons.egg_outlined,
+          valueKey: const Key('layingProduction')),
+      _todayMetric(context.tr('laying_rate_today'),
+          data['taux_ponte'] == null ? context.tr('laying_not_calculable')
+              : '${_oneDecimal(data['taux_ponte'])} %', Icons.percent,
+          valueKey: const Key('layingRate')),
+      _todayMetric(context.tr('laying_stock_current'),
+          '${data['stock_disponible']} ${context.tr('egg_eggs_short')}',
+          Icons.inventory_2_outlined,
+          subtitle: trayCount(data['stock_disponible']),
+          valueKey: const Key('layingStock')),
+      _todayMetric(context.tr('laying_marketable_today'),
+          data['commercialisable_jour'] == null
+              ? context.tr('laying_not_calculable')
+              : '${data['commercialisable_jour']} ${context.tr('egg_eggs_short')}',
+          Icons.check_circle_outline,
+          valueKey: const Key('layingMarketable')),
+      _todayMetric(context.tr('laying_broken_rate_today'),
+          data['taux_casse'] == null ? context.tr('laying_not_calculable')
+              : '${_oneDecimal(data['taux_casse'])} %', Icons.heart_broken_outlined,
+          valueKey: const Key('layingBreakage')),
+      _todayMetric(context.tr('laying_feed_today'),
+          data['aliment_enregistre'] == true
+              ? '${_kilograms(data['aliment_jour_kg'])} kg'
+              : context.tr('laying_no_feed'), Icons.grass_outlined,
+          valueKey: const Key('layingFeed')),
+      _todayMetric(context.tr('laying_feed_per_hen'),
+          data['consommation_par_poule_g'] == null
+              ? context.tr('laying_not_calculable')
+              : '${_oneDecimal(data['consommation_par_poule_g'])} g/poule',
+          Icons.scale_outlined,
+          valueKey: const Key('layingFeedPerHen')),
+    ];
+    return TerreEtOrPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('${context.tr('laying_today')}$dateLabel',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          LayoutBuilder(builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 900 ? 4 : 2;
+            const gap = 6.0;
+            final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+            return Wrap(spacing: gap, runSpacing: gap, children: [
+              for (final metric in values) SizedBox(width: width, child: metric),
+            ]);
+          }),
+          const SizedBox(height: 6),
+          Text(context.tr('laying_approximation'),
+              style: Theme.of(context).textTheme.bodySmall),
+          if (data['taux_ponte_inhabituel'] == true)
+            Text(context.tr('laying_unusual'),
+                key: const Key('layingUnusualRate'),
+                style: const TextStyle(color: TerreEtOrColors.gold)),
+          if (data['collectes_enregistrees'] != true)
+            Text(context.tr('laying_no_collection')),
+        ],
+      ),
+    );
+  }
+
+  Widget _evolutionPanel() {
+    final days = kpis!['evolution'] as List<dynamic>? ?? [];
+    var maximum = 1;
+    for (final raw in days) {
+      final value = (raw as Map)['production'];
+      if (value is num && value > maximum) maximum = value.toInt();
+    }
+    final hasData = days.any((raw) => (raw as Map)['production'] != null);
+    return TerreEtOrPanel(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(context.tr('laying_evolution'),
+            style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        if (!hasData)
+          Text(context.tr('laying_no_evolution'),
+              key: const Key('layingEvolutionEmpty'))
+        else ...[
+          Text(context.tr('laying_missing_day'),
+              style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              for (final raw in days)
+                Builder(builder: (context) {
+                  final item = raw as Map;
+                  final production = item['production'] as num?;
+                  final day = DateTime.parse(item['date'].toString());
+                  final barHeight = production == null || production == 0 ? 0.0
+                      : (production / maximum * 86).clamp(4.0, 86.0).toDouble();
+                  return SizedBox(
+                    key: Key('layingDay-${item['date']}'), width: 56,
+                    child: Column(children: [
+                      Text(production?.toString() ?? '—',
+                          style: const TextStyle(fontSize: 11)),
+                      SizedBox(height: 90, child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: production == null
+                            ? const SizedBox(height: 2, width: 22,
+                                child: ColoredBox(color: TerreEtOrColors.border))
+                            : Container(height: barHeight, width: 22,
+                                decoration: BoxDecoration(
+                                  color: TerreEtOrColors.green,
+                                  borderRadius: BorderRadius.circular(4),
+                                )),
+                      )),
+                      Text('${day.day}/${day.month}',
+                          style: const TextStyle(fontSize: 10)),
+                    ]),
+                  );
+                }),
+            ]),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  Widget _periodResults() {
+    return TerreEtOrPanel(child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.tr('laying_period_results'),
+            style: Theme.of(context).textTheme.titleMedium),
+        Text('Œufs vendus : ${stats!['oeufs_vendus']}'),
+        Text('CA œufs : ${money(stats!['chiffre_affaires_oeufs'])}'),
+        Text('Marge œufs : ${money(stats!['marge_oeufs'])}'),
+        Text('Coût par œuf : ${money(stats!['cout_par_oeuf'])}'),
+      ],
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -571,93 +764,22 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                     child: CircularProgressIndicator(),
                   ),
                 )
-              else if (stats != null) ...[
-                GridView.count(
-                  crossAxisCount:
-                      MediaQuery.sizeOf(context).width >= 850 ? 4 : 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: 1.35,
-                  children: [
-                    _metric(
-                      'Poules vivantes',
-                      stats!['nombre_poules_vivantes'],
-                      Icons.pets,
-                    ),
-                    _metric(
-                      'Œufs produits',
-                      stats!['oeufs_collectes'],
-                      Icons.egg_outlined,
-                    ),
-                    _metric(
-                      'Taux de ponte',
-                      '${number(stats!['taux_ponte']).toStringAsFixed(1)} %',
-                      Icons.percent,
-                    ),
-                    _metric(
-                      'Stock d’œufs',
-                      stats!['stock_oeufs'],
-                      Icons.inventory_2_outlined,
-                    ),
-                    _metric(
-                      context.tr('egg_tray_equivalent'),
-                      trayCount(stats!['stock_oeufs']),
-                      Icons.grid_view,
-                    ),
-                    _metric(
-                      'Œufs vendus',
-                      stats!['oeufs_vendus'],
-                      Icons.shopping_cart_outlined,
-                    ),
-                    _metric(
-                      'CA œufs',
-                      money(stats!['chiffre_affaires_oeufs']),
-                      Icons.payments_outlined,
-                    ),
-                    _metric(
-                      'Marge œufs',
-                      money(stats!['marge_oeufs']),
-                      Icons.trending_up,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                TerreEtOrPanel(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Qualité et alimentation',
-                        style: Theme.of(context).textTheme.titleMedium,
+              else if (kpis != null)
+                _todayPanel()
+              else
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(children: [
+                      Text(context.tr('laying_kpi_error'),
+                          key: const Key('layingKpiError')),
+                      TextButton(
+                        onPressed: loadData,
+                        child: Text(context.tr('laying_retry')),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Commercialisables : ${stats!['oeufs_commercialisables']}',
-                      ),
-                      Text(
-                        'Cassés : ${stats!['oeufs_casses']} · Déclassés : ${stats!['oeufs_declasses']}',
-                      ),
-                      Text(
-                        'Aliment : ${number(stats!['consommation_aliment_kg']).toStringAsFixed(2)} kg',
-                      ),
-                      Text('Coût par œuf : ${money(stats!['cout_par_oeuf'])}'),
-                    ],
+                    ]),
                   ),
                 ),
-              ],
-              if (!loading) ...[
-                const SizedBox(height: 14),
-                if (datedStockError != null)
-                  Card(child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Text(context.tr('egg_stock_error'),
-                        key: const Key('eggStockLoadError')),
-                  ))
-                else if (datedStock != null)
-                  _datedStockPanel(),
-              ],
               const SizedBox(height: 14),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -752,6 +874,27 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                       ),
                     ),
                   ]),
+              if (!loading) ...[
+                const SizedBox(height: 14),
+                if (datedStockError != null)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Text(context.tr('egg_stock_error'),
+                          key: const Key('eggStockLoadError')),
+                    ),
+                  )
+                else if (datedStock != null)
+                  _datedStockPanel(),
+                if (kpis != null) ...[
+                  const SizedBox(height: 14),
+                  _evolutionPanel(),
+                ],
+                if (stats != null) ...[
+                  const SizedBox(height: 14),
+                  _periodResults(),
+                ],
+              ],
             ],
           ),
         ),
@@ -759,34 +902,4 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
     );
   }
 
-  Widget _metric(String label, dynamic value, IconData icon) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: TerreEtOrColors.gold),
-            const SizedBox(height: 7),
-            Text(
-              value?.toString() ?? '0',
-              style: const TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-                color: TerreEtOrColors.ink,
-              ),
-            ),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 11,
-                color: TerreEtOrColors.muted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
