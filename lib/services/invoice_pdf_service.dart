@@ -1,7 +1,7 @@
-import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'app_settings.dart';
 
 class InvoicePdfService {
   static const _navy = PdfColor.fromInt(0xFF073B5C);
@@ -19,7 +19,7 @@ class InvoicePdfService {
   }
 
   static String _money(dynamic value) {
-    return '${NumberFormat('#,##0', 'fr_FR').format(_number(value))} FCFA';
+    return AppSettings.instance.formatMoney(_number(value), decimals: 0);
   }
 
   static String _safe(dynamic value, [String fallback = '-']) {
@@ -42,6 +42,16 @@ class InvoicePdfService {
         _safe(sale['exploitation_nom'], isFr ? 'Mon exploitation' : 'My farm');
     final farmId = _safe(sale['exploitation_id']);
     final total = _number(sale['montant_total']);
+    final eggSale = sale['produit_vendu'] == 'OEUFS';
+    final eggCount = _number(sale['nombre_oeufs']).toInt();
+    final eggDescription = isFr
+        ? 'Œufs — ${eggCount ~/ 30} alvéoles + ${eggCount % 30} œufs'
+        : 'Eggs — ${eggCount ~/ 30} trays + ${eggCount % 30} eggs';
+    final unitPriceHeader = eggSale
+        ? (sale['conditionnement'] == 'COMPOSE'
+            ? (isFr ? 'PRIX LOT' : 'BUNDLE PRICE')
+            : (isFr ? 'PRIX COND.' : 'PACK PRICE'))
+        : (isFr ? 'PRIX UNIT.' : 'UNIT PRICE');
     final paid = _number(sale['montant_paye']);
     final balance = _number(sale['reste']);
     final statusColor = isPaid ? _green : _gold;
@@ -184,12 +194,12 @@ class InvoicePdfService {
                 pw.TableRow(
                   decoration: const pw.BoxDecoration(color: _navy),
                   children: (isFr
-                          ? ['DÉSIGNATION', 'LOT', 'QTÉ', 'PRIX UNIT.', 'TOTAL']
+                          ? ['DÉSIGNATION', 'LOT', 'QTÉ', unitPriceHeader, 'TOTAL']
                           : [
                               'DESCRIPTION',
                               'BATCH',
                               'QTY',
-                              'UNIT PRICE',
+                              unitPriceHeader,
                               'TOTAL'
                             ])
                       .map((label) => pw.Padding(
@@ -202,8 +212,9 @@ class InvoicePdfService {
                       .toList(),
                 ),
                 pw.TableRow(children: [
-                  _tableValue(_safe(sale['espece'])),
+                  _tableValue(eggSale ? eggDescription : _safe(sale['espece'])),
                   _tableValue(_safe(sale['lot_nom'])),
+                  // COMPOSE facture un lot de 608 œufs (pas 608 × le prix du lot).
                   _tableValue(_safe(sale['quantite'])),
                   _tableValue(_money(sale['prix_unitaire'])),
                   _tableValue(_money(total)),

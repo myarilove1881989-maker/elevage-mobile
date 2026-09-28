@@ -23,9 +23,15 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   int? selectedClientId;
 
   String selectedType = "VENTE";
+  String selectedProduct = "ANIMAUX";
 
   final TextEditingController quantiteController = TextEditingController();
   final TextEditingController prixController = TextEditingController();
+  final TextEditingController traysController = TextEditingController(text: '0');
+  final TextEditingController extraEggsController = TextEditingController(text: '0');
+  final TextEditingController totalPriceController = TextEditingController();
+  int? eggStockAvailable;
+  bool eggStockLoading = false;
 
   DateTime selectedDate = DateTime.now();
 
@@ -84,12 +90,34 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   }
 
   // ================= GET LOT =================
+  List<Lot> get selectableLots => selectedType == 'VENTE' &&
+          selectedProduct == 'OEUFS'
+      ? lots.where((lot) => lot.typeProduction == 'OEUFS').toList()
+      : lots;
+
   Lot? get selectedLot {
-    if (selectedLotId == null) return null;
-    return lots.firstWhere(
-      (lot) => lot.id == selectedLotId,
-      orElse: () => lots.first,
-    );
+    for (final lot in selectableLots) {
+      if (lot.id == selectedLotId) return lot;
+    }
+    return null;
+  }
+
+  Future<void> loadEggStock(int lotId) async {
+    setState(() {
+      eggStockLoading = true;
+      eggStockAvailable = null;
+    });
+    try {
+      final stock = await widget.apiService.getDatedEggStock(lotId);
+      if (!mounted || selectedLotId != lotId || selectedProduct != 'OEUFS') return;
+      setState(() {
+        eggStockAvailable = (stock['stock_global'] as num).toInt();
+        eggStockLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || selectedLotId != lotId || selectedProduct != 'OEUFS') return;
+      setState(() => eggStockLoading = false);
+    }
   }
 
   // ================= MESSAGE =================
@@ -213,6 +241,45 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
       return;
     }
 
+    if (selectedType == "VENTE" && selectedProduct == "OEUFS") {
+      final trays = int.tryParse(traysController.text.trim());
+      final extra = int.tryParse(extraEggsController.text.trim());
+      if (trays == null || trays < 0 || extra == null || extra < 0 ||
+          extra >= 30 || trays * 30 + extra <= 0) {
+        showMessage(context.tr('sale_invalid_quantity'));
+        return;
+      }
+      final price = totalPriceController.text.trim().replaceAll(',', '.');
+      if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(price) ||
+          (double.tryParse(price) ?? 0) <= 0) {
+        showMessage(context.tr('sale_invalid_total'));
+        return;
+      }
+      if (eggStockAvailable == null) {
+        showMessage(context.tr('sale_stock_unavailable'));
+        return;
+      }
+      if (trays * 30 + extra > eggStockAvailable!) {
+        showMessage('${context.tr('sale_stock_insufficient')} : '
+            '$eggStockAvailable ${context.tr('egg_eggs_short')}');
+        return;
+      }
+      setState(() => isSubmitting = true);
+      try {
+        await widget.apiService.createMixedEggSale(
+          lotId: selectedLotId!, clientId: selectedClientId!,
+          fullTrays: trays, extraEggs: extra,
+          totalPrice: price, date: selectedDate,
+        );
+        if (mounted) Navigator.pop(context, true);
+      } catch (error) {
+        if (mounted) showMessage(error.toString().replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) setState(() => isSubmitting = false);
+      }
+      return;
+    }
+
     if (quantiteController.text.isEmpty || prixController.text.isEmpty) {
       showMessage("Tous les champs sont obligatoires");
       return;
@@ -272,6 +339,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   void dispose() {
     quantiteController.dispose();
     prixController.dispose();
+    traysController.dispose();
+    extraEggsController.dispose();
+    totalPriceController.dispose();
     super.dispose();
   }
 
@@ -309,6 +379,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                       children: [
                         // TYPE
                         DropdownButtonFormField<String>(
+                          key: const Key('movementTypeDropdown'),
                           value: selectedType,
                           items: types.map((t) {
                             return DropdownMenuItem(
@@ -320,6 +391,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                             setState(() {
                               selectedType = value!;
                               selectedClientId = null;
+                              selectedLotId = null;
+                              eggStockAvailable = null;
                             });
                           },
                           decoration: InputDecoration(
@@ -330,23 +403,59 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
                         const SizedBox(height: 16),
 
+                        if (selectedType == 'VENTE') ...[
+                          DropdownButtonFormField<String>(
+                            key: const Key('saleProductDropdown'),
+                            value: selectedProduct,
+                            decoration: InputDecoration(
+                              labelText: context.tr('sale_product'),
+                              border: const OutlineInputBorder(),
+                            ),
+                            items: [
+                              DropdownMenuItem(value: 'ANIMAUX',
+                                  child: Text(context.tr('sale_animals'))),
+                              DropdownMenuItem(value: 'OEUFS',
+                                  child: Text(context.tr('sale_eggs'))),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                selectedProduct = value ?? 'ANIMAUX';
+                                selectedLotId = null;
+                                eggStockAvailable = null;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
                         // LOT
                         DropdownButtonFormField<int>(
+                          key: const Key('movementLotDropdown'),
                           value: selectedLotId,
-                          items: lots.map((lot) {
+                          items: selectableLots.map((lot) {
                             return DropdownMenuItem<int>(
                               value: lot.id,
                               child: Text(lot.nom),
                             );
                           }).toList(),
                           onChanged: (value) {
-                            setState(() => selectedLotId = value);
+                            setState(() {
+                              selectedLotId = value;
+                              eggStockAvailable = null;
+                            });
+                            if (value != null && selectedType == 'VENTE' &&
+                                selectedProduct == 'OEUFS') {
+                              loadEggStock(value);
+                            }
                           },
                           decoration: InputDecoration(
                             labelText: context.tr('batch'),
                             border: OutlineInputBorder(),
                           ),
                         ),
+                        if (selectedType == 'VENTE' && selectedProduct == 'OEUFS' &&
+                            selectableLots.isEmpty)
+                          Text(context.tr('egg_stock_empty')),
 
                         const SizedBox(height: 16),
 
@@ -358,6 +467,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                                 children: [
                                   Expanded(
                                     child: DropdownButtonFormField<int>(
+                                      key: const Key('movementClientDropdown'),
                                       value: selectedClientId,
                                       items: clients.map((c) {
                                         return DropdownMenuItem<int>(
@@ -389,7 +499,28 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                           ),
 
                         // STOCK
-                        if (selectedLot != null)
+                        if (selectedLot != null && selectedType == 'VENTE' &&
+                            selectedProduct == 'OEUFS')
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: eggStockLoading
+                                ? const CircularProgressIndicator()
+                                : eggStockAvailable == null
+                                    ? TextButton(
+                                        key: const Key('eggStockRetry'),
+                                        onPressed: () => loadEggStock(selectedLotId!),
+                                        child: Text(context.tr('sale_stock_retry')),
+                                      )
+                                    : Text(
+                                        '${context.tr('sale_stock_eggs')} : '
+                                        '$eggStockAvailable ${context.tr('egg_eggs_short')} · '
+                                        '${eggStockAvailable! ~/ 30} ${context.tr('egg_trays_short')} + '
+                                        '${eggStockAvailable! % 30} ${context.tr('egg_eggs_short')}',
+                                        key: const Key('eggSaleStock'),
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                          )
+                        else if (selectedLot != null)
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
@@ -422,27 +553,68 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                         const SizedBox(height: 16),
 
                         // QUANTITE
-                        TextField(
-                          controller: quantiteController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: context.tr('quantity'),
-                            border: OutlineInputBorder(),
+                        if (selectedType == 'VENTE' && selectedProduct == 'OEUFS') ...[
+                          TextField(
+                            key: const Key('eggSaleTrays'),
+                            controller: traysController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: context.tr('egg_full_trays'),
+                              border: const OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => setState(() {}),
                           ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // PRIX
-                        TextField(
-                          controller: prixController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText:
-                                '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',
-                            border: OutlineInputBorder(),
+                          const SizedBox(height: 16),
+                          TextField(
+                            key: const Key('eggSaleExtra'),
+                            controller: extraEggsController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: context.tr('sale_extra_eggs'),
+                              border: const OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => setState(() {}),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${context.tr('sale_total_eggs')} : '
+                            '${((int.tryParse(traysController.text) ?? 0) * 30) + (int.tryParse(extraEggsController.text) ?? 0)} '
+                            '${context.tr('egg_eggs_short')}',
+                            key: const Key('eggSaleTotalEggs'),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            key: const Key('eggSaleTotalPrice'),
+                            controller: totalPriceController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: '${context.tr('sale_total_price')} '
+                                  '(${AppSettings.instance.currency.symbol})',
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ] else ...[
+                          TextField(
+                            key: const Key('animalSaleQuantity'),
+                            controller: quantiteController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: context.tr('quantity'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            key: const Key('animalSalePrice'),
+                            controller: prixController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: '${context.tr('unit_price_auto')} '
+                                  '(${AppSettings.instance.currency.symbol})',
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(height: 20),
 
@@ -450,6 +622,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
+                            key: const Key('saveMovement'),
                             onPressed: isSubmitting ? null : submit,
                             child: isSubmitting
                                 ? const CircularProgressIndicator(

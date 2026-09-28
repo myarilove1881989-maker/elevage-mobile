@@ -94,6 +94,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
       lot!['mouvements'] ?? [],
     ).where((m) => m['type_mouvement'] != 'ACHAT').toList();
     final expenses = List<dynamic>.from(lot!['depenses'] ?? []);
+    final eggSales = List<dynamic>.from(lot!['ventes_oeufs'] ?? []);
     final initial = purchases.fold<double>(
       0,
       (s, a) => s + numValue(a['quantite']),
@@ -258,7 +259,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                   children: [
                     if (purchases.isEmpty &&
                         movements.isEmpty &&
-                        expenses.isEmpty)
+                        expenses.isEmpty && eggSales.isEmpty)
                       Text(context.tr('no_data')),
                     ...purchases.map(
                       (a) => _event(
@@ -292,13 +293,32 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                         onDelete: () async {
                           if (!await confirmDelete()) return;
                           final id = intValue(m['id']);
-                          if (id != null &&
-                              await widget.apiService.deleteMouvement(id)) {
-                            message('Supprimé');
-                            fetchLot();
+                          try {
+                            if (id != null &&
+                                await widget.apiService.deleteMouvement(id)) {
+                              message('Supprimé');
+                              fetchLot();
+                            }
+                          } catch (error) {
+                            if (mounted) message(error.toString().replaceFirst('Exception: ', ''));
                           }
                         },
                       ),
+                    ),
+                    ...eggSales.map(
+                      (v) {
+                        final count = intValue(v['nombre_oeufs']) ?? 0;
+                        return _event(
+                          icon: Icons.egg_outlined,
+                          color: TerreEtOrColors.green,
+                          title: '${context.tr('sale')} · ${context.tr('sale_eggs')}',
+                          subtitle: '$count ${context.tr('egg_eggs_short')} · '
+                              '${count ~/ 30} ${context.tr('egg_trays_short')} + '
+                              '${count % 30} ${context.tr('egg_eggs_short')} · '
+                              '${money(v['montant_total'])}',
+                          date: v['date']?.toString() ?? '',
+                        );
+                      },
                     ),
                     ...expenses.map(
                       (d) => _event(
@@ -347,7 +367,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
     required String title,
     required String subtitle,
     required String date,
-    required VoidCallback onDelete,
+    VoidCallback? onDelete,
   }) => Container(
     padding: const EdgeInsets.symmetric(vertical: 9),
     decoration: const BoxDecoration(
@@ -384,14 +404,15 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
           date,
           style: const TextStyle(color: TerreEtOrColors.muted, fontSize: 11),
         ),
-        IconButton(
-          onPressed: onDelete,
-          icon: const Icon(
-            Icons.delete_outline,
-            color: Color(0xFFD85B4B),
-            size: 20,
+        if (onDelete != null)
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(
+              Icons.delete_outline,
+              color: Color(0xFFD85B4B),
+              size: 20,
+            ),
           ),
-        ),
       ],
     ),
   );

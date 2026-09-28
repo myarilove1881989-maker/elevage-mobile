@@ -490,6 +490,30 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> createMixedEggSale({
+    required int lotId,
+    required int clientId,
+    required int fullTrays,
+    required int extraEggs,
+    required String totalPrice,
+    required DateTime date,
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/oeufs/ventes/"),
+      headers: _headers(),
+      body: jsonEncode({
+        "lot": lotId,
+        "client": clientId,
+        "conditionnement": "COMPOSE",
+        "nombre_alveoles": fullTrays,
+        "oeufs_supplementaires": extraEggs,
+        "prix_total": totalPrice,
+        "date": date.toIso8601String().split("T")[0],
+      }),
+    );
+    return await _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> createFeedConsumption({
     required int lotId,
     required double quantityKg,

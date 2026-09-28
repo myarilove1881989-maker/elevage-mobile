@@ -561,6 +561,13 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     final espece = v["espece"] ?? "";
     final lot = v["lot_nom"] ?? "";
     final quantite = v["quantite"] ?? 0;
+    final eggSale = v['produit_vendu'] == 'OEUFS';
+    final eggCount = (v['nombre_oeufs'] as num?)?.toInt() ?? 0;
+    final quantityLabel = eggSale
+        ? '$eggCount ${context.tr('egg_eggs_short')} · '
+            '${eggCount ~/ 30} ${context.tr('egg_trays_short')} + '
+            '${eggCount % 30} ${context.tr('egg_eggs_short')}'
+        : '$quantite ${context.tr('sale_animals').toLowerCase()}';
     final date = v["date"] ?? "";
 
     return Card(
@@ -595,9 +602,10 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        espece.toString().isNotEmpty
-                            ? espece.toString()
-                            : "Espèce inconnue",
+                        eggSale
+                            ? context.tr('sale_eggs')
+                            : '${context.tr('sale_animals')} · '
+                                '${espece.toString().isNotEmpty ? espece : "Espèce inconnue"}',
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -646,7 +654,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                   Expanded(
                     child: buildVenteInfo(
                       "Quantité",
-                      "$quantite",
+                      quantityLabel,
                     ),
                   ),
                   Expanded(
