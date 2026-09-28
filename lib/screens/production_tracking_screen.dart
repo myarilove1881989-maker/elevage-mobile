@@ -4,6 +4,7 @@ import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../theme/terre_et_or_theme.dart';
 import 'egg_production_screen.dart';
+import 'feed_distribution_screen.dart';
 
 class ProductionTrackingScreen extends StatefulWidget {
   final ApiService apiService;
@@ -132,22 +133,29 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> {
           icon: Icons.egg_outlined,
           title: context.tr('laying_tracking'),
           message: context.tr('laying_tracking_available'),
-          action: ElevatedButton.icon(
-            key: const Key('openEggTrackingButton'),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EggProductionScreen(
-                    apiService: widget.apiService,
-                    lotId: _asInt(lot['id'])!,
-                    lotName: lot['nom']?.toString() ?? context.tr('batch'),
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.egg_outlined),
-            label: Text(context.tr('open_laying_tracking')),
+          action: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton.icon(
+                key: const Key('openEggTrackingButton'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EggProductionScreen(
+                        apiService: widget.apiService,
+                        lotId: _asInt(lot['id'])!,
+                        lotName: lot['nom']?.toString() ?? context.tr('batch'),
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.egg_outlined),
+                label: Text(context.tr('open_laying_tracking')),
+              ),
+              const SizedBox(height: 10),
+              _feedButton(lot),
+            ],
           ),
         );
       case 'REPRODUCTION':
@@ -168,9 +176,26 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> {
           icon: Icons.show_chart,
           title: context.tr('growth_tracking'),
           message: context.tr('growth_tracking_future'),
+          action: _feedButton(lot),
         );
     }
   }
+
+  Widget _feedButton(Map<String, dynamic> lot) => ElevatedButton.icon(
+        key: const Key('openFeedTrackingButton'),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FeedDistributionScreen(
+              apiService: widget.apiService,
+              lotId: _asInt(lot['id'])!,
+              lotName: lot['nom']?.toString() ?? context.tr('batch'),
+            ),
+          ),
+        ),
+        icon: const Icon(Icons.grass_outlined),
+        label: Text(context.tr('open_feed_tracking')),
+      );
 
   @override
   Widget build(BuildContext context) {

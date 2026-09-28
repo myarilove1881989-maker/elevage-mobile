@@ -486,6 +486,41 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<List<dynamic>> getFeedDistributions(int lotId) async {
+    final response = await http.get(
+      Uri.parse("$baseUrl/alimentation/distributions/").replace(
+        queryParameters: {'lot': '$lotId'},
+      ),
+      headers: _headers(),
+    );
+    return List<dynamic>.from(await _handleResponse(response) as List);
+  }
+
+  Future<Map<String, dynamic>> createFeedDistribution({
+    required int lotId,
+    required DateTime distributedAt,
+    required String feedName,
+    required double quantityKg,
+    double? pricePerKg,
+    int? expenseId,
+    String note = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/alimentation/distributions/"),
+      headers: _headers(),
+      body: jsonEncode({
+        'lot': lotId,
+        'distribution_at': distributedAt.toUtc().toIso8601String(),
+        'aliment': feedName.trim(),
+        'quantite_kg': quantityKg,
+        if (pricePerKg != null) 'prix_kg': pricePerKg,
+        if (expenseId != null) 'depense': expenseId,
+        'note': note.trim(),
+      }),
+    );
+    return Map<String, dynamic>.from(await _handleResponse(response) as Map);
+  }
+
   // ================= MOUVEMENT =================
   Future<bool> createMouvement({
     required int lotId,

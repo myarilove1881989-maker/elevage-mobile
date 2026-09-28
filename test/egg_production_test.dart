@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:app_elevage/screens/egg_production_screen.dart';
+import 'package:app_elevage/screens/feed_distribution_screen.dart';
 import 'package:app_elevage/services/api_service.dart';
 
 class EggApiFake extends ApiService {
@@ -48,12 +50,16 @@ class EggApiFake extends ApiService {
   }
 
   @override
-  Future<Map<String, dynamic>> createFeedConsumption({
+  Future<List<dynamic>> getFeedDistributions(int lotId) async => [];
+
+  @override
+  Future<Map<String, dynamic>> createFeedDistribution({
     required int lotId,
+    required DateTime distributedAt,
+    required String feedName,
     required double quantityKg,
     double? pricePerKg,
     int? expenseId,
-    DateTime? date,
     String note = '',
   }) async {
     linkedExpense = expenseId;
@@ -68,6 +74,13 @@ void main() {
     final api = EggApiFake();
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('fr'),
+        supportedLocales: const [Locale('fr'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: EggProductionScreen(apiService: api, lotId: 1, lotName: 'Ponte'),
       ),
     );
@@ -91,6 +104,13 @@ void main() {
     final api = EggApiFake();
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('fr'),
+        supportedLocales: const [Locale('fr'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: EggProductionScreen(apiService: api, lotId: 1, lotName: 'Ponte'),
       ),
     );
@@ -102,12 +122,33 @@ void main() {
     );
     await tester.tap(find.text('Alimentation'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<int>));
+    await tester.tap(find.byKey(const Key('addFeedDistribution')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('feedNameField')), 'Aliment pondeuse');
+    await tester.enterText(find.byKey(const Key('feedQuantityField')), '10');
+    final formScroll = find.descendant(
+      of: find.byType(FeedDistributionFormScreen),
+      matching: find.byType(Scrollable),
+    ).first;
+    await tester.scrollUntilVisible(
+      find.text('Coût facultatif'), 200,
+      scrollable: formScroll,
+    );
+    await tester.tap(find.text('Coût facultatif'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('feedExpenseDropdown')), 200,
+      scrollable: formScroll,
+    );
+    await tester.tap(find.byKey(const Key('feedExpenseDropdown')));
     await tester.pumpAndSettle();
     await tester.tap(find.textContaining('#42').last);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).first, '10');
-    await tester.tap(find.text('Enregistrer'));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('saveFeedDistribution')), 200,
+      scrollable: formScroll,
+    );
+    await tester.tap(find.byKey(const Key('saveFeedDistribution')));
     await tester.pumpAndSettle();
     expect(api.linkedExpense, 42);
     expect(tester.takeException(), isNull);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../theme/terre_et_or_theme.dart';
+import 'feed_distribution_screen.dart';
 
 class EggProductionScreen extends StatefulWidget {
   final ApiService apiService;
@@ -283,123 +284,16 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
   }
 
   Future<void> showFeedDialog() async {
-    List<dynamic> expenses;
-    try {
-      final lot = await widget.apiService.getLotDetail(widget.lotId);
-      expenses = (lot['depenses'] as List<dynamic>?) ?? [];
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-      return;
-    }
-    if (!mounted) return;
-    int? expenseId;
-    final quantity = TextEditingController();
-    final price = TextEditingController();
-    final note = TextEditingController();
-    final dialogRoute = DialogRoute<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Alimentation du jour'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<int>(
-                decoration: const InputDecoration(
-                  labelText: 'Dépense déjà enregistrée (facultatif)',
-                ),
-                items: [
-                  const DropdownMenuItem(
-                    value: 0,
-                    child: Text('Aucune : coût estimé'),
-                  ),
-                  ...expenses.map(
-                    (expense) => DropdownMenuItem<int>(
-                      value: expense['id'] as int,
-                      child: Text(
-                        '#${expense['id']} · ${money(expense['montant'])}',
-                      ),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => expenseId = value == 0 ? null : value,
-              ),
-              const Text(
-                'Liez la dépense existante pour éviter de compter deux fois le même coût. Le prix/kg est ignoré si une dépense est liée.',
-              ),
-              TextField(
-                controller: quantity,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Quantité consommée (kg)',
-                ),
-              ),
-              TextField(
-                controller: price,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText:
-                      'Prix par kg facultatif (${AppSettings.instance.currency.symbol})',
-                ),
-              ),
-              TextField(
-                controller: note,
-                decoration: const InputDecoration(
-                  labelText: 'Note facultative',
-                ),
-              ),
-            ],
-          ),
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FeedDistributionScreen(
+          apiService: widget.apiService,
+          lotId: widget.lotId,
+          lotName: widget.lotName,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (saving) return;
-              saving = true;
-              try {
-                await widget.apiService.createFeedConsumption(
-                  expenseId: expenseId,
-                  lotId: widget.lotId,
-                  quantityKg: double.parse(quantity.text.replaceAll(',', '.')),
-                  pricePerKg: price.text.trim().isEmpty
-                      ? null
-                      : double.parse(price.text.replaceAll(',', '.')),
-                  note: note.text.trim(),
-                );
-                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-              } catch (error) {
-                if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(
-                    dialogContext,
-                  ).showSnackBar(SnackBar(content: Text(error.toString())));
-                }
-              } finally {
-                saving = false;
-              }
-            },
-            child: const Text('Enregistrer'),
-          ),
-        ],
       ),
     );
-    final saved = await Navigator.of(context).push(dialogRoute);
-    await dialogRoute.completed;
-    quantity.dispose();
-    price.dispose();
-    note.dispose();
-    if (saved == true) await loadData();
+    if (mounted) await loadData();
   }
 
   Widget _numberField(TextEditingController controller, String label) {
