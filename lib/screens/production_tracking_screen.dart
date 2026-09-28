@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../theme/terre_et_or_theme.dart';
 import 'egg_production_screen.dart';
 import 'feed_distribution_screen.dart';
+import 'growth_tracking_screen.dart';
 
 class ProductionTrackingScreen extends StatefulWidget {
   final ApiService apiService;
@@ -175,11 +176,34 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> {
         return _statusCard(
           icon: Icons.show_chart,
           title: context.tr('growth_tracking'),
-          message: context.tr('growth_tracking_future'),
-          action: _feedButton(lot),
+          message: context.tr('growth_tracking_intro'),
+          action: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _growthButton(lot),
+              const SizedBox(height: 10),
+              _feedButton(lot),
+            ],
+          ),
         );
     }
   }
+
+  Widget _growthButton(Map<String, dynamic> lot) => ElevatedButton.icon(
+        key: const Key('openGrowthTrackingButton'),
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GrowthTrackingScreen(
+              apiService: widget.apiService,
+              lotId: _asInt(lot['id'])!,
+              lotName: lot['nom']?.toString() ?? context.tr('batch'),
+            ),
+          ),
+        ),
+        icon: const Icon(Icons.monitor_weight_outlined),
+        label: Text(context.tr('open_growth_tracking')),
+      );
 
   Widget _feedButton(Map<String, dynamic> lot) => ElevatedButton.icon(
         key: const Key('openFeedTrackingButton'),

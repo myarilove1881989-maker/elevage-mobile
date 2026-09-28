@@ -521,6 +521,37 @@ class ApiService {
     return Map<String, dynamic>.from(await _handleResponse(response) as Map);
   }
 
+  Future<Map<String, dynamic>> getProductionWeights(int lotId) async {
+    final response = await http.get(
+      Uri.parse("$baseUrl/production/pesees/").replace(
+        queryParameters: {'lot': '$lotId'},
+      ),
+      headers: _headers(),
+    );
+    return Map<String, dynamic>.from(await _handleResponse(response) as Map);
+  }
+
+  Future<Map<String, dynamic>> createProductionWeight({
+    required int lotId,
+    required DateTime weighedAt,
+    required int animalsWeighed,
+    required double sampleWeightKg,
+    String note = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/production/pesees/"),
+      headers: _headers(),
+      body: jsonEncode({
+        'lot': lotId,
+        'pesee_at': weighedAt.toUtc().toIso8601String(),
+        'nombre_animaux_peses': animalsWeighed,
+        'poids_total_kg': sampleWeightKg,
+        'note': note.trim(),
+      }),
+    );
+    return Map<String, dynamic>.from(await _handleResponse(response) as Map);
+  }
+
   // ================= MOUVEMENT =================
   Future<bool> createMouvement({
     required int lotId,

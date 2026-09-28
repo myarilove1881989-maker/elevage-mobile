@@ -1,5 +1,6 @@
 import 'package:app_elevage/screens/dashboard_screen.dart';
 import 'package:app_elevage/screens/egg_production_screen.dart';
+import 'package:app_elevage/screens/growth_tracking_screen.dart';
 import 'package:app_elevage/screens/production_tracking_screen.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'package:flutter/material.dart';
@@ -88,6 +89,17 @@ class ProductionTrackingApiFake extends ApiService {
     DateTime? start,
     DateTime? end,
   }) async => [];
+
+  @override
+  Future<Map<String, dynamic>> getProductionWeights(int lotId) async => {
+    'lot': lotId,
+    'lot_nom': 'Poulets de chair',
+    'effectif_actuel': 80,
+    'dernier_poids_moyen_kg': null,
+    'biomasse_estimee_kg': null,
+    'gmq_g_par_jour': null,
+    'pesees': <dynamic>[],
+  };
 }
 
 Widget testApp(Widget home) => MaterialApp(
@@ -161,7 +173,7 @@ void main() {
     expect(find.byType(EggProductionScreen), findsOneWidget);
   });
 
-  testWidgets('Affiche l’état futur pour CHAIR', (tester) async {
+  testWidgets('Ouvre le suivi de croissance pour CHAIR', (tester) async {
     final api = ProductionTrackingApiFake();
     await tester.pumpWidget(
       testApp(ProductionTrackingScreen(apiService: api)),
@@ -180,6 +192,11 @@ void main() {
 
     expect(find.text('Suivi de croissance'), findsOneWidget);
     expect(find.byKey(const Key('openEggTrackingButton')), findsNothing);
+    expect(find.byKey(const Key('openGrowthTrackingButton')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('openGrowthTrackingButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(GrowthTrackingScreen), findsOneWidget);
+    expect(find.text('Effectif actuel'), findsOneWidget);
   });
 
   testWidgets('Affiche les états neutres REPRODUCTION et AUTRE', (
