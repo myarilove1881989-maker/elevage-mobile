@@ -10,8 +10,7 @@ class CurrencyOption {
 
   const CurrencyOption(this.code, this.labelFr, this.labelEn, this.symbol);
 
-  String label(String languageCode) =>
-      languageCode == 'en' ? labelEn : labelFr;
+  String label(String languageCode) => languageCode == 'en' ? labelEn : labelFr;
 }
 
 class CountryOption {
@@ -27,8 +26,7 @@ class CountryOption {
     this.currencyCode,
   );
 
-  String label(String languageCode) =>
-      languageCode == 'en' ? labelEn : labelFr;
+  String label(String languageCode) => languageCode == 'en' ? labelEn : labelFr;
 }
 
 class AppSettings extends ChangeNotifier {
@@ -69,10 +67,12 @@ class AppSettings extends ChangeNotifier {
     CountryOption('SL', 'Sierra Leone', 'Sierra Leone', 'SLE'),
     CountryOption('TG', 'Togo', 'Togo', 'XOF'),
     CountryOption('CM', 'Cameroun', 'Cameroon', 'XAF'),
-    CountryOption('CG', 'Congo (Congo-Brazzaville)', 'Congo (Congo-Brazzaville)', 'XAF'),
+    CountryOption(
+        'CG', 'Congo (Congo-Brazzaville)', 'Congo (Congo-Brazzaville)', 'XAF'),
     CountryOption('GA', 'Gabon', 'Gabon', 'XAF'),
     CountryOption('GQ', 'Guinée équatoriale', 'Equatorial Guinea', 'XAF'),
-    CountryOption('CF', 'République centrafricaine', 'Central African Republic', 'XAF'),
+    CountryOption(
+        'CF', 'République centrafricaine', 'Central African Republic', 'XAF'),
     CountryOption('TD', 'Tchad', 'Chad', 'XAF'),
     CountryOption('FR', 'France', 'France', 'EUR'),
     CountryOption('BE', 'Belgique', 'Belgium', 'EUR'),

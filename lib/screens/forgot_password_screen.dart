@@ -67,7 +67,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> changePassword() async {
     final password = passwordController.text;
     if (password.length < 8) {
-      setState(() => errorMessage = "Le mot de passe doit contenir au moins 8 caractères.");
+      setState(() => errorMessage =
+          "Le mot de passe doit contenir au moins 8 caractères.");
       return;
     }
     if (password != confirmPasswordController.text) {
@@ -99,9 +100,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        errorMessage = error
-            .toString()
-            .replaceFirst("Exception: ", "");
+        errorMessage = error.toString().replaceFirst("Exception: ", "");
       });
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -166,7 +165,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       controller: emailController,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                decoration: InputDecoration(
+                      decoration: InputDecoration(
                         labelText: context.tr('email'),
                         prefixIcon: Icon(Icons.email_outlined),
                         border: OutlineInputBorder(),
@@ -179,7 +178,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       textAlign: TextAlign.center,
                       maxLength: 6,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
+                      decoration: InputDecoration(
                         labelText: context.tr('verification_code'),
                         counterText: "",
                         border: OutlineInputBorder(),
@@ -204,7 +203,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             () => hidePassword = !hidePassword,
                           ),
                           icon: Icon(
-                            hidePassword ? Icons.visibility : Icons.visibility_off,
+                            hidePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
                           ),
                         ),
                       ),

@@ -17,7 +17,6 @@ class AddDepenseScreen extends StatefulWidget {
 }
 
 class _AddDepenseScreenState extends State<AddDepenseScreen> {
-
   List<dynamic> lots = [];
   List<dynamic> categories = [];
 
@@ -95,7 +94,6 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
 
   // ================= SUBMIT =================
   Future<void> submit() async {
-
     final montant = double.tryParse(montantController.text.trim());
 
     if (selectedLotId == null) {
@@ -131,7 +129,6 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
       } else {
         showMessage("Erreur enregistrement");
       }
-
     } catch (e) {
       showMessage("Erreur serveur");
     }
@@ -150,7 +147,6 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
   // ================= UI =================
   @override
   Widget build(BuildContext context) {
-
     if (isInitLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -160,123 +156,123 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     return Theme(
       data: terreEtOrTheme(context),
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(context.tr('add_expense')),
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              TerreEtOrHeader(
-                icon: Icons.account_balance_wallet_outlined,
-                title: context.tr('add_expense'),
-                subtitle: AppSettings.instance.languageCode == 'en'
-                    ? 'Record an expense linked to a batch'
-                    : 'Enregistrez une charge liée à un lot',
-              ),
-              TerreEtOrPanel(
-                child: Column(
-                  children: [
-
-              // ================= LOT =================
-              DropdownButtonFormField<int>(
-                value: selectedLotId,
-                hint: Text(context.tr('choose_batch')),
-                items: lots.map<DropdownMenuItem<int>>((lot) {
-                  return DropdownMenuItem(
-                    value: lot["id"],
-                    child: Text(lot["nom"]),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => selectedLotId = value);
-                },
-                decoration: InputDecoration(
-                  labelText: context.tr('batch'),
-                  border: OutlineInputBorder(),
+        appBar: AppBar(
+          title: Text(context.tr('add_expense')),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                TerreEtOrHeader(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: context.tr('add_expense'),
+                  subtitle: AppSettings.instance.languageCode == 'en'
+                      ? 'Record an expense linked to a batch'
+                      : 'Enregistrez une charge liée à un lot',
                 ),
-              ),
+                TerreEtOrPanel(
+                  child: Column(
+                    children: [
+                      // ================= LOT =================
+                      DropdownButtonFormField<int>(
+                        value: selectedLotId,
+                        hint: Text(context.tr('choose_batch')),
+                        items: lots.map<DropdownMenuItem<int>>((lot) {
+                          return DropdownMenuItem(
+                            value: lot["id"],
+                            child: Text(lot["nom"]),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() => selectedLotId = value);
+                        },
+                        decoration: InputDecoration(
+                          labelText: context.tr('batch'),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
 
-              const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-              // ================= CATEGORIE =================
-              DropdownButtonFormField<int>(
-                value: selectedCategorieId,
-                hint: Text(context.tr('choose_category')),
-                items: categories.map<DropdownMenuItem<int>>((c) {
-                  return DropdownMenuItem(
-                    value: c["id"],
-                    child: Text(c["nom"]),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() => selectedCategorieId = value);
-                },
-                decoration: InputDecoration(
-                  labelText: context.tr('category'),
-                  border: OutlineInputBorder(),
+                      // ================= CATEGORIE =================
+                      DropdownButtonFormField<int>(
+                        value: selectedCategorieId,
+                        hint: Text(context.tr('choose_category')),
+                        items: categories.map<DropdownMenuItem<int>>((c) {
+                          return DropdownMenuItem(
+                            value: c["id"],
+                            child: Text(c["nom"]),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() => selectedCategorieId = value);
+                        },
+                        decoration: InputDecoration(
+                          labelText: context.tr('category'),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ================= DATE =================
+                      TerreEtOrDateTile(
+                        label:
+                            "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
+                        onTap: pickDate,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ================= MONTANT =================
+                      TextField(
+                        controller: montantController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText:
+                              '${context.tr('amount')} (${AppSettings.instance.currency.symbol})',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ================= NOTE =================
+                      TextField(
+                        controller: noteController,
+                        decoration: InputDecoration(
+                          labelText: context.tr('optional_note'),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ================= BOUTON =================
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : submit,
+                          child: isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(context.tr('save')),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ================= DATE =================
-              TerreEtOrDateTile(
-                label: "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                onTap: pickDate,
-              ),
-
-              const SizedBox(height: 16),
-
-              // ================= MONTANT =================
-              TextField(
-                controller: montantController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: '${context.tr('amount')} (${AppSettings.instance.currency.symbol})',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ================= NOTE =================
-              TextField(
-                controller: noteController,
-                decoration: InputDecoration(
-                  labelText: context.tr('optional_note'),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ================= BOUTON =================
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : submit,
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(context.tr('save')),
-                ),
-              ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

@@ -15,7 +15,6 @@ class LotListScreen extends StatefulWidget {
 }
 
 class _LotListScreenState extends State<LotListScreen> {
-
   List<dynamic> lots = [];
   bool isLoading = true;
 
@@ -35,7 +34,6 @@ class _LotListScreenState extends State<LotListScreen> {
         lots = result;
         isLoading = false;
       });
-
     } catch (e) {
       if (!mounted) return;
 
@@ -47,7 +45,6 @@ class _LotListScreenState extends State<LotListScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     if (isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -57,77 +54,76 @@ class _LotListScreenState extends State<LotListScreen> {
     return Theme(
       data: terreEtOrTheme(context),
       child: Scaffold(
-      appBar: AppBar(title: Text(context.tr('batches'))),
-
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-            child: TerreEtOrHeader(
-              icon: Icons.inventory_2_outlined,
-              title: context.tr('batches'),
-              subtitle: AppSettings.instance.languageCode == 'en'
-                  ? 'Track your batches and available stock'
-                  : 'Suivez vos lots et leur stock disponible',
+        appBar: AppBar(title: Text(context.tr('batches'))),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+              child: TerreEtOrHeader(
+                icon: Icons.inventory_2_outlined,
+                title: context.tr('batches'),
+                subtitle: AppSettings.instance.languageCode == 'en'
+                    ? 'Track your batches and available stock'
+                    : 'Suivez vos lots et leur stock disponible',
+              ),
             ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: fetchLots,
-              child: ListView.builder(
-                physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: lots.length,
-                itemBuilder: (context, index) {
-            final lot = lots[index];
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: fetchLots,
+                child: ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: lots.length,
+                  itemBuilder: (context, index) {
+                    final lot = lots[index];
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: TerreEtOrColors.paleGold,
-                  foregroundColor: TerreEtOrColors.gold,
-                  child: Icon(Icons.inventory_2_outlined),
-                ),
-                title: Text(lot["nom"]),
-                subtitle: Text("${context.tr('stock')}: ${lot["stock"]}"),
-                trailing: const Icon(
-                  Icons.chevron_right,
-                  color: TerreEtOrColors.navy,
-                ),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: TerreEtOrColors.paleGold,
+                          foregroundColor: TerreEtOrColors.gold,
+                          child: Icon(Icons.inventory_2_outlined),
+                        ),
+                        title: Text(lot["nom"]),
+                        subtitle:
+                            Text("${context.tr('stock')}: ${lot["stock"]}"),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: TerreEtOrColors.navy,
+                        ),
 
-                // 🔥 CLICK = DETAIL
-                onTap: () async {
+                        // 🔥 CLICK = DETAIL
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LotDetailScreen(
+                                apiService: widget.apiService,
+                                lotId: lot["id"],
+                              ),
+                            ),
+                          );
 
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => LotDetailScreen(
-                        apiService: widget.apiService,
-                        lotId: lot["id"],
+                          // 🔥🔥🔥 ICI LA MAGIE
+                          if (result == true) {
+                            // refresh liste locale
+                            await fetchLots();
+
+                            // 🔥 remonter jusqu'au dashboard
+                            if (mounted) {
+                              Navigator.pop(context, true);
+                            }
+                          }
+                        },
                       ),
-                    ),
-                  );
-
-                  // 🔥🔥🔥 ICI LA MAGIE
-                  if (result == true) {
-
-                    // refresh liste locale
-                    await fetchLots();
-
-                    // 🔥 remonter jusqu'au dashboard
-                    if (mounted) {
-                      Navigator.pop(context, true);
-                    }
-                  }
-                },
-              ),
-            );
-                },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

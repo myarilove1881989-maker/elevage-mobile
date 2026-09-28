@@ -36,8 +36,10 @@ class InvoicePdfService {
     final isFr = languageCode == 'fr';
     final isPaid = _number(sale['reste']) <= 0;
     final invoicePrefix = isFr ? 'FAC' : 'INV';
-    final invoiceNumber = '$invoicePrefix-${DateTime.now().year}-${sale['id'].toString().padLeft(5, '0')}';
-    final farmName = _safe(sale['exploitation_nom'], isFr ? 'Mon exploitation' : 'My farm');
+    final invoiceNumber =
+        '$invoicePrefix-${DateTime.now().year}-${sale['id'].toString().padLeft(5, '0')}';
+    final farmName =
+        _safe(sale['exploitation_nom'], isFr ? 'Mon exploitation' : 'My farm');
     final farmId = _safe(sale['exploitation_id']);
     final total = _number(sale['montant_total']);
     final paid = _number(sale['montant_paye']);
@@ -54,9 +56,14 @@ class InvoicePdfService {
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text(label, style: const pw.TextStyle(fontSize: 8, color: _muted)),
+              pw.Text(label,
+                  style: const pw.TextStyle(fontSize: 8, color: _muted)),
               pw.SizedBox(height: 3),
-              pw.Text(value, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _ink)),
+              pw.Text(value,
+                  style: pw.TextStyle(
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _ink)),
             ],
           ),
         );
@@ -80,22 +87,43 @@ class InvoicePdfService {
                     pw.RichText(
                       text: pw.TextSpan(
                         children: [
-                          pw.TextSpan(text: "Elev'", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: _navy)),
-                          pw.TextSpan(text: 'Age', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: _gold)),
+                          pw.TextSpan(
+                              text: "Elev'",
+                              style: pw.TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _navy)),
+                          pw.TextSpan(
+                              text: 'Age',
+                              style: pw.TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _gold)),
                         ],
                       ),
                     ),
                     pw.SizedBox(height: 7),
-                    pw.Text('${isFr ? 'EXPLOITATION' : 'FARM'} : $farmName', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _green)),
-                    pw.Text('${isFr ? 'Identifiant exploitation' : 'Farm identifier'} : $farmId', style: const pw.TextStyle(fontSize: 8, color: _muted)),
+                    pw.Text('${isFr ? 'EXPLOITATION' : 'FARM'} : $farmName',
+                        style: pw.TextStyle(
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _green)),
+                    pw.Text(
+                        '${isFr ? 'Identifiant exploitation' : 'Farm identifier'} : $farmId',
+                        style: const pw.TextStyle(fontSize: 8, color: _muted)),
                   ],
                 ),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Text(isFr ? 'FACTURE / REÇU' : 'INVOICE / RECEIPT', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: _navy)),
+                    pw.Text(isFr ? 'FACTURE / REÇU' : 'INVOICE / RECEIPT',
+                        style: pw.TextStyle(
+                            fontSize: 18,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _navy)),
                     pw.SizedBox(height: 5),
-                    pw.Text(invoiceNumber, style: const pw.TextStyle(fontSize: 9, color: _muted)),
+                    pw.Text(invoiceNumber,
+                        style: const pw.TextStyle(fontSize: 9, color: _muted)),
                   ],
                 ),
               ],
@@ -105,20 +133,35 @@ class InvoicePdfService {
               color: statusColor,
               padding: const pw.EdgeInsets.symmetric(vertical: 9),
               child: pw.Text(
-                isFr ? (isPaid ? 'PAYÉE' : 'PAIEMENT PARTIEL') : (isPaid ? 'PAID IN FULL' : 'PARTIALLY PAID'),
+                isFr
+                    ? (isPaid ? 'PAYÉE' : 'PAIEMENT PARTIEL')
+                    : (isPaid ? 'PAID IN FULL' : 'PARTIALLY PAID'),
                 textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(color: PdfColors.white, fontSize: 12, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold),
               ),
             ),
             pw.Container(
               color: paleColor,
               padding: const pw.EdgeInsets.symmetric(vertical: 7),
-              child: pw.Text('${isFr ? 'Montant payé' : 'Amount paid'} : ${_money(paid)}', textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: _ink)),
+              child: pw.Text(
+                  '${isFr ? 'Montant payé' : 'Amount paid'} : ${_money(paid)}',
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _ink)),
             ),
             pw.SizedBox(height: 22),
             pw.Table(
               border: pw.TableBorder.all(color: _line, width: .7),
-              columnWidths: const {0: pw.FlexColumnWidth(1), 1: pw.FlexColumnWidth(1), 2: pw.FlexColumnWidth(1)},
+              columnWidths: const {
+                0: pw.FlexColumnWidth(1),
+                1: pw.FlexColumnWidth(1),
+                2: pw.FlexColumnWidth(1)
+              },
               children: [
                 pw.TableRow(children: [
                   infoCell(isFr ? 'CLIENT' : 'CUSTOMER', customerName),
@@ -130,14 +173,32 @@ class InvoicePdfService {
             pw.SizedBox(height: 24),
             pw.Table(
               border: pw.TableBorder.all(color: _line, width: .7),
-              columnWidths: const {0: pw.FlexColumnWidth(1.35), 1: pw.FlexColumnWidth(1.45), 2: pw.FlexColumnWidth(.55), 3: pw.FlexColumnWidth(.9), 4: pw.FlexColumnWidth(1)},
+              columnWidths: const {
+                0: pw.FlexColumnWidth(1.35),
+                1: pw.FlexColumnWidth(1.45),
+                2: pw.FlexColumnWidth(.55),
+                3: pw.FlexColumnWidth(.9),
+                4: pw.FlexColumnWidth(1)
+              },
               children: [
                 pw.TableRow(
                   decoration: const pw.BoxDecoration(color: _navy),
                   children: (isFr
                           ? ['DÉSIGNATION', 'LOT', 'QTÉ', 'PRIX UNIT.', 'TOTAL']
-                          : ['DESCRIPTION', 'BATCH', 'QTY', 'UNIT PRICE', 'TOTAL'])
-                      .map((label) => pw.Padding(padding: const pw.EdgeInsets.all(7), child: pw.Text(label, style: pw.TextStyle(color: PdfColors.white, fontSize: 7, fontWeight: pw.FontWeight.bold))))
+                          : [
+                              'DESCRIPTION',
+                              'BATCH',
+                              'QTY',
+                              'UNIT PRICE',
+                              'TOTAL'
+                            ])
+                      .map((label) => pw.Padding(
+                          padding: const pw.EdgeInsets.all(7),
+                          child: pw.Text(label,
+                              style: pw.TextStyle(
+                                  color: PdfColors.white,
+                                  fontSize: 7,
+                                  fontWeight: pw.FontWeight.bold))))
                       .toList(),
                 ),
                 pw.TableRow(children: [
@@ -155,38 +216,72 @@ class InvoicePdfService {
               child: pw.Container(
                 width: 245,
                 child: pw.Column(children: [
-                  _totalLine(isFr ? 'TOTAL FACTURE' : 'INVOICE TOTAL', _money(total)),
-                  _totalLine(isFr ? 'MONTANT PAYÉ' : 'AMOUNT PAID', _money(paid)),
+                  _totalLine(
+                      isFr ? 'TOTAL FACTURE' : 'INVOICE TOTAL', _money(total)),
+                  _totalLine(
+                      isFr ? 'MONTANT PAYÉ' : 'AMOUNT PAID', _money(paid)),
                   pw.Container(
                     color: paleColor,
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                    child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                      pw.Text(isFr ? 'RESTE À PAYER' : 'BALANCE DUE', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: _ink)),
-                      pw.Text(_money(balance), style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: _ink)),
-                    ]),
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 9),
+                    child: pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text(isFr ? 'RESTE À PAYER' : 'BALANCE DUE',
+                              style: pw.TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _ink)),
+                          pw.Text(_money(balance),
+                              style: pw.TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _ink)),
+                        ]),
                   ),
                 ]),
               ),
             ),
             pw.SizedBox(height: 24),
             pw.Container(
-              decoration: pw.BoxDecoration(color: paleColor, border: pw.Border.all(color: statusColor, width: .8)),
+              decoration: pw.BoxDecoration(
+                  color: paleColor,
+                  border: pw.Border.all(color: statusColor, width: .8)),
               padding: const pw.EdgeInsets.all(10),
               child: pw.Text(
                 isFr
-                    ? (isPaid ? 'Cette facture est intégralement réglée. Aucun solde ne reste dû.' : 'Paiement partiel enregistré. Le solde indiqué reste à régler.')
-                    : (isPaid ? 'This invoice has been paid in full. No balance remains due.' : 'Partial payment recorded. The balance shown remains due.'),
+                    ? (isPaid
+                        ? 'Cette facture est intégralement réglée. Aucun solde ne reste dû.'
+                        : 'Paiement partiel enregistré. Le solde indiqué reste à régler.')
+                    : (isPaid
+                        ? 'This invoice has been paid in full. No balance remains due.'
+                        : 'Partial payment recorded. The balance shown remains due.'),
                 style: const pw.TextStyle(fontSize: 9, color: _ink),
               ),
             ),
             pw.Spacer(),
-            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-              pw.Text(farmName, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: _ink)),
-              pw.Text(customerName, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: _ink)),
-            ]),
+            pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(farmName,
+                      style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                          color: _ink)),
+                  pw.Text(customerName,
+                      style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight: pw.FontWeight.bold,
+                          color: _ink)),
+                ]),
             pw.SizedBox(height: 18),
             pw.Divider(color: _gold, thickness: 3),
-            pw.Text(isFr ? "Document généré par Elev'Age." : "Generated by Elev'Age.", textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 7, color: _muted)),
+            pw.Text(
+                isFr
+                    ? "Document généré par Elev'Age."
+                    : "Generated by Elev'Age.",
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 7, color: _muted)),
           ],
         ),
       ),
@@ -200,14 +295,25 @@ class InvoicePdfService {
 
   static pw.Widget _tableValue(String value) => pw.Padding(
         padding: const pw.EdgeInsets.all(7),
-        child: pw.Text(value, style: const pw.TextStyle(fontSize: 8, color: _ink)),
+        child:
+            pw.Text(value, style: const pw.TextStyle(fontSize: 8, color: _ink)),
       );
 
   static pw.Widget _totalLine(String label, String value) => pw.Padding(
         padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-        child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: _ink)),
-          pw.Text(value, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: _ink)),
-        ]),
+        child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(label,
+                  style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _ink)),
+              pw.Text(value,
+                  style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _ink)),
+            ]),
       );
 }

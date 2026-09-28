@@ -125,7 +125,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             TextField(
               controller: usernameController,
-                decoration: InputDecoration(
+              decoration: InputDecoration(
                 labelText: context.tr('username'),
               ),
             ),
@@ -134,7 +134,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
-                decoration: InputDecoration(
+              decoration: InputDecoration(
                 labelText: context.tr('email'),
               ),
             ),
@@ -181,16 +181,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
             const SizedBox(height: 20),
-
             if (errorMessage.isNotEmpty)
               Text(
                 errorMessage,
                 style: const TextStyle(color: Colors.red),
                 textAlign: TextAlign.center,
               ),
-
             const SizedBox(height: 12),
-
             ElevatedButton(
               onPressed: isLoading ? null : handleRegister,
               child: isLoading

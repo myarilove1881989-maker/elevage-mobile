@@ -55,9 +55,8 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
 
     try {
       var data = await widget.apiService.getEspeces();
-      final existingNames = data
-          .map((item) => item['nom'].toString().toLowerCase())
-          .toSet();
+      final existingNames =
+          data.map((item) => item['nom'].toString().toLowerCase()).toSet();
       final missing = speciesCatalog
           .where((name) => !existingNames.contains(name.toLowerCase()))
           .toList();
@@ -136,8 +135,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
 
     final quantite = int.tryParse(quantiteController.text.trim());
     final prixTotal = double.tryParse(prixTotalController.text.trim());
-    final prixUnitaire =
-        double.tryParse(prixUnitaireController.text.trim());
+    final prixUnitaire = double.tryParse(prixUnitaireController.text.trim());
 
     if (quantite == null || quantite <= 0) {
       showMessage("Quantité invalide");
@@ -157,16 +155,15 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
     setState(() => isSubmitting = true);
 
     try {
-      
 // 🔥 2. créer l'achat
-final success = await widget.apiService.createAchat(
-  nomLot: nomLotController.text.trim(),
-  especeId: selectedEspece!,
-  quantite: quantite,
-  prixTotal: prixTotal,
-  prixUnitaire: prixUnitaire,
-  date: selectedDate,
-);
+      final success = await widget.apiService.createAchat(
+        nomLot: nomLotController.text.trim(),
+        especeId: selectedEspece!,
+        quantite: quantite,
+        prixTotal: prixTotal,
+        prixUnitaire: prixUnitaire,
+        date: selectedDate,
+      );
 
       if (!mounted) return;
 
@@ -205,159 +202,167 @@ final success = await widget.apiService.createAchat(
     return Theme(
       data: terreEtOrTheme(context),
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(context.tr('new_purchase')),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TerreEtOrHeader(
-                icon: Icons.shopping_bag_outlined,
-                title: context.tr('new_purchase'),
-                subtitle: AppSettings.instance.languageCode == 'en'
-                    ? 'Create a batch and record its initial purchase'
-                    : 'Créez un lot et enregistrez son achat initial',
-              ),
-              TerreEtOrPanel(
-                child: Column(
-                  children: [
-              // ================= NOM LOT =================
-              TextFormField(
-                controller: nomLotController,
-                decoration: InputDecoration(
-                  labelText: context.tr('lot_name'),
-                  border: const OutlineInputBorder(),
+        appBar: AppBar(
+          title: Text(context.tr('new_purchase')),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                TerreEtOrHeader(
+                  icon: Icons.shopping_bag_outlined,
+                  title: context.tr('new_purchase'),
+                  subtitle: AppSettings.instance.languageCode == 'en'
+                      ? 'Create a batch and record its initial purchase'
+                      : 'Créez un lot et enregistrez son achat initial',
                 ),
-                validator: (value) =>
-                    value == null || value.isEmpty ? context.tr('required') : null,
-              ),
+                TerreEtOrPanel(
+                  child: Column(
+                    children: [
+                      // ================= NOM LOT =================
+                      TextFormField(
+                        controller: nomLotController,
+                        decoration: InputDecoration(
+                          labelText: context.tr('lot_name'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.isEmpty
+                            ? context.tr('required')
+                            : null,
+                      ),
 
-              const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-              Autocomplete<Map<String, dynamic>>(
-                displayStringForOption: (option) =>
-                    speciesLabel(option['nom'].toString()),
-                optionsBuilder: (textEditingValue) {
-                  final query = textEditingValue.text.trim().toLowerCase();
-                  final options = especes.cast<Map<String, dynamic>>();
-                  if (query.isEmpty) return options;
-                  return options.where(
-                    (item) => speciesLabel(item['nom'].toString())
-                        .toLowerCase()
-                        .contains(query),
-                  );
-                },
-                onSelected: (option) {
-                  setState(() => selectedEspece = option['id'] as int);
-                },
-                fieldViewBuilder: (
-                  context,
-                  textEditingController,
-                  focusNode,
-                  onFieldSubmitted,
-                ) {
-                  return TextFormField(
-                    controller: textEditingController,
-                    focusNode: focusNode,
-                    onChanged: (_) => setState(() => selectedEspece = null),
-                    decoration: InputDecoration(
-                      labelText: context.tr('choose_species'),
-                      hintText: context.tr('search_species'),
-                      prefixIcon: const Icon(Icons.pets_outlined),
-                      suffixIcon: const Icon(Icons.arrow_drop_down),
-                      border: const OutlineInputBorder(),
-                    ),
-                    validator: (_) => selectedEspece == null
-                        ? context.tr('species_required')
-                        : null,
-                  );
-                },
-              ),
+                      Autocomplete<Map<String, dynamic>>(
+                        displayStringForOption: (option) =>
+                            speciesLabel(option['nom'].toString()),
+                        optionsBuilder: (textEditingValue) {
+                          final query =
+                              textEditingValue.text.trim().toLowerCase();
+                          final options = especes.cast<Map<String, dynamic>>();
+                          if (query.isEmpty) return options;
+                          return options.where(
+                            (item) => speciesLabel(item['nom'].toString())
+                                .toLowerCase()
+                                .contains(query),
+                          );
+                        },
+                        onSelected: (option) {
+                          setState(() => selectedEspece = option['id'] as int);
+                        },
+                        fieldViewBuilder: (
+                          context,
+                          textEditingController,
+                          focusNode,
+                          onFieldSubmitted,
+                        ) {
+                          return TextFormField(
+                            controller: textEditingController,
+                            focusNode: focusNode,
+                            onChanged: (_) =>
+                                setState(() => selectedEspece = null),
+                            decoration: InputDecoration(
+                              labelText: context.tr('choose_species'),
+                              hintText: context.tr('search_species'),
+                              prefixIcon: const Icon(Icons.pets_outlined),
+                              suffixIcon: const Icon(Icons.arrow_drop_down),
+                              border: const OutlineInputBorder(),
+                            ),
+                            validator: (_) => selectedEspece == null
+                                ? context.tr('species_required')
+                                : null,
+                          );
+                        },
+                      ),
 
-              const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-              // ================= QUANTITE =================
-              TextFormField(
-                controller: quantiteController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: context.tr('quantity'),
-                  border: const OutlineInputBorder(),
+                      // ================= QUANTITE =================
+                      TextFormField(
+                        controller: quantiteController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: context.tr('quantity'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => calculatePrixUnitaire(),
+                        validator: (value) => value == null || value.isEmpty
+                            ? context.tr('required')
+                            : null,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ================= PRIX TOTAL =================
+                      TextFormField(
+                        controller: prixTotalController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText:
+                              '${context.tr('total_price')} (${AppSettings.instance.currency.symbol})',
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => calculatePrixUnitaire(),
+                        validator: (value) => value == null || value.isEmpty
+                            ? context.tr('required')
+                            : null,
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ================= PRIX UNITAIRE =================
+                      TextFormField(
+                        controller: prixUnitaireController,
+                        readOnly: true,
+                        decoration: InputDecoration(
+                          labelText:
+                              '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // ================= DATE =================
+                      TerreEtOrDateTile(
+                        label:
+                            "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+
+                          if (picked != null) {
+                            setState(() => selectedDate = picked);
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ================= BOUTON =================
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isSubmitting ? null : submit,
+                          child: isSubmitting
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white)
+                              : Text(context.tr('create_lot')),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                onChanged: (_) => calculatePrixUnitaire(),
-                validator: (value) =>
-                    value == null || value.isEmpty ? context.tr('required') : null,
-              ),
-
-              const SizedBox(height: 16),
-
-              // ================= PRIX TOTAL =================
-              TextFormField(
-                controller: prixTotalController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: '${context.tr('total_price')} (${AppSettings.instance.currency.symbol})',
-                  border: const OutlineInputBorder(),
-                ),
-                onChanged: (_) => calculatePrixUnitaire(),
-                validator: (value) =>
-                    value == null || value.isEmpty ? context.tr('required') : null,
-              ),
-
-              const SizedBox(height: 16),
-
-              // ================= PRIX UNITAIRE =================
-              TextFormField(
-                controller: prixUnitaireController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  labelText: '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ================= DATE =================
-              TerreEtOrDateTile(
-                label: "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
-                  );
-
-                  if (picked != null) {
-                    setState(() => selectedDate = picked);
-                  }
-                },
-              ),
-
-              const SizedBox(height: 20),
-
-              // ================= BOUTON =================
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isSubmitting ? null : submit,
-                  child: isSubmitting
-                      ? const CircularProgressIndicator(
-                          color: Colors.white)
-                      : Text(context.tr('create_lot')),
-                ),
-              ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

@@ -84,12 +84,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
-  'assets/images/elevage_logo.png',
-  height: 180,
-),
-
-const SizedBox(height: 40),
-
+                    'assets/images/elevage_logo.png',
+                    height: 180,
+                  ),
+                  const SizedBox(height: 40),
                   TextField(
                     controller: usernameController,
                     decoration: InputDecoration(
@@ -100,9 +98,7 @@ const SizedBox(height: 40),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
                   TextField(
                     controller: passwordController,
                     obscureText: _obscurePassword,
@@ -127,7 +123,6 @@ const SizedBox(height: 40),
                       ),
                     ),
                   ),
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -146,7 +141,6 @@ const SizedBox(height: 40),
                       child: Text(context.tr('forgot_password')),
                     ),
                   ),
-
                   if (errorMessage.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -158,7 +152,6 @@ const SizedBox(height: 40),
                         ),
                       ),
                     ),
-
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -189,9 +182,7 @@ const SizedBox(height: 40),
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   TextButton(
                     onPressed: isLoading
                         ? null

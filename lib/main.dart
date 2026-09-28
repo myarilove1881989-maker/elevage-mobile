@@ -22,8 +22,8 @@ Future<void> initNotifications() async {
   await notificationsPlugin.initialize(settings);
 
   // 🔥 Demande permission Android (sécurisé)
-  final androidPlugin = notificationsPlugin
-      .resolvePlatformSpecificImplementation<
+  final androidPlugin =
+      notificationsPlugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
 
   await androidPlugin?.requestNotificationsPermission();

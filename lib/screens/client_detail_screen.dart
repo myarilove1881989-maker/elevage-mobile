@@ -115,185 +115,178 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   // ================= PAIEMENT =================
 
   Future<void> payer(int venteId, double resteVente) async {
-  final controller = TextEditingController();
+    final controller = TextEditingController();
 
-  await showDialog(
-    context: context,
-    builder: (_) => StatefulBuilder(
-      builder: (context, setStateDialog) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.payment),
-              const SizedBox(width: 10),
-              Text(context.tr('save_payment')),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      "Reste à payer sur cette vente",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formatMoney(resteVente),
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: resteVente > 0 ? Colors.red : Colors.green,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              TextField(
-                controller: controller,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: InputDecoration(
-                  labelText: context.tr('amount'),
-                  hintText: "Ex : 50000",
-                  prefixIcon: Icon(Icons.euro),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: resteVente <= 0
-                      ? null
-                      : () {
-                          controller.text =
-                              resteVente.toStringAsFixed(2);
-                        },
-                  icon: const Icon(Icons.flash_on),
-                  label: Text(context.tr('pay_balance')),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isPaying
-                  ? null
-                  : () {
-                      Navigator.pop(context);
-                    },
-              child: Text(context.tr('cancel')),
+    await showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.payment),
+                const SizedBox(width: 10),
+                Text(context.tr('save_payment')),
+              ],
             ),
-
-            ElevatedButton(
-              onPressed: isPaying
-                  ? null
-                  : () async {
-                      final montant =
-                          double.tryParse(controller.text.trim());
-
-                      if (montant == null || montant <= 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "Veuillez saisir un montant valide",
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-
-                      if (montant > resteVente) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "Montant supérieur au reste de cette vente",
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-
-                      setState(() {
-                        isPaying = true;
-                      });
-
-                      setStateDialog(() {});
-
-                      try {
-                        await api.createPayment(
-                          widget.clientId,
-                          venteId,
-                          montant,
-                        );
-
-                        if (!mounted) return;
-
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Reste à payer sur cette vente",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        formatMoney(resteVente),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: resteVente > 0 ? Colors.red : Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: context.tr('amount'),
+                    hintText: "Ex : 50000",
+                    prefixIcon: Icon(Icons.euro),
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: resteVente <= 0
+                        ? null
+                        : () {
+                            controller.text = resteVente.toStringAsFixed(2);
+                          },
+                    icon: const Icon(Icons.flash_on),
+                    label: Text(context.tr('pay_balance')),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isPaying
+                    ? null
+                    : () {
                         Navigator.pop(context);
+                      },
+                child: Text(context.tr('cancel')),
+              ),
+              ElevatedButton(
+                onPressed: isPaying
+                    ? null
+                    : () async {
+                        final montant = double.tryParse(controller.text.trim());
 
-                        await load();
+                        if (montant == null || montant <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                "Veuillez saisir un montant valide",
+                              ),
+                            ),
+                          );
+                          return;
+                        }
 
-                        if (!mounted) return;
+                        if (montant > resteVente) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                "Montant supérieur au reste de cette vente",
+                              ),
+                            ),
+                          );
+                          return;
+                        }
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(context.tr('payment_saved')),
-                          ),
-                        );
-                      } catch (e) {
-                        print("ERREUR PAIEMENT: $e");
-
-                        if (!mounted) return;
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text("Erreur : $e"),
-                          ),
-                        );
-                      }
-
-                      if (mounted) {
                         setState(() {
-                          isPaying = false;
+                          isPaying = true;
                         });
-                      }
-                    },
-              child: isPaying
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : Text(context.tr('validate')),
-            ),
-          ],
-        );
-      },
-    ),
-  );
 
-  controller.dispose();
-}
+                        setStateDialog(() {});
+
+                        try {
+                          await api.createPayment(
+                            widget.clientId,
+                            venteId,
+                            montant,
+                          );
+
+                          if (!mounted) return;
+
+                          Navigator.pop(context);
+
+                          await load();
+
+                          if (!mounted) return;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(context.tr('payment_saved')),
+                            ),
+                          );
+                        } catch (e) {
+                          print("ERREUR PAIEMENT: $e");
+
+                          if (!mounted) return;
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Erreur : $e"),
+                            ),
+                          );
+                        }
+
+                        if (mounted) {
+                          setState(() {
+                            isPaying = false;
+                          });
+                        }
+                      },
+                child: isPaying
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(context.tr('validate')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    controller.dispose();
+  }
 
   // ================= CONTACT =================
 
@@ -329,8 +322,14 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: const Border(left: BorderSide(color: TerreEtOrColors.gold, width: 5)),
-        boxShadow: [BoxShadow(color: TerreEtOrColors.navy.withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 6))],
+        border: const Border(
+            left: BorderSide(color: TerreEtOrColors.gold, width: 5)),
+        boxShadow: [
+          BoxShadow(
+              color: TerreEtOrColors.navy.withValues(alpha: 0.07),
+              blurRadius: 20,
+              offset: const Offset(0, 6))
+        ],
       ),
       child: Wrap(
         alignment: WrapAlignment.spaceBetween,
@@ -339,19 +338,42 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         runSpacing: 14,
         children: [
           Row(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(radius: 27, backgroundColor: (hasDebt ? TerreEtOrColors.gold : TerreEtOrColors.green).withValues(alpha: .14), child: Icon(Icons.person_outline, size: 29, color: hasDebt ? TerreEtOrColors.gold : TerreEtOrColors.green)),
+            CircleAvatar(
+                radius: 27,
+                backgroundColor:
+                    (hasDebt ? TerreEtOrColors.gold : TerreEtOrColors.green)
+                        .withValues(alpha: .14),
+                child: Icon(Icons.person_outline,
+                    size: 29,
+                    color: hasDebt
+                        ? TerreEtOrColors.gold
+                        : TerreEtOrColors.green)),
             const SizedBox(width: 12),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(widget.nom, style: const TextStyle(color: TerreEtOrColors.ink, fontSize: 20, fontWeight: FontWeight.bold)),
-              if (widget.telephone.trim().isNotEmpty) Text(widget.telephone, style: const TextStyle(color: TerreEtOrColors.muted)),
+              Text(widget.nom,
+                  style: const TextStyle(
+                      color: TerreEtOrColors.ink,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold)),
+              if (widget.telephone.trim().isNotEmpty)
+                Text(widget.telephone,
+                    style: const TextStyle(color: TerreEtOrColors.muted)),
             ]),
           ]),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            const Text('Reste à payer', style: TextStyle(color: TerreEtOrColors.muted, fontSize: 12)),
+            const Text('Reste à payer',
+                style: TextStyle(color: TerreEtOrColors.muted, fontSize: 12)),
             const SizedBox(height: 3),
-            Text(formatMoney(balance), style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold, color: hasDebt ? const Color(0xFFD85B4B) : TerreEtOrColors.green)),
+            Text(formatMoney(balance),
+                style: TextStyle(
+                    fontSize: 23,
+                    fontWeight: FontWeight.bold,
+                    color: hasDebt
+                        ? const Color(0xFFD85B4B)
+                        : TerreEtOrColors.green)),
           ]),
-          Row(mainAxisSize: MainAxisSize.min,
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               OutlinedButton.icon(
                 onPressed: appeler,
@@ -379,22 +401,30 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
       child: LayoutBuilder(builder: (context, constraints) {
         final cards = [
           buildSummaryCard(
-              title: "FACTURÉ",
-              value: totalFacture,
-              color: const Color(0xFF3D7FA1),
-            ),
+            title: "FACTURÉ",
+            value: totalFacture,
+            color: const Color(0xFF3D7FA1),
+          ),
           buildSummaryCard(
-              title: "PAYÉ",
-              value: totalPaye,
-              color: TerreEtOrColors.green,
-            ),
+            title: "PAYÉ",
+            value: totalPaye,
+            color: TerreEtOrColors.green,
+          ),
           buildSummaryCard(
-              title: "RESTE",
-              value: balance,
-              color: balance > 0 ? const Color(0xFFD85B4B) : TerreEtOrColors.green,
-            ),
+            title: "RESTE",
+            value: balance,
+            color:
+                balance > 0 ? const Color(0xFFD85B4B) : TerreEtOrColors.green,
+          ),
         ];
-        return GridView.count(crossAxisCount: 3, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: constraints.maxWidth < 500 ? 1.15 : 2.2, children: cards);
+        return GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: constraints.maxWidth < 500 ? 1.15 : 2.2,
+            children: cards);
       }),
     );
   }
@@ -408,7 +438,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const ListTile(
-              title: Text('Choisir la langue de la facture', style: TextStyle(fontWeight: FontWeight.bold)),
+              title: Text('Choisir la langue de la facture',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
             ListTile(
               leading: const CircleAvatar(child: Text('FR')),
@@ -531,7 +562,6 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     final lot = v["lot_nom"] ?? "";
     final quantite = v["quantite"] ?? 0;
     final date = v["date"] ?? "";
-    
 
     return Card(
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
@@ -559,9 +589,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     color: Colors.blueGrey.shade700,
                   ),
                 ),
-
                 const SizedBox(width: 10),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -586,7 +614,6 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     ],
                   ),
                 ),
-
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 9,
@@ -607,9 +634,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 14),
-
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -633,9 +658,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 10),
-
             Row(
               children: [
                 Expanded(
@@ -654,9 +677,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
-
             Row(
               children: [
                 Icon(
@@ -681,25 +702,25 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => openInvoice(v),
                   icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                  label: Text(status == 'PAYE' ? 'Facture payée' : 'Facture partielle'),
+                  label: Text(
+                      status == 'PAYE' ? 'Facture payée' : 'Facture partielle'),
                 ),
               ),
             ],
             if (reste > 0) ...[
-  const SizedBox(height: 12),
-
-  SizedBox(
-    width: double.infinity,
-    child: ElevatedButton.icon(
-      onPressed: () => payer(
-        (venteId as num).toInt(),
-        reste,
-      ),
-      icon: const Icon(Icons.payment, size: 18),
-      label: Text(context.tr('pay')),
-    ),
-  ),
-],
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => payer(
+                    (venteId as num).toInt(),
+                    reste,
+                  ),
+                  icon: const Icon(Icons.payment, size: 18),
+                  label: Text(context.tr('pay')),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -785,9 +806,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 color: Colors.green.shade700,
               ),
             ),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,9 +827,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                       color: Colors.grey.shade600,
                     ),
                   ),
-
-                  if (note != null &&
-                      note.toString().trim().isNotEmpty) ...[
+                  if (note != null && note.toString().trim().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
                       note.toString(),
@@ -838,7 +855,6 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         title: Text(widget.nom),
         elevation: 0,
       ),
-
       body: loading
           ? const Center(
               child: CircularProgressIndicator(),

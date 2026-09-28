@@ -196,8 +196,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                 itemBuilder: (_, i) {
                   final item = data[i];
                   final marge = (item["marge"] ?? 0).toDouble();
-                  final rentabilite =
-                      (item["rentabilite"] ?? 0).toDouble();
+                  final rentabilite = (item["rentabilite"] ?? 0).toDouble();
 
                   return Container(
                     margin: const EdgeInsets.symmetric(vertical: 6),
@@ -214,13 +213,11 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                       ],
                     ),
                     child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // LEFT
                         Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               item["nom"] ?? "",
@@ -234,9 +231,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                             Text(
                               "${(rentabilite * 100).toStringAsFixed(1)} %",
                               style: TextStyle(
-                                color: marge >= 0
-                                    ? Colors.green
-                                    : Colors.red,
+                                color: marge >= 0 ? Colors.green : Colors.red,
                                 fontSize: 12,
                               ),
                             ),
@@ -245,15 +240,12 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
 
                         // RIGHT
                         Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
                               AppSettings.instance.formatMoney(marge),
                               style: TextStyle(
-                                color: marge >= 0
-                                    ? Colors.green
-                                    : Colors.red,
+                                color: marge >= 0 ? Colors.green : Colors.red,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -263,9 +255,7 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
                               marge >= 0
                                   ? Icons.arrow_upward
                                   : Icons.arrow_downward,
-                              color: marge >= 0
-                                  ? Colors.green
-                                  : Colors.red,
+                              color: marge >= 0 ? Colors.green : Colors.red,
                               size: 14,
                             ),
                           ],

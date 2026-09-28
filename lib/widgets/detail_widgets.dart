@@ -52,7 +52,9 @@ class DetailMetricCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: TerreEtOrColors.muted, fontSize: 12)),
+                Text(label,
+                    style: const TextStyle(
+                        color: TerreEtOrColors.muted, fontSize: 12)),
                 const SizedBox(height: 4),
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -68,7 +70,9 @@ class DetailMetricCard extends StatelessWidget {
                 ),
                 if (caption != null) ...[
                   const SizedBox(height: 3),
-                  Text(caption!, style: const TextStyle(color: TerreEtOrColors.muted, fontSize: 11)),
+                  Text(caption!,
+                      style: const TextStyle(
+                          color: TerreEtOrColors.muted, fontSize: 11)),
                 ],
               ],
             ),
@@ -84,7 +88,8 @@ class DetailSection extends StatelessWidget {
   final String? subtitle;
   final Widget child;
 
-  const DetailSection({super.key, required this.title, this.subtitle, required this.child});
+  const DetailSection(
+      {super.key, required this.title, this.subtitle, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -104,10 +109,16 @@ class DetailSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(color: TerreEtOrColors.ink, fontSize: 17, fontWeight: FontWeight.w700)),
+          Text(title,
+              style: const TextStyle(
+                  color: TerreEtOrColors.ink,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700)),
           if (subtitle != null) ...[
             const SizedBox(height: 3),
-            Text(subtitle!, style: const TextStyle(color: TerreEtOrColors.muted, fontSize: 12)),
+            Text(subtitle!,
+                style: const TextStyle(
+                    color: TerreEtOrColors.muted, fontSize: 12)),
           ],
           const SizedBox(height: 16),
           child,
@@ -116,4 +127,3 @@ class DetailSection extends StatelessWidget {
     );
   }
 }
-

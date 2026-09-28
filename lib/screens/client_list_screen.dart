@@ -84,7 +84,8 @@ class _ClientListScreenState extends State<ClientListScreen> {
                   value: pays.isEmpty ? null : pays,
                   isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: '${context.tr('country')} (${context.tr('optional')})',
+                    labelText:
+                        '${context.tr('country')} (${context.tr('optional')})',
                   ),
                   items: AppSettings.sortedCountries(
                     AppSettings.instance.languageCode,
@@ -104,7 +105,8 @@ class _ClientListScreenState extends State<ClientListScreen> {
                 TextField(
                   controller: villeController,
                   decoration: InputDecoration(
-                    hintText: '${context.tr('city')} (${context.tr('optional')})',
+                    hintText:
+                        '${context.tr('city')} (${context.tr('optional')})',
                   ),
                 ),
               ],
@@ -162,123 +164,121 @@ class _ClientListScreenState extends State<ClientListScreen> {
     return Theme(
       data: terreEtOrTheme(context),
       child: Scaffold(
-      appBar: AppBar(title: Text(context.tr('customers'))),
-
-      floatingActionButton: FloatingActionButton(
-        onPressed: addClient,
-        child: const Icon(Icons.add),
-      ),
-
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-                  child: TerreEtOrHeader(
-                    icon: Icons.people_alt_outlined,
-                    title: context.tr('customers'),
-                    subtitle: AppSettings.instance.languageCode == 'en'
-                        ? 'Find your customers and their contact details'
-                        : 'Retrouvez vos clients et leurs coordonnées',
-                  ),
-                ),
-
-                // 🔍 BARRE DE RECHERCHE
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: TextField(
-                decoration: InputDecoration(
-                      hintText: context.tr('search_customer'),
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
+        appBar: AppBar(title: Text(context.tr('customers'))),
+        floatingActionButton: FloatingActionButton(
+          onPressed: addClient,
+          child: const Icon(Icons.add),
+        ),
+        body: loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                    child: TerreEtOrHeader(
+                      icon: Icons.people_alt_outlined,
+                      title: context.tr('customers'),
+                      subtitle: AppSettings.instance.languageCode == 'en'
+                          ? 'Find your customers and their contact details'
+                          : 'Retrouvez vos clients et leurs coordonnées',
                     ),
-                    onChanged: (value) {
-                      setState(() {
-                        search = value.toLowerCase();
-                      });
-                    },
                   ),
-                ),
 
-                // 📋 LISTE
-                Expanded(
-                  child: filteredClients.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(18),
-                                decoration: const BoxDecoration(
-                                  color: TerreEtOrColors.paleGold,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.people_outline,
-                                  color: TerreEtOrColors.gold,
-                                  size: 36,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(context.tr('no_customer')),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: filteredClients.length,
-                          itemBuilder: (_, i) {
-                            final c =
-                                filteredClients[i] as Map<String, dynamic>;
+                  // 🔍 BARRE DE RECHERCHE
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: context.tr('search_customer'),
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          search = value.toLowerCase();
+                        });
+                      },
+                    ),
+                  ),
 
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              child: ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: TerreEtOrColors.paleGold,
-                                  foregroundColor: TerreEtOrColors.gold,
-                                  child: Icon(Icons.person_outline),
+                  // 📋 LISTE
+                  Expanded(
+                    child: filteredClients.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(18),
+                                  decoration: const BoxDecoration(
+                                    color: TerreEtOrColors.paleGold,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.people_outline,
+                                    color: TerreEtOrColors.gold,
+                                    size: 36,
+                                  ),
                                 ),
-                                title: Text(c["nom"] ?? ""),
-                                subtitle: Text(
-                                  [
-                                    c["telephone"],
-                                    c["ville"],
-                                    countryName(c["pays"]),
-                                  ]
-                                      .where(
-                                        (value) =>
-                                            value != null &&
-                                            value.toString().trim().isNotEmpty,
-                                      )
-                                      .join(' • '),
-                                ),
-                                trailing:
-                                    const Icon(Icons.arrow_forward_ios),
+                                const SizedBox(height: 12),
+                                Text(context.tr('no_customer')),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filteredClients.length,
+                            itemBuilder: (_, i) {
+                              final c =
+                                  filteredClients[i] as Map<String, dynamic>;
 
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ClientDetailScreen(
-                                        clientId: c["id"],
-                                        nom: c["nom"] ?? "",
-                                        telephone:
-                                            c["telephone"] ?? "",
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                child: ListTile(
+                                  leading: const CircleAvatar(
+                                    backgroundColor: TerreEtOrColors.paleGold,
+                                    foregroundColor: TerreEtOrColors.gold,
+                                    child: Icon(Icons.person_outline),
+                                  ),
+                                  title: Text(c["nom"] ?? ""),
+                                  subtitle: Text(
+                                    [
+                                      c["telephone"],
+                                      c["ville"],
+                                      countryName(c["pays"]),
+                                    ]
+                                        .where(
+                                          (value) =>
+                                              value != null &&
+                                              value
+                                                  .toString()
+                                                  .trim()
+                                                  .isNotEmpty,
+                                        )
+                                        .join(' • '),
+                                  ),
+                                  trailing: const Icon(Icons.arrow_forward_ios),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ClientDetailScreen(
+                                          clientId: c["id"],
+                                          nom: c["nom"] ?? "",
+                                          telephone: c["telephone"] ?? "",
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
       ),
     );
   }
