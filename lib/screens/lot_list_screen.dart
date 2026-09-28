@@ -46,9 +46,7 @@ class _LotListScreenState extends State<LotListScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Theme(
@@ -78,16 +76,25 @@ class _LotListScreenState extends State<LotListScreen> {
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 6),
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       child: ListTile(
-                        leading: const CircleAvatar(
+                        leading: CircleAvatar(
                           backgroundColor: TerreEtOrColors.paleGold,
                           foregroundColor: TerreEtOrColors.gold,
-                          child: Icon(Icons.inventory_2_outlined),
+                          child: Icon(
+                            lot['type_production'] == 'OEUFS'
+                                ? Icons.egg_outlined
+                                : Icons.inventory_2_outlined,
+                          ),
                         ),
                         title: Text(lot["nom"]),
-                        subtitle:
-                            Text("${context.tr('stock')}: ${lot["stock"]}"),
+                        subtitle: Text(
+                          lot['type_production'] == 'OEUFS'
+                              ? "Ponte · ${context.tr('stock')}: ${lot['stock']} poules"
+                              : "${context.tr('stock')}: ${lot['stock']}",
+                        ),
                         trailing: const Icon(
                           Icons.chevron_right,
                           color: TerreEtOrColors.navy,

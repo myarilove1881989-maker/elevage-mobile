@@ -25,7 +25,6 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
     'Chèvre',
     'Lapin',
     'Poisson',
-    'Œufs',
   ];
 
   final _formKey = GlobalKey<FormState>();
@@ -39,6 +38,9 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
 
   List especes = [];
   int? selectedEspece;
+  String selectedProductionType = 'CHAIR';
+  String selectedProductionStatus = 'ELEVAGE';
+  DateTime? layingStartDate;
 
   bool isLoading = true;
   bool isSubmitting = false;
@@ -55,8 +57,9 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
 
     try {
       var data = await widget.apiService.getEspeces();
-      final existingNames =
-          data.map((item) => item['nom'].toString().toLowerCase()).toSet();
+      final existingNames = data
+          .map((item) => item['nom'].toString().toLowerCase())
+          .toSet();
       final missing = speciesCatalog
           .where((name) => !existingNames.contains(name.toLowerCase()))
           .toList();
@@ -99,7 +102,6 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
       'Chèvre': 'Goat',
       'Lapin': 'Rabbit',
       'Poisson': 'Fish',
-      'Œufs': 'Eggs',
     };
     return englishNames[name] ?? name;
   }
@@ -119,9 +121,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
 
   // ================= MESSAGE =================
   void showMessage(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   // ================= SUBMIT =================
@@ -155,7 +155,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
     setState(() => isSubmitting = true);
 
     try {
-// 🔥 2. créer l'achat
+      // 🔥 2. créer l'achat
       final success = await widget.apiService.createAchat(
         nomLot: nomLotController.text.trim(),
         especeId: selectedEspece!,
@@ -163,6 +163,9 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
         prixTotal: prixTotal,
         prixUnitaire: prixUnitaire,
         date: selectedDate,
+        typeProduction: selectedProductionType,
+        statutProduction: selectedProductionStatus,
+        dateDebutPonte: layingStartDate,
       );
 
       if (!mounted) return;
@@ -194,17 +197,13 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Theme(
       data: terreEtOrTheme(context),
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(context.tr('new_purchase')),
-        ),
+        appBar: AppBar(title: Text(context.tr('new_purchase'))),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: Form(
@@ -239,43 +238,133 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
                         displayStringForOption: (option) =>
                             speciesLabel(option['nom'].toString()),
                         optionsBuilder: (textEditingValue) {
-                          final query =
-                              textEditingValue.text.trim().toLowerCase();
+                          final query = textEditingValue.text
+                              .trim()
+                              .toLowerCase();
                           final options = especes.cast<Map<String, dynamic>>();
                           if (query.isEmpty) return options;
                           return options.where(
-                            (item) => speciesLabel(item['nom'].toString())
-                                .toLowerCase()
-                                .contains(query),
+                            (item) => speciesLabel(
+                              item['nom'].toString(),
+                            ).toLowerCase().contains(query),
                           );
                         },
                         onSelected: (option) {
                           setState(() => selectedEspece = option['id'] as int);
                         },
-                        fieldViewBuilder: (
-                          context,
-                          textEditingController,
-                          focusNode,
-                          onFieldSubmitted,
-                        ) {
-                          return TextFormField(
-                            controller: textEditingController,
-                            focusNode: focusNode,
-                            onChanged: (_) =>
-                                setState(() => selectedEspece = null),
-                            decoration: InputDecoration(
-                              labelText: context.tr('choose_species'),
-                              hintText: context.tr('search_species'),
-                              prefixIcon: const Icon(Icons.pets_outlined),
-                              suffixIcon: const Icon(Icons.arrow_drop_down),
-                              border: const OutlineInputBorder(),
-                            ),
-                            validator: (_) => selectedEspece == null
-                                ? context.tr('species_required')
-                                : null,
-                          );
+                        fieldViewBuilder:
+                            (
+                              context,
+                              textEditingController,
+                              focusNode,
+                              onFieldSubmitted,
+                            ) {
+                              return TextFormField(
+                                controller: textEditingController,
+                                focusNode: focusNode,
+                                onChanged: (_) =>
+                                    setState(() => selectedEspece = null),
+                                decoration: InputDecoration(
+                                  labelText: context.tr('choose_species'),
+                                  hintText: context.tr('search_species'),
+                                  prefixIcon: const Icon(Icons.pets_outlined),
+                                  suffixIcon: const Icon(Icons.arrow_drop_down),
+                                  border: const OutlineInputBorder(),
+                                ),
+                                validator: (_) => selectedEspece == null
+                                    ? context.tr('species_required')
+                                    : null,
+                              );
+                            },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedProductionType,
+                        decoration: const InputDecoration(
+                          labelText: 'Type de production',
+                          prefixIcon: Icon(Icons.category_outlined),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'CHAIR',
+                            child: Text('Élevage de chair'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'OEUFS',
+                            child: Text('Production d’œufs'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'REPRODUCTION',
+                            child: Text('Reproduction'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'AUTRE',
+                            child: Text('Autre'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            selectedProductionType = value;
+                            selectedProductionStatus = value == 'OEUFS'
+                                ? 'PONTE'
+                                : 'ELEVAGE';
+                            if (value != 'OEUFS') layingStartDate = null;
+                          });
                         },
                       ),
+
+                      if (selectedProductionType == 'OEUFS') ...[
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedProductionStatus,
+                          decoration: const InputDecoration(
+                            labelText: 'Statut du lot',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'ELEVAGE',
+                              child: Text('Élevage'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'PONTE',
+                              child: Text('Ponte'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'REFORME',
+                              child: Text('Réforme'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'TERMINE',
+                              child: Text('Terminé'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => selectedProductionStatus = value);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        TerreEtOrDateTile(
+                          label: layingStartDate == null
+                              ? 'Date de début de ponte (facultative)'
+                              : 'Début de ponte : ${layingStartDate!.toIso8601String().split('T')[0]}',
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: layingStartDate ?? selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setState(() => layingStartDate = picked);
+                            }
+                          },
+                        ),
+                      ],
 
                       const SizedBox(height: 16),
 
@@ -352,7 +441,8 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
                           onPressed: isSubmitting ? null : submit,
                           child: isSubmitting
                               ? const CircularProgressIndicator(
-                                  color: Colors.white)
+                                  color: Colors.white,
+                                )
                               : Text(context.tr('create_lot')),
                         ),
                       ),

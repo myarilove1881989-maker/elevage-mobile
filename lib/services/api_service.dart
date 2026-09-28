@@ -25,9 +25,7 @@ class ApiService {
 
     if (currentToken == null) {
       print("⚠️ Token manquant");
-      return {
-        "Content-Type": "application/json",
-      };
+      return {"Content-Type": "application/json"};
     }
 
     return {
@@ -97,14 +95,15 @@ class ApiService {
     }
   }
 
-// ================= REGISTER =================
+  // ================= REGISTER =================
   Future<dynamic> register(
-      String username, String email, String password) async {
+    String username,
+    String email,
+    String password,
+  ) async {
     final response = await http.post(
       Uri.parse("$baseUrl/register/"),
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "username": username,
         "email": email,
@@ -162,10 +161,7 @@ class ApiService {
     final response = await http.post(
       Uri.parse("$baseUrl/token/"),
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "username": username,
-        "password": password,
-      }),
+      body: jsonEncode({"username": username, "password": password}),
     );
 
     print("LOGIN RESPONSE: ${response.body}");
@@ -209,15 +205,13 @@ class ApiService {
       print("🌐 AVANT REQUETE");
 
       final uri = Uri.parse("$baseUrl/dashboard/").replace(
-        queryParameters:
-            especeId == null ? null : {"espece": especeId.toString()},
+        queryParameters: especeId == null
+            ? null
+            : {"espece": especeId.toString()},
       );
 
       final response = await http
-          .get(
-            uri,
-            headers: _headers(),
-          )
+          .get(uri, headers: _headers())
           .timeout(const Duration(seconds: 30));
 
       print("✅ APRES REQUETE");
@@ -275,7 +269,7 @@ class ApiService {
     return true;
   }
 
-// ================= STOCK DETAIL =================
+  // ================= STOCK DETAIL =================
   Future<Map<String, dynamic>> getStockDetail(int lotId) async {
     final response = await http.get(
       Uri.parse("$baseUrl/stock-detail/?lot=$lotId"),
@@ -347,6 +341,11 @@ class ApiService {
     required double prixTotal,
     required double prixUnitaire,
     required DateTime date,
+    String typeProduction = 'CHAIR',
+    String statutProduction = 'ELEVAGE',
+    DateTime? dateNaissance,
+    int? ageArriveeSemaines,
+    DateTime? dateDebutPonte,
   }) async {
     final body = {
       "nom_lot": nomLot,
@@ -355,6 +354,14 @@ class ApiService {
       "prix_total": prixTotal,
       "prix_unitaire": prixUnitaire,
       "date": date.toIso8601String().split("T")[0],
+      "type_production": typeProduction,
+      "statut_production": statutProduction,
+      if (dateNaissance != null)
+        "date_naissance": dateNaissance.toIso8601String().split("T")[0],
+      if (ageArriveeSemaines != null)
+        "age_arrivee_semaines": ageArriveeSemaines,
+      if (dateDebutPonte != null)
+        "date_debut_ponte": dateDebutPonte.toIso8601String().split("T")[0],
     };
 
     final response = await http.post(
@@ -365,6 +372,118 @@ class ApiService {
 
     await _handleResponse(response);
     return true;
+  }
+
+  // ================= POULES PONDEUSES =================
+  Future<List<dynamic>> getEggCollections(
+    int lotId, {
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    final query = <String, String>{"lot": lotId.toString()};
+    if (start != null) {
+      query["date_debut"] = start.toIso8601String().split("T")[0];
+    }
+    if (end != null) {
+      query["date_fin"] = end.toIso8601String().split("T")[0];
+    }
+    final uri = Uri.parse(
+      "$baseUrl/oeufs/collectes/",
+    ).replace(queryParameters: query);
+    final response = await http.get(uri, headers: _headers());
+    return await _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> createEggCollection({
+    required int lotId,
+    required DateTime collectedAt,
+    required int total,
+    int broken = 0,
+    int downgraded = 0,
+    int consumedOrDonated = 0,
+    String note = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/oeufs/collectes/"),
+      headers: _headers(),
+      body: jsonEncode({
+        "lot": lotId,
+        "collecte_at": collectedAt.toIso8601String(),
+        "nombre_collecte": total,
+        "nombre_casses": broken,
+        "nombre_declasses": downgraded,
+        "nombre_consommes_donnes": consumedOrDonated,
+        "note": note,
+      }),
+    );
+    return await _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> getEggStatistics(
+    int lotId, {
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    final query = <String, String>{"lot": lotId.toString()};
+    if (start != null) {
+      query["date_debut"] = start.toIso8601String().split("T")[0];
+    }
+    if (end != null) {
+      query["date_fin"] = end.toIso8601String().split("T")[0];
+    }
+    final uri = Uri.parse(
+      "$baseUrl/oeufs/statistiques/",
+    ).replace(queryParameters: query);
+    final response = await http.get(uri, headers: _headers());
+    return await _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> createEggSale({
+    required int lotId,
+    required int clientId,
+    required String packaging,
+    required int packageCount,
+    required double packagePrice,
+    int? eggsPerPackage,
+    DateTime? date,
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/oeufs/ventes/"),
+      headers: _headers(),
+      body: jsonEncode({
+        "lot": lotId,
+        "client": clientId,
+        "conditionnement": packaging,
+        "nombre_conditionnements": packageCount,
+        "prix_unitaire_conditionnement": packagePrice,
+        if (eggsPerPackage != null) "oeufs_par_conditionnement": eggsPerPackage,
+        "date": (date ?? DateTime.now()).toIso8601String().split("T")[0],
+      }),
+    );
+    return await _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> createFeedConsumption({
+    required int lotId,
+    required double quantityKg,
+    double? pricePerKg,
+    int? expenseId,
+    DateTime? date,
+    String note = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/oeufs/alimentation/"),
+      headers: _headers(),
+      body: jsonEncode({
+        "lot": lotId,
+        "quantite_kg": quantityKg,
+        if (pricePerKg != null) "prix_kg": pricePerKg,
+        if (expenseId != null) "depense": expenseId,
+        "date": (date ?? DateTime.now()).toIso8601String().split("T")[0],
+        "note": note,
+      }),
+    );
+    return await _handleResponse(response);
   }
 
   // ================= MOUVEMENT =================
@@ -442,11 +561,7 @@ class ApiService {
     return res;
   }
 
-  Future<bool> createPayment(
-    int clientId,
-    int venteId,
-    double montant,
-  ) async {
+  Future<bool> createPayment(int clientId, int venteId, double montant) async {
     final res = await post("/payments/create/", {
       "client": clientId,
       "vente": venteId,
@@ -487,7 +602,7 @@ class ApiService {
     return await _handleResponse(response);
   }
 
-// ================= GENERIC POST =================
+  // ================= GENERIC POST =================
   Future<dynamic> post(String endpoint, Map<String, dynamic> data) async {
     final normalizedBase = baseUrl.replaceFirst(RegExp(r'/+$'), '');
     final normalizedEndpoint = endpoint.replaceFirst(RegExp(r'^/+'), '');
