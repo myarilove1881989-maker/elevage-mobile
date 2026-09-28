@@ -43,6 +43,8 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
     return days;
   }
   Map<String, dynamic>? stats;
+  Map<String, dynamic>? datedStock;
+  String? datedStockError;
   List<dynamic> collections = [];
   bool loading = true;
   bool saving = false;
@@ -69,7 +71,11 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
       AppSettings.instance.formatMoney(number(value), decimals: 0);
 
   Future<void> loadData() async {
-    if (mounted) setState(() => loading = true);
+    if (mounted) setState(() {
+      loading = true;
+      datedStock = null;
+      datedStockError = null;
+    });
     try {
       final results = await Future.wait([
         widget.apiService.getEggStatistics(
@@ -83,10 +89,19 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
           end: periodEnd,
         ),
       ]);
+      Map<String, dynamic>? stock;
+      String? stockError;
+      try {
+        stock = await widget.apiService.getDatedEggStock(widget.lotId);
+      } catch (error) {
+        stockError = error.toString();
+      }
       if (!mounted) return;
       setState(() {
         stats = results[0] as Map<String, dynamic>;
         collections = results[1] as List<dynamic>;
+        datedStock = stock;
+        datedStockError = stockError;
         loading = false;
       });
     } catch (error) {
@@ -428,6 +443,74 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
     );
   }
 
+  Widget _datedStockPanel() {
+    final stock = datedStock!;
+    final rows = stock['collectes'] as List<dynamic>? ?? [];
+    final complete = stock['origines_completes'] == true;
+    return TerreEtOrPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.tr('egg_dated_stock'),
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text('${context.tr('egg_global_available')} : ${stock['stock_global']} œufs',
+              key: const Key('eggDatedGlobalStock')),
+          Text(trayCount(stock['stock_global'])),
+          if (!complete) ...[
+            const SizedBox(height: 8),
+            Text(context.tr('egg_origin_unknown'),
+                key: const Key('eggStockUnknown')),
+            Text('${context.tr('egg_unallocated_exits')} : '
+                '${stock['sorties_non_attribuees']}'),
+            if (number(stock['entrees_hors_collecte']) != 0)
+              Text('${context.tr('egg_unattributed_entries')} : '
+                  '${stock['entrees_hors_collecte']}'),
+          ],
+          const SizedBox(height: 12),
+          Text(context.tr('egg_by_collection'),
+              style: Theme.of(context).textTheme.titleMedium),
+          if (rows.isEmpty)
+            Text(context.tr('egg_stock_empty')),
+          for (final raw in rows)
+            _datedCollectionCard(Map<String, dynamic>.from(raw as Map), complete),
+        ],
+      ),
+    );
+  }
+
+  Widget _datedCollectionCard(Map<String, dynamic> item, bool complete) {
+    final at = DateTime.parse(item['collecte_at'].toString()).toLocal();
+    final localizations = MaterialLocalizations.of(context);
+    final stamp = '${localizations.formatMediumDate(at)} — '
+        '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(at))}';
+    final remaining = item['restant'];
+    return Card(
+      key: Key('eggStockCollection-${item['id']}'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(stamp, style: Theme.of(context).textTheme.titleSmall),
+            Text('${context.tr('egg_collected_total')} : ${item['nombre_collecte']}'),
+            Text('${context.tr('egg_commercializable')} : '
+                '${item['nombre_commercialisable']}'),
+            Text('${context.tr('egg_assigned_exits')} : '
+                '${item['sorties_affectees']}'),
+            if (complete && remaining != null) ...[
+              Text('${context.tr('egg_collection_remaining')} : $remaining'),
+              Text(trayCount(remaining)),
+              if (number(remaining) == 0)
+                Text(context.tr('egg_exhausted')),
+            ] else
+              Text(context.tr('egg_remaining_unknown')),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -563,6 +646,17 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                     ],
                   ),
                 ),
+              ],
+              if (!loading) ...[
+                const SizedBox(height: 14),
+                if (datedStockError != null)
+                  Card(child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Text(context.tr('egg_stock_error'),
+                        key: const Key('eggStockLoadError')),
+                  ))
+                else if (datedStock != null)
+                  _datedStockPanel(),
               ],
               const SizedBox(height: 14),
               LayoutBuilder(

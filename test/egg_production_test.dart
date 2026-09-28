@@ -12,6 +12,9 @@ class EggApiFake extends ApiService {
   int? lastRemainder;
   DateTime? lastCollectedAt;
   List<dynamic> sampleCollections = [];
+  Map<String, dynamic>? sampleStock;
+  bool stockFails = false;
+  int stockLoads = 0;
   int? linkedExpense;
   @override
   Future<Map<String, dynamic>> getEggStatistics(
@@ -33,6 +36,19 @@ class EggApiFake extends ApiService {
     DateTime? start,
     DateTime? end,
   }) async => sampleCollections;
+
+  @override
+  Future<Map<String, dynamic>> getDatedEggStock(int lotId) async {
+    stockLoads++;
+    if (stockFails) throw Exception('Stock indisponible');
+    return sampleStock ?? {
+      'stock_global': 30,
+      'origines_completes': true,
+      'sorties_non_attribuees': 0,
+      'entrees_hors_collecte': 0,
+      'collectes': [],
+    };
+  }
   @override
   Future<Map<String, dynamic>> getLotDetail(int lotId) async => {
     'depenses': [
@@ -113,6 +129,7 @@ void main() {
     expect(api.lastRemainder, 17);
     expect(api.lastCollectedAt, isNotNull);
     expect(api.loads, 2);
+    expect(api.stockLoads, 2);
     expect(tester.takeException(), isNull);
   });
   testWidgets('Refuse 30 œufs restants avant l’envoi', (tester) async {
@@ -225,6 +242,121 @@ void main() {
     await tester.tap(find.byKey(const Key('saveFeedDistribution')));
     await tester.pumpAndSettle();
     expect(api.linkedExpense, 42);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Affiche le stock daté et une collecte épuisée', (tester) async {
+    final api = EggApiFake();
+    api.sampleStock = {
+      'stock_global': 2080,
+      'origines_completes': true,
+      'sorties_non_attribuees': 0,
+      'entrees_hors_collecte': 0,
+      'collectes': [
+        {
+          'id': 2, 'collecte_at': '2026-09-28T17:30:00',
+          'nombre_collecte': 900, 'nombre_commercialisable': 880,
+          'sorties_affectees': 0, 'restant': 880,
+        },
+        {
+          'id': 1, 'collecte_at': '2026-09-28T08:15:00',
+          'nombre_collecte': 1500, 'nombre_commercialisable': 1500,
+          'sorties_affectees': 300, 'restant': 1200,
+        },
+        {
+          'id': 3, 'collecte_at': '2026-09-27T16:20:00',
+          'nombre_collecte': 500, 'nombre_commercialisable': 500,
+          'sorties_affectees': 500, 'restant': 0,
+        },
+      ],
+    };
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: EggProductionScreen(apiService: api, lotId: 1, lotName: 'Ponte'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('eggDatedGlobalStock')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.textContaining('2080 œufs'), findsOneWidget);
+    expect(find.text('69 alvéoles + 10 œufs'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-2')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.textContaining('17:30'), findsOneWidget);
+    expect(find.text('29 alvéoles + 10 œufs'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-1')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.textContaining('08:15'), findsOneWidget);
+    expect(find.text('Restants : 1200'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-3')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Épuisée'), findsOneWidget);
+  });
+
+  testWidgets('Rend explicite l origine inconnue des ventes', (tester) async {
+    final api = EggApiFake();
+    api.sampleStock = {
+      'stock_global': 600,
+      'origines_completes': false,
+      'sorties_non_attribuees': 600,
+      'entrees_hors_collecte': 0,
+      'collectes': [
+        {
+          'id': 1, 'collecte_at': '2026-09-26T08:00:00',
+          'nombre_collecte': 500, 'nombre_commercialisable': 500,
+          'sorties_affectees': 0, 'restant': null,
+        },
+      ],
+    };
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: EggProductionScreen(apiService: api, lotId: 1, lotName: 'Ponte'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('eggStockUnknown')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.textContaining('Stock disponible : 600 œufs'), findsOneWidget);
+    expect(find.text('Sorties sans origine : 600'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-1')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Restant indéterminé'), findsOneWidget);
+  });
+
+  testWidgets('Montre une liste vide et une erreur API après rafraîchissement',
+      (tester) async {
+    final api = EggApiFake();
+    await tester.pumpWidget(MaterialApp(
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr'), Locale('en')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: EggProductionScreen(apiService: api, lotId: 1, lotName: 'Ponte'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Aucune collecte enregistrée pour ce lot.'),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Aucune collecte enregistrée pour ce lot.'), findsOneWidget);
+    api.stockFails = true;
+    await tester.widget<RefreshIndicator>(find.byType(RefreshIndicator)).onRefresh();
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('eggStockLoadError')),
+        250, scrollable: find.byType(Scrollable).first);
+    expect(find.text('Impossible de charger le stock par collecte.'), findsOneWidget);
+    expect(api.stockLoads, greaterThanOrEqualTo(2));
     expect(tester.takeException(), isNull);
   });
 }

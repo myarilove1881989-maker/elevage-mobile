@@ -442,6 +442,14 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> getDatedEggStock(int lotId) async {
+    final uri = Uri.parse("$baseUrl/oeufs/stock-date/").replace(
+      queryParameters: {"lot": lotId.toString()},
+    );
+    final response = await http.get(uri, headers: _headers());
+    return await _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> createEggSale({
     required int lotId,
     required int clientId,
