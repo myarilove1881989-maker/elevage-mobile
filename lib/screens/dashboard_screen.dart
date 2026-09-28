@@ -7,6 +7,7 @@ import 'package:app_elevage/screens/add_achat_screen.dart';
 import 'package:app_elevage/screens/add_mouvement_screen.dart';
 import 'package:app_elevage/screens/add_depense_screen.dart';
 import 'package:app_elevage/screens/lot_list_screen.dart';
+import 'package:app_elevage/screens/production_tracking_screen.dart';
 
 import '../main.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -620,6 +621,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (result == true) await refreshDashboard();
   }
 
+  Future<void> _openProductionTracking() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductionTrackingScreen(apiService: apiService),
+      ),
+    );
+  }
+
   Future<void> _openMouvement() async {
     final result = await Navigator.push(
       context,
@@ -768,6 +778,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 () => _openAchat()),
             item(context.tr('expenses'), Icons.shopping_cart_outlined,
                 () => _openDepense()),
+            item(
+              context.tr('production_tracking'),
+              Icons.monitor_heart_outlined,
+              () => _openProductionTracking(),
+            ),
             item(
               context.tr('movements'),
               Icons.swap_horiz,
@@ -1220,7 +1235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final bool horizontal = constraints.maxWidth >= 700;
+                  final bool horizontal = constraints.maxWidth >= 900;
 
                   Widget especeFilter() {
                     return DropdownButtonFormField<int>(
@@ -1282,6 +1297,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   Widget lotFilter() {
                     return DropdownButtonFormField<int?>(
+                      isExpanded: true,
                       value: selectedLotId,
                       decoration: InputDecoration(
                         labelText: context.tr('batch'),

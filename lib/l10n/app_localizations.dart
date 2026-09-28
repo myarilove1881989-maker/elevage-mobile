@@ -13,6 +13,29 @@ class AppLocalizations {
       'refresh': 'Actualiser',
       'purchases': 'Achats',
       'expenses': 'Dépenses',
+      'production_tracking': 'Suivi de production',
+      'production_tracking_subtitle':
+          'Choisissez une espèce et un lot pour accéder à son suivi',
+      'production_tracking_load_error':
+          'Impossible de charger les espèces et les lots.',
+      'no_batch_for_species': 'Aucun lot disponible pour cette espèce.',
+      'production_type': 'Type de production',
+      'production_type_meat': 'Chair',
+      'production_type_eggs': 'Œufs',
+      'production_type_reproduction': 'Reproduction',
+      'production_type_other': 'Autre',
+      'laying_tracking': 'Suivi de ponte',
+      'laying_tracking_available':
+          'Les collectes, le stock et les ventes d’œufs sont disponibles pour ce lot.',
+      'open_laying_tracking': 'Ouvrir le suivi de ponte',
+      'growth_tracking': 'Suivi de croissance',
+      'growth_tracking_future':
+          'Le suivi de croissance de ce lot sera disponible prochainement.',
+      'reproduction_tracking': 'Suivi de reproduction',
+      'reproduction_tracking_future':
+          'Ce suivi sera disponible ultérieurement.',
+      'no_specialized_tracking':
+          "Aucun suivi de production spécialisé n'est disponible pour ce type de lot.",
       'movements': 'Mouvements',
       'billing': 'Facturation',
       'history': 'Historique',
@@ -142,6 +165,29 @@ class AppLocalizations {
       'refresh': 'Refresh',
       'purchases': 'Purchases',
       'expenses': 'Expenses',
+      'production_tracking': 'Production tracking',
+      'production_tracking_subtitle':
+          'Choose a species and batch to access its production tracking',
+      'production_tracking_load_error':
+          'Unable to load species and batches.',
+      'no_batch_for_species': 'No batch is available for this species.',
+      'production_type': 'Production type',
+      'production_type_meat': 'Meat',
+      'production_type_eggs': 'Eggs',
+      'production_type_reproduction': 'Breeding',
+      'production_type_other': 'Other',
+      'laying_tracking': 'Laying tracking',
+      'laying_tracking_available':
+          'Egg collections, stock and sales are available for this batch.',
+      'open_laying_tracking': 'Open laying tracking',
+      'growth_tracking': 'Growth tracking',
+      'growth_tracking_future':
+          'Growth tracking for this batch will be available soon.',
+      'reproduction_tracking': 'Breeding tracking',
+      'reproduction_tracking_future':
+          'This tracking will be available later.',
+      'no_specialized_tracking':
+          'No specialized production tracking is available for this batch type.',
       'movements': 'Movements',
       'billing': 'Billing',
       'history': 'History',
