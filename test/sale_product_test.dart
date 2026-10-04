@@ -14,6 +14,7 @@ class SaleApiFake extends ApiService {
   int? eggExtra;
   String? eggTotal;
   int eggStock = 1000;
+  bool eggOriginsComplete = true;
   bool stockFails = false;
   int stockLoads = 0;
   String? clientCountry;
@@ -35,7 +36,11 @@ class SaleApiFake extends ApiService {
   Future<Map<String, dynamic>> getDatedEggStock(int lotId) async {
     stockLoads++;
     if (stockFails) throw Exception('Stock indisponible');
-    return {'stock_global': eggStock, 'collectes': <dynamic>[]};
+    return {
+      'stock_global': eggStock,
+      'origines_completes': eggOriginsComplete,
+      'collectes': <dynamic>[],
+    };
   }
 
   @override
@@ -193,6 +198,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('eggSaleStock')), findsOneWidget);
     expect(api.stockLoads, 2);
+  });
+
+  testWidgets('Bloque une vente si l’origine du stock reste indéterminée',
+      (tester) async {
+    final api = SaleApiFake()..eggOriginsComplete = false;
+    await tester.pumpWidget(saleApp(api));
+    await tester.pumpAndSettle();
+    await chooseEggs(tester);
+    expect(find.byKey(const Key('eggSaleOriginsIncomplete')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('eggSaleTrays')));
+    await tester.enterText(find.byKey(const Key('eggSaleTrays')), '2');
+    await tester.enterText(find.byKey(const Key('eggSaleTotalPrice')), '5000');
+    await tester.ensureVisible(find.byKey(const Key('saveMovement')));
+    await tester.tap(find.byKey(const Key('saveMovement')));
+    await tester.pump();
+    expect(api.eggLot, isNull);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Le bouton nouveau client conserve le pays et la ville',

@@ -31,6 +31,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   final TextEditingController extraEggsController = TextEditingController(text: '0');
   final TextEditingController totalPriceController = TextEditingController();
   int? eggStockAvailable;
+  bool eggOriginsComplete = false;
   bool eggStockLoading = false;
 
   DateTime selectedDate = DateTime.now();
@@ -106,12 +107,14 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     setState(() {
       eggStockLoading = true;
       eggStockAvailable = null;
+      eggOriginsComplete = false;
     });
     try {
       final stock = await widget.apiService.getDatedEggStock(lotId);
       if (!mounted || selectedLotId != lotId || selectedProduct != 'OEUFS') return;
       setState(() {
         eggStockAvailable = (stock['stock_global'] as num).toInt();
+        eggOriginsComplete = stock['origines_completes'] == true;
         eggStockLoading = false;
       });
     } catch (_) {
@@ -259,6 +262,10 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
         showMessage(context.tr('sale_stock_unavailable'));
         return;
       }
+      if (!eggOriginsComplete) {
+        showMessage(context.tr('sale_origins_incomplete'));
+        return;
+      }
       if (trays * 30 + extra > eggStockAvailable!) {
         showMessage('${context.tr('sale_stock_insufficient')} : '
             '$eggStockAvailable ${context.tr('egg_eggs_short')}');
@@ -393,6 +400,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                               selectedClientId = null;
                               selectedLotId = null;
                               eggStockAvailable = null;
+                              eggOriginsComplete = false;
                             });
                           },
                           decoration: InputDecoration(
@@ -422,6 +430,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                                 selectedProduct = value ?? 'ANIMAUX';
                                 selectedLotId = null;
                                 eggStockAvailable = null;
+                                eggOriginsComplete = false;
                               });
                             },
                           ),
@@ -442,6 +451,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                             setState(() {
                               selectedLotId = value;
                               eggStockAvailable = null;
+                              eggOriginsComplete = false;
                             });
                             if (value != null && selectedType == 'VENTE' &&
                                 selectedProduct == 'OEUFS') {
@@ -511,13 +521,23 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                                         onPressed: () => loadEggStock(selectedLotId!),
                                         child: Text(context.tr('sale_stock_retry')),
                                       )
-                                    : Text(
-                                        '${context.tr('sale_stock_eggs')} : '
-                                        '$eggStockAvailable ${context.tr('egg_eggs_short')} · '
-                                        '${eggStockAvailable! ~/ 30} ${context.tr('egg_trays_short')} + '
-                                        '${eggStockAvailable! % 30} ${context.tr('egg_eggs_short')}',
-                                        key: const Key('eggSaleStock'),
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                    : Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${context.tr('sale_stock_eggs')} : '
+                                            '$eggStockAvailable ${context.tr('egg_eggs_short')} · '
+                                            '${eggStockAvailable! ~/ 30} ${context.tr('egg_trays_short')} + '
+                                            '${eggStockAvailable! % 30} ${context.tr('egg_eggs_short')}',
+                                            key: const Key('eggSaleStock'),
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                          if (!eggOriginsComplete)
+                                            Text(
+                                              context.tr('sale_origins_incomplete'),
+                                              key: const Key('eggSaleOriginsIncomplete'),
+                                            ),
+                                        ],
                                       ),
                           )
                         else if (selectedLot != null)
