@@ -95,11 +95,14 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
     ).where((m) => m['type_mouvement'] != 'ACHAT').toList();
     final expenses = List<dynamic>.from(lot!['depenses'] ?? []);
     final eggSales = List<dynamic>.from(lot!['ventes_oeufs'] ?? []);
+    final birthsIssued = List<dynamic>.from(lot!['naissances_issues'] ?? []);
     final initial = purchases.fold<double>(
       0,
       (s, a) => s + numValue(a['quantite']),
-    );
-    final outgoing = movements.fold<double>(
+    ) + movements.where((m) => m['type_mouvement'] == 'NAISSANCE')
+        .fold<double>(0, (s, m) => s + numValue(m['quantite']));
+    final outgoing = movements.where((m) => m['type_mouvement'] != 'NAISSANCE')
+        .fold<double>(
       0,
       (s, m) => s + numValue(m['quantite']),
     );
@@ -259,8 +262,27 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                   children: [
                     if (purchases.isEmpty &&
                         movements.isEmpty &&
-                        expenses.isEmpty && eggSales.isEmpty)
+                        expenses.isEmpty && eggSales.isEmpty && birthsIssued.isEmpty)
                       Text(context.tr('no_data')),
+                    ...birthsIssued.map((b) => _event(
+                      icon: Icons.child_friendly_outlined,
+                      color: TerreEtOrColors.green,
+                      title: '${context.tr('birth_issued')} : ${b['nouveau_lot_nom']}',
+                      subtitle: '${context.tr('birth_total')} : ${b['total_naissances']} · '
+                          '${context.tr('birth_stillborn')} : ${b['mort_nes']} · '
+                          '${context.tr('birth_live')} : ${b['nes_vivants']}',
+                      date: b['date']?.toString() ?? '',
+                      onTap: () async {
+                        final id = intValue(b['nouveau_lot_id']);
+                        if (id == null) return;
+                        await Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => LotDetailScreen(
+                            apiService: widget.apiService, lotId: id,
+                          ),
+                        ));
+                        if (mounted) fetchLot();
+                      },
+                    )),
                     ...purchases.map(
                       (a) => _event(
                         icon: Icons.shopping_bag_outlined,
@@ -290,8 +312,10 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                         title: m['type_mouvement'] == 'NAISSANCE'
                             ? context.tr('birth') : m['type_mouvement']?.toString() ?? 'Mouvement',
                         subtitle: m['type_mouvement'] == 'NAISSANCE'
-                            ? '+${m['quantite'] ?? 0} ${context.tr('units')}'
-                                '${(m['mort_nes'] ?? 0) > 0 ? ' · ${context.tr('birth_stillborn')} : ${m['mort_nes']}' : ''}'
+                            ? '${context.tr('birth_total')} : ${m['total_naissances'] ?? m['quantite'] ?? 0} · '
+                                '${context.tr('birth_live')} : ${m['quantite'] ?? 0} · '
+                                '${context.tr('birth_stillborn')} : ${m['mort_nes'] ?? 0}'
+                                '${m['lot_origine_nom'] != null ? ' · ${context.tr('birth_origin')} : ${m['lot_origine_nom']}' : ''}'
                                 '${(m['note'] ?? '').toString().isNotEmpty ? ' · ${m['note']}' : ''}'
                             : '${m['quantite'] ?? 0} unités${m['prix_unitaire'] != null ? ' · PU ${money(m['prix_unitaire'])}' : ''}',
                         date: m['date']?.toString() ?? '',
@@ -373,6 +397,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
     required String subtitle,
     required String date,
     VoidCallback? onDelete,
+    VoidCallback? onTap,
   }) => Container(
     padding: const EdgeInsets.symmetric(vertical: 9),
     decoration: const BoxDecoration(
@@ -391,7 +416,9 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
         ),
         const SizedBox(width: 11),
         Expanded(
-          child: Column(
+          child: InkWell(
+            onTap: onTap,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -403,6 +430,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                 ),
               ),
             ],
+            ),
           ),
         ),
         Text(

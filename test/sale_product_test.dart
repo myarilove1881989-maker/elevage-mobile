@@ -20,17 +20,19 @@ class SaleApiFake extends ApiService {
   String? clientCountry;
   String? clientCity;
   int? birthLot;
-  int? birthLive;
+  int? birthTotal;
   int? birthStillborn;
+  String? birthNewLotName;
+  String? birthProductionType;
   String? birthNote;
   DateTime? birthDate;
   bool birthFails = false;
 
   @override
   Future<List<dynamic>> getLots() async => [
-    {'id': 1, 'nom': 'Chair A', 'stock': 100, 'type_production': 'CHAIR'},
-    {'id': 2, 'nom': 'Pondeuses A', 'stock': 100, 'type_production': 'OEUFS'},
-    {'id': 3, 'nom': 'Reproduction', 'stock': 50, 'type_production': 'REPRODUCTION'},
+    {'id': 1, 'nom': 'Chair A', 'stock': 100, 'type_production': 'CHAIR', 'espece_nom': 'Porc'},
+    {'id': 2, 'nom': 'Pondeuses A', 'stock': 100, 'type_production': 'OEUFS', 'espece_nom': 'Poule'},
+    {'id': 3, 'nom': 'Reproduction', 'stock': 50, 'type_production': 'REPRODUCTION', 'espece_nom': 'Porc'},
   ];
 
   @override
@@ -66,20 +68,28 @@ class SaleApiFake extends ApiService {
   }
 
   @override
-  Future<bool> createBirth({
+  Future<Map<String, dynamic>> createBirth({
     required int lotId,
-    required int live,
+    required int totalBirths,
     required int stillborn,
+    required String newLotName,
+    required String productionType,
     required DateTime date,
     String note = '',
   }) async {
     if (birthFails) throw Exception('Échec naissance');
     birthLot = lotId;
-    birthLive = live;
+    birthTotal = totalBirths;
     birthStillborn = stillborn;
+    birthNewLotName = newLotName;
+    birthProductionType = productionType;
     birthDate = date;
     birthNote = note;
-    return true;
+    return {
+      'nouveau_lot': {'id': 42, 'nom': newLotName},
+      'nes_vivants': totalBirths - stillborn,
+      'mort_nes': stillborn,
+    };
   }
 
   @override
@@ -287,7 +297,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Naissance ajoute les vivants sans client ni prix', (tester) async {
+  testWidgets('Naissance crée un nouveau lot de 10 vivants pour 12 total et 2 morts', (tester) async {
     final api = SaleApiFake();
     await tester.pumpWidget(saleApp(api));
     await tester.pumpAndSettle();
@@ -296,19 +306,32 @@ void main() {
     expect(find.byKey(const Key('saleProductDropdown')), findsNothing);
     expect(find.byKey(const Key('animalSalePrice')), findsNothing);
     expect(find.byKey(const Key('eggSaleTrays')), findsNothing);
-    expect(find.byKey(const Key('birthLive')), findsOneWidget);
+    expect(find.byKey(const Key('birthTotal')), findsOneWidget);
     expect(find.byKey(const Key('birthStillborn')), findsOneWidget);
+    expect(find.byKey(const Key('birthNewLotName')), findsOneWidget);
+    expect(find.byKey(const Key('birthProductionType')), findsOneWidget);
     await pick(tester, const Key('movementLotDropdown'), 'Reproduction');
-    await tester.ensureVisible(find.byKey(const Key('birthLive')));
-    await tester.enterText(find.byKey(const Key('birthLive')), '12');
+    expect(find.textContaining('Porc'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('birthTotal')));
+    await tester.enterText(find.byKey(const Key('birthTotal')), '12');
     await tester.enterText(find.byKey(const Key('birthStillborn')), '2');
+    await tester.pump();
+    expect(find.text('Nés vivants : 10'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('birthNewLotName')));
+    await tester.enterText(find.byKey(const Key('birthNewLotName')), 'Porcelets octobre');
     await tester.enterText(find.byKey(const Key('birthNote')), 'Portée normale');
     await tester.ensureVisible(find.byKey(const Key('saveMovement')));
     await tester.tap(find.byKey(const Key('saveMovement')));
     await tester.pumpAndSettle();
+    expect(find.textContaining('Porcelets octobre : 10'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.tap(find.text('Fermer'));
+    await tester.pumpAndSettle();
     expect(api.birthLot, 3);
-    expect(api.birthLive, 12);
+    expect(api.birthTotal, 12);
     expect(api.birthStillborn, 2);
+    expect(api.birthNewLotName, 'Porcelets octobre');
+    expect(api.birthProductionType, 'CHAIR');
     expect(api.birthNote, 'Portée normale');
     expect(api.birthDate, isNotNull);
     expect(api.animalLot, isNull);
@@ -332,23 +355,54 @@ void main() {
     await tester.pumpAndSettle();
     await pick(tester, const Key('movementTypeDropdown'), 'Naissance');
     await pick(tester, const Key('movementLotDropdown'), 'Chair A');
-    await tester.ensureVisible(find.byKey(const Key('birthLive')));
+    await tester.ensureVisible(find.byKey(const Key('birthTotal')));
     for (final value in ['0', '-1', '1.5']) {
-      await tester.enterText(find.byKey(const Key('birthLive')), value);
+      await tester.enterText(find.byKey(const Key('birthTotal')), value);
       await tapSave();
       expect(api.birthLot, isNull);
     }
-    await tester.enterText(find.byKey(const Key('birthLive')), '12');
+    await tester.enterText(find.byKey(const Key('birthTotal')), '12');
     await tester.enterText(find.byKey(const Key('birthStillborn')), '-2');
     await tapSave();
     expect(api.birthLot, isNull);
+    await tester.enterText(find.byKey(const Key('birthStillborn')), '12');
+    await tapSave();
+    expect(api.birthLot, isNull);
+    await tester.enterText(find.byKey(const Key('birthStillborn')), '14');
+    await tapSave();
+    expect(api.birthLot, isNull);
     await tester.enterText(find.byKey(const Key('birthStillborn')), '2');
+    await tester.enterText(find.byKey(const Key('birthNewLotName')), '   ');
+    await tapSave();
+    expect(api.birthLot, isNull);
+    await tester.enterText(find.byKey(const Key('birthNewLotName')), 'Porcelets');
     api.birthFails = true;
     await tapSave();
     await tester.pump();
     expect(find.textContaining('Échec naissance'), findsOneWidget);
     expect(api.birthLot, isNull);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Le type de production du nouveau lot reste modifiable',
+      (tester) async {
+    final api = SaleApiFake();
+    await tester.pumpWidget(saleApp(api));
+    await tester.pumpAndSettle();
+    await pick(tester, const Key('movementTypeDropdown'), 'Naissance');
+    await pick(tester, const Key('movementLotDropdown'), 'Reproduction');
+    await pick(tester, const Key('birthProductionType'), 'Œufs');
+    await tester.ensureVisible(find.byKey(const Key('birthTotal')));
+    await tester.enterText(find.byKey(const Key('birthTotal')), '12');
+    await tester.enterText(find.byKey(const Key('birthStillborn')), '2');
+    await tester.ensureVisible(find.byKey(const Key('saveMovement')));
+    await tester.tap(find.byKey(const Key('saveMovement')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fermer'));
+    await tester.pumpAndSettle();
+    expect(api.birthProductionType, 'OEUFS');
+    expect(api.birthTotal, 12);
+    expect(api.birthStillborn, 2);
   });
 
   testWidgets('Le formulaire reste accessible sur une largeur étroite',

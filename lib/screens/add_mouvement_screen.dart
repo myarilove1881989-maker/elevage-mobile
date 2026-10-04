@@ -29,6 +29,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   final TextEditingController prixController = TextEditingController();
   final TextEditingController stillbornController = TextEditingController(text: '0');
   final TextEditingController birthNoteController = TextEditingController();
+  final TextEditingController birthLotNameController = TextEditingController();
+  String birthProductionType = 'CHAIR';
   final TextEditingController traysController = TextEditingController(text: '0');
   final TextEditingController extraEggsController = TextEditingController(text: '0');
   final TextEditingController totalPriceController = TextEditingController();
@@ -69,7 +71,23 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   @override
   void initState() {
     super.initState();
+    birthLotNameController.text = defaultBirthLotName(selectedDate);
     fetchData();
+  }
+
+  String defaultBirthLotName(DateTime value) =>
+      'Naissance - '
+      '${value.day.toString().padLeft(2, '0')}/'
+      '${value.month.toString().padLeft(2, '0')}/${value.year}';
+
+  int? get birthLivePreview {
+    final total = int.tryParse(quantiteController.text.trim());
+    final stillborn = int.tryParse(stillbornController.text.trim());
+    if (total == null || stillborn == null || stillborn < 0 ||
+        total <= stillborn) {
+      return null;
+    }
+    return total - stillborn;
   }
 
   // ================= FETCH DATA =================
@@ -250,25 +268,47 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     }
 
     if (selectedType == 'NAISSANCE') {
-      final live = int.tryParse(quantiteController.text.trim());
+      final total = int.tryParse(quantiteController.text.trim());
       final stillborn = int.tryParse(stillbornController.text.trim());
-      if (live == null || live <= 0) {
+      if (stillborn == null || stillborn < 0) {
+        showMessage(context.tr('birth_invalid_stillborn'));
+        return;
+      }
+      if (total == null || total <= stillborn) {
         showMessage(context.tr('birth_invalid_live'));
         return;
       }
-      if (stillborn == null || stillborn < 0) {
-        showMessage(context.tr('birth_invalid_stillborn'));
+      final newLotName = birthLotNameController.text.trim();
+      if (newLotName.isEmpty || newLotName.length > 100) {
+        showMessage(context.tr('birth_new_lot_required'));
         return;
       }
       setState(() => isSubmitting = true);
       try {
         final saved = await widget.apiService.createBirth(
-          lotId: selectedLotId!, live: live, stillborn: stillborn,
+          lotId: selectedLotId!, totalBirths: total, stillborn: stillborn,
+          newLotName: newLotName, productionType: birthProductionType,
           date: selectedDate, note: birthNoteController.text.trim(),
         );
-        if (mounted && saved) {
-          showMessage('${context.tr('birth_saved')} : $live');
-          Navigator.pop(context, true);
+        if (mounted) {
+          setState(() => isSubmitting = false);
+          await showDialog<void>(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogContext) => AlertDialog(
+              title: Text(context.tr('birth_saved')),
+              content: Text('${saved['nouveau_lot']['nom']} : '
+                  '${saved['nes_vivants']} ${context.tr('birth_live').toLowerCase()} · '
+                  '${saved['mort_nes'] ?? stillborn} ${context.tr('birth_stillborn').toLowerCase()}'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(context.tr('close')),
+                ),
+              ],
+            ),
+          );
+          if (mounted) Navigator.pop(context, true);
         }
       } catch (error) {
         if (mounted) showMessage(error.toString().replaceFirst('Exception: ', ''));
@@ -382,6 +422,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     prixController.dispose();
     stillbornController.dispose();
     birthNoteController.dispose();
+    birthLotNameController.dispose();
     traysController.dispose();
     extraEggsController.dispose();
     totalPriceController.dispose();
@@ -495,10 +536,19 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                             }
                           },
                           decoration: InputDecoration(
-                            labelText: context.tr('batch'),
+                            labelText: selectedType == 'NAISSANCE'
+                                ? context.tr('birth_parent') : context.tr('batch'),
                             border: OutlineInputBorder(),
                           ),
                         ),
+                        if (selectedType == 'NAISSANCE' && selectedLot != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '${context.tr('birth_species')} : ${selectedLot!.especeNom ?? ''}',
+                              key: const Key('birthSpecies'),
+                            ),
+                          ),
                         if (selectedType == 'VENTE' && selectedProduct == 'OEUFS' &&
                             selectableLots.isEmpty)
                           Text(context.tr('egg_stock_empty')),
@@ -601,7 +651,14 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                             );
 
                             if (picked != null) {
-                              setState(() => selectedDate = picked);
+                              setState(() {
+                                if (birthLotNameController.text ==
+                                    defaultBirthLotName(selectedDate)) {
+                                  birthLotNameController.text =
+                                      defaultBirthLotName(picked);
+                                }
+                                selectedDate = picked;
+                              });
                             }
                           },
                         ),
@@ -651,13 +708,14 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                           ),
                         ] else if (selectedType == 'NAISSANCE') ...[
                           TextField(
-                            key: const Key('birthLive'),
+                            key: const Key('birthTotal'),
                             controller: quantiteController,
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
-                              labelText: context.tr('birth_live'),
+                              labelText: context.tr('birth_total'),
                               border: const OutlineInputBorder(),
                             ),
+                            onChanged: (_) => setState(() {}),
                           ),
                           const SizedBox(height: 16),
                           TextField(
@@ -668,6 +726,44 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                               labelText: context.tr('birth_stillborn'),
                               border: const OutlineInputBorder(),
                             ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${context.tr('birth_live')} : '
+                            '${birthLivePreview ?? '—'}',
+                            key: const Key('birthCalculatedLive'),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            key: const Key('birthNewLotName'),
+                            controller: birthLotNameController,
+                            decoration: InputDecoration(
+                              labelText: context.tr('birth_new_lot'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            key: const Key('birthProductionType'),
+                            initialValue: birthProductionType,
+                            decoration: InputDecoration(
+                              labelText: context.tr('birth_new_lot_type'),
+                              border: const OutlineInputBorder(),
+                            ),
+                            items: ['CHAIR', 'OEUFS', 'REPRODUCTION', 'AUTRE']
+                                .map((type) => DropdownMenuItem<String>(
+                                      value: type,
+                                      child: Text(context.tr({
+                                        'CHAIR': 'production_type_meat',
+                                        'OEUFS': 'production_type_eggs',
+                                        'REPRODUCTION': 'production_type_reproduction',
+                                        'AUTRE': 'production_type_other',
+                                      }[type]!)),
+                                    ))
+                                .toList(),
+                            onChanged: (value) => setState(() =>
+                                birthProductionType = value ?? 'CHAIR'),
                           ),
                           const SizedBox(height: 16),
                           TextField(

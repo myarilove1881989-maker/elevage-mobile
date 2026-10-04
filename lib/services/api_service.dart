@@ -604,10 +604,12 @@ class ApiService {
   }
 
   // ================= MOUVEMENT =================
-  Future<bool> createBirth({
+  Future<Map<String, dynamic>> createBirth({
     required int lotId,
-    required int live,
+    required int totalBirths,
     required int stillborn,
+    required String newLotName,
+    required String productionType,
     required DateTime date,
     String note = '',
   }) async {
@@ -617,14 +619,15 @@ class ApiService {
       body: jsonEncode({
         "lot": lotId,
         "type_mouvement": "NAISSANCE",
-        "quantite": live,
+        "total_naissances": totalBirths,
         "mort_nes": stillborn,
+        "nom_nouveau_lot": newLotName,
+        "type_production": productionType,
         "date": date.toIso8601String().split("T")[0],
         "note": note,
       }),
     );
-    await _handleResponse(response);
-    return true;
+    return Map<String, dynamic>.from(await _handleResponse(response) as Map);
   }
 
   Future<bool> createMouvement({
