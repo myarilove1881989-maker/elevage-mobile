@@ -284,11 +284,16 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                     ),
                     ...movements.map(
                       (m) => _event(
-                        icon: Icons.swap_horiz,
+                        icon: m['type_mouvement'] == 'NAISSANCE'
+                            ? Icons.child_friendly_outlined : Icons.swap_horiz,
                         color: _movementColor(m['type_mouvement']?.toString()),
-                        title: m['type_mouvement']?.toString() ?? 'Mouvement',
-                        subtitle:
-                            '${m['quantite'] ?? 0} unités${m['prix_unitaire'] != null ? ' · PU ${money(m['prix_unitaire'])}' : ''}',
+                        title: m['type_mouvement'] == 'NAISSANCE'
+                            ? context.tr('birth') : m['type_mouvement']?.toString() ?? 'Mouvement',
+                        subtitle: m['type_mouvement'] == 'NAISSANCE'
+                            ? '+${m['quantite'] ?? 0} ${context.tr('units')}'
+                                '${(m['mort_nes'] ?? 0) > 0 ? ' · ${context.tr('birth_stillborn')} : ${m['mort_nes']}' : ''}'
+                                '${(m['note'] ?? '').toString().isNotEmpty ? ' · ${m['note']}' : ''}'
+                            : '${m['quantite'] ?? 0} unités${m['prix_unitaire'] != null ? ' · PU ${money(m['prix_unitaire'])}' : ''}',
                         date: m['date']?.toString() ?? '',
                         onDelete: () async {
                           if (!await confirmDelete()) return;

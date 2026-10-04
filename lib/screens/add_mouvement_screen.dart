@@ -27,6 +27,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
   final TextEditingController quantiteController = TextEditingController();
   final TextEditingController prixController = TextEditingController();
+  final TextEditingController stillbornController = TextEditingController(text: '0');
+  final TextEditingController birthNoteController = TextEditingController();
   final TextEditingController traysController = TextEditingController(text: '0');
   final TextEditingController extraEggsController = TextEditingController(text: '0');
   final TextEditingController totalPriceController = TextEditingController();
@@ -44,6 +46,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     "MORTALITE",
     "DON",
     "VOL",
+    "NAISSANCE",
   ];
 
   String movementLabel(String type) {
@@ -56,6 +59,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
         return context.tr('donation');
       case 'VOL':
         return context.tr('theft');
+      case 'NAISSANCE':
+        return context.tr('birth');
       default:
         return type;
     }
@@ -244,6 +249,35 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
       return;
     }
 
+    if (selectedType == 'NAISSANCE') {
+      final live = int.tryParse(quantiteController.text.trim());
+      final stillborn = int.tryParse(stillbornController.text.trim());
+      if (live == null || live <= 0) {
+        showMessage(context.tr('birth_invalid_live'));
+        return;
+      }
+      if (stillborn == null || stillborn < 0) {
+        showMessage(context.tr('birth_invalid_stillborn'));
+        return;
+      }
+      setState(() => isSubmitting = true);
+      try {
+        final saved = await widget.apiService.createBirth(
+          lotId: selectedLotId!, live: live, stillborn: stillborn,
+          date: selectedDate, note: birthNoteController.text.trim(),
+        );
+        if (mounted && saved) {
+          showMessage('${context.tr('birth_saved')} : $live');
+          Navigator.pop(context, true);
+        }
+      } catch (error) {
+        if (mounted) showMessage(error.toString().replaceFirst('Exception: ', ''));
+      } finally {
+        if (mounted) setState(() => isSubmitting = false);
+      }
+      return;
+    }
+
     if (selectedType == "VENTE" && selectedProduct == "OEUFS") {
       final trays = int.tryParse(traysController.text.trim());
       final extra = int.tryParse(extraEggsController.text.trim());
@@ -346,6 +380,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   void dispose() {
     quantiteController.dispose();
     prixController.dispose();
+    stillbornController.dispose();
+    birthNoteController.dispose();
     traysController.dispose();
     extraEggsController.dispose();
     totalPriceController.dispose();
@@ -378,8 +414,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                     icon: Icons.swap_horiz_rounded,
                     title: context.tr('add_movement'),
                     subtitle: AppSettings.instance.languageCode == 'en'
-                        ? 'Record a sale, mortality, donation or theft'
-                        : 'Enregistrez une vente, mortalité, un don ou un vol',
+                        ? 'Record a sale, mortality, donation, theft or birth'
+                        : 'Enregistrez une vente, mortalité, un don, un vol ou une naissance',
                   ),
                   TerreEtOrPanel(
                     child: Column(
@@ -540,7 +576,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                                         ],
                                       ),
                           )
-                        else if (selectedLot != null)
+                        else if (selectedLot != null && selectedType != 'NAISSANCE')
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
@@ -610,6 +646,35 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                             decoration: InputDecoration(
                               labelText: '${context.tr('sale_total_price')} '
                                   '(${AppSettings.instance.currency.symbol})',
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ] else if (selectedType == 'NAISSANCE') ...[
+                          TextField(
+                            key: const Key('birthLive'),
+                            controller: quantiteController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: context.tr('birth_live'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            key: const Key('birthStillborn'),
+                            controller: stillbornController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: context.tr('birth_stillborn'),
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            key: const Key('birthNote'),
+                            controller: birthNoteController,
+                            decoration: InputDecoration(
+                              labelText: context.tr('birth_note'),
                               border: const OutlineInputBorder(),
                             ),
                           ),

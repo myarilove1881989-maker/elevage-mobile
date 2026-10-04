@@ -604,6 +604,29 @@ class ApiService {
   }
 
   // ================= MOUVEMENT =================
+  Future<bool> createBirth({
+    required int lotId,
+    required int live,
+    required int stillborn,
+    required DateTime date,
+    String note = '',
+  }) async {
+    final response = await http.post(
+      Uri.parse("$baseUrl/mouvements/create/"),
+      headers: _headers(),
+      body: jsonEncode({
+        "lot": lotId,
+        "type_mouvement": "NAISSANCE",
+        "quantite": live,
+        "mort_nes": stillborn,
+        "date": date.toIso8601String().split("T")[0],
+        "note": note,
+      }),
+    );
+    await _handleResponse(response);
+    return true;
+  }
+
   Future<bool> createMouvement({
     required int lotId,
     required String type,

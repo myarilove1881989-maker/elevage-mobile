@@ -62,6 +62,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     final mortality = _number('mortalite');
     final theft = _number('vol');
     final donation = _number('don');
+    final births = _number('naissances');
     final lossRate = initial == 0 ? 0.0 : lost / initial * 100;
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('stock'))),
@@ -82,7 +83,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                 childAspectRatio: constraints.maxWidth < 430 ? 1.25 : 1.65,
                 children: [
                   DetailMetricCard(
-                      label: 'Stock initial',
+                      label: context.tr('stock_entries'),
                       value: _value(initial),
                       caption: context.tr('units'),
                       icon: Icons.inventory_2_outlined,
@@ -103,12 +104,16 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                       label: 'Pertes',
                       value: _value(lost),
                       caption:
-                          '${lossRate.toStringAsFixed(1)} % du stock initial',
+                          '${lossRate.toStringAsFixed(1)} % ${context.tr('stock_loss_fraction')}',
                       icon: Icons.warning_amber_rounded,
                       color: const Color(0xFFD85B4B)),
                 ],
               ),
               const SizedBox(height: 14),
+              if (births > 0) ...[
+                Text('${context.tr('birth')} : ${_value(births)} ${context.tr('units')}'),
+                const SizedBox(height: 14),
+              ],
               DetailSection(
                 title: 'Répartition du stock',
                 subtitle: 'Situation actuelle du lot',

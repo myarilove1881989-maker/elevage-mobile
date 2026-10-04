@@ -19,6 +19,12 @@ class SaleApiFake extends ApiService {
   int stockLoads = 0;
   String? clientCountry;
   String? clientCity;
+  int? birthLot;
+  int? birthLive;
+  int? birthStillborn;
+  String? birthNote;
+  DateTime? birthDate;
+  bool birthFails = false;
 
   @override
   Future<List<dynamic>> getLots() async => [
@@ -56,6 +62,23 @@ class SaleApiFake extends ApiService {
     movementType = type;
     animalQuantity = quantite;
     animalPrice = prixUnitaire;
+    return true;
+  }
+
+  @override
+  Future<bool> createBirth({
+    required int lotId,
+    required int live,
+    required int stillborn,
+    required DateTime date,
+    String note = '',
+  }) async {
+    if (birthFails) throw Exception('Échec naissance');
+    birthLot = lotId;
+    birthLive = live;
+    birthStillborn = stillborn;
+    birthDate = date;
+    birthNote = note;
     return true;
   }
 
@@ -264,6 +287,70 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Naissance ajoute les vivants sans client ni prix', (tester) async {
+    final api = SaleApiFake();
+    await tester.pumpWidget(saleApp(api));
+    await tester.pumpAndSettle();
+    await pick(tester, const Key('movementTypeDropdown'), 'Naissance');
+    expect(find.byKey(const Key('movementClientDropdown')), findsNothing);
+    expect(find.byKey(const Key('saleProductDropdown')), findsNothing);
+    expect(find.byKey(const Key('animalSalePrice')), findsNothing);
+    expect(find.byKey(const Key('eggSaleTrays')), findsNothing);
+    expect(find.byKey(const Key('birthLive')), findsOneWidget);
+    expect(find.byKey(const Key('birthStillborn')), findsOneWidget);
+    await pick(tester, const Key('movementLotDropdown'), 'Reproduction');
+    await tester.ensureVisible(find.byKey(const Key('birthLive')));
+    await tester.enterText(find.byKey(const Key('birthLive')), '12');
+    await tester.enterText(find.byKey(const Key('birthStillborn')), '2');
+    await tester.enterText(find.byKey(const Key('birthNote')), 'Portée normale');
+    await tester.ensureVisible(find.byKey(const Key('saveMovement')));
+    await tester.tap(find.byKey(const Key('saveMovement')));
+    await tester.pumpAndSettle();
+    expect(api.birthLot, 3);
+    expect(api.birthLive, 12);
+    expect(api.birthStillborn, 2);
+    expect(api.birthNote, 'Portée normale');
+    expect(api.birthDate, isNotNull);
+    expect(api.animalLot, isNull);
+    expect(api.eggLot, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Naissance refuse les quantités invalides et affiche les erreurs',
+      (tester) async {
+    final api = SaleApiFake();
+    final save = find.byKey(const Key('saveMovement'));
+    Future<void> tapSave() async {
+      ScaffoldMessenger.of(tester.element(save)).clearSnackBars();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pump();
+    }
+    await tester.pumpWidget(saleApp(api));
+    await tester.pumpAndSettle();
+    await pick(tester, const Key('movementTypeDropdown'), 'Naissance');
+    await pick(tester, const Key('movementLotDropdown'), 'Chair A');
+    await tester.ensureVisible(find.byKey(const Key('birthLive')));
+    for (final value in ['0', '-1', '1.5']) {
+      await tester.enterText(find.byKey(const Key('birthLive')), value);
+      await tapSave();
+      expect(api.birthLot, isNull);
+    }
+    await tester.enterText(find.byKey(const Key('birthLive')), '12');
+    await tester.enterText(find.byKey(const Key('birthStillborn')), '-2');
+    await tapSave();
+    expect(api.birthLot, isNull);
+    await tester.enterText(find.byKey(const Key('birthStillborn')), '2');
+    api.birthFails = true;
+    await tapSave();
+    await tester.pump();
+    expect(find.textContaining('Échec naissance'), findsOneWidget);
+    expect(api.birthLot, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Le formulaire reste accessible sur une largeur étroite',
       (tester) async {
     tester.view.physicalSize = const Size(360, 720);
@@ -274,6 +361,21 @@ void main() {
     await tester.pumpWidget(saleApp(api));
     await tester.pumpAndSettle();
     await chooseEggs(tester);
+    await tester.ensureVisible(find.byKey(const Key('saveMovement')));
+    expect(find.byKey(const Key('saveMovement')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Le formulaire naissance reste accessible sur mobile étroit',
+      (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(saleApp(SaleApiFake()));
+    await tester.pumpAndSettle();
+    await pick(tester, const Key('movementTypeDropdown'), 'Naissance');
+    await tester.ensureVisible(find.byKey(const Key('birthNote')));
     await tester.ensureVisible(find.byKey(const Key('saveMovement')));
     expect(find.byKey(const Key('saveMovement')), findsOneWidget);
     expect(tester.takeException(), isNull);
