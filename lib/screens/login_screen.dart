@@ -57,7 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
           errorMessage = context.tr('invalid_credentials');
         });
       }
+    } on ApiConnectionException {
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        errorMessage = context.tr('server_unreachable');
+      });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         isLoading = false;
         errorMessage = context.tr('invalid_credentials');

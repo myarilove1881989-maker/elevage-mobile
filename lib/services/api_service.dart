@@ -7,6 +7,11 @@ import 'package:app_elevage/models/dette_client.dart';
 
 String? globalToken;
 
+/// Réponse absente du serveur (connexion, adresse API ou CORS).
+class ApiConnectionException implements Exception {
+  const ApiConnectionException();
+}
+
 class ApiService {
   // ✅ URL API centralisée (compatible local + Render)
   static String get baseUrl {
@@ -101,15 +106,20 @@ class ApiService {
     String email,
     String password,
   ) async {
-    final response = await http.post(
-      Uri.parse("$baseUrl/register/"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "username": username,
-        "email": email,
-        "password": password,
-      }),
-    );
+    late final http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse("$baseUrl/register/"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "username": username,
+          "email": email,
+          "password": password,
+        }),
+      );
+    } on http.ClientException {
+      throw const ApiConnectionException();
+    }
 
     print("REGISTER RESPONSE: ${response.body}");
 
@@ -158,11 +168,16 @@ class ApiService {
 
   // ================= LOGIN =================
   Future<bool> login(String username, String password) async {
-    final response = await http.post(
-      Uri.parse("$baseUrl/token/"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"username": username, "password": password}),
-    );
+    late final http.Response response;
+    try {
+      response = await http.post(
+        Uri.parse("$baseUrl/token/"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"username": username, "password": password}),
+      );
+    } on http.ClientException {
+      throw const ApiConnectionException();
+    }
 
     print("LOGIN RESPONSE: ${response.body}");
 

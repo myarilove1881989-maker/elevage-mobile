@@ -91,6 +91,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
 
       Navigator.pop(context);
+    } on ApiConnectionException {
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        errorMessage = context.tr('server_unreachable');
+      });
     } catch (e) {
       if (!mounted) return;
 

@@ -892,6 +892,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final filteredLots = getFilteredLots();
     final screenWidth = MediaQuery.sizeOf(context).width;
     final showNavActions = screenWidth >= 1100;
+    final navSpacing = screenWidth < 1200 ? 12.0 : 18.0;
 
     return Scaffold(
       drawer: _navigationDrawer(),
@@ -1011,7 +1012,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
 
-                    const SizedBox(width: 18),
+                    SizedBox(width: navSpacing),
 
                     // DÉPENSES
                     InkWell(
@@ -1051,7 +1052,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
 
-                    const SizedBox(width: 18),
+                    SizedBox(width: navSpacing),
+
+                    // SUIVI DE PRODUCTION
+                    InkWell(
+                      key: const Key('topProductionTrackingButton'),
+                      onTap: _openProductionTracking,
+                      child: SizedBox(
+                        width: 140,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.monitor_heart_outlined,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              context.tr('production_tracking'),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(width: navSpacing),
 
                     // MOUVEMENTS
                     InkWell(
@@ -1091,7 +1122,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
 
-                    const SizedBox(width: 18),
+                    SizedBox(width: navSpacing),
 
                     // FACTURATION
                     InkWell(
@@ -1119,7 +1150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
 
-                    const SizedBox(width: 18),
+                    SizedBox(width: navSpacing),
 
                     // HISTORIQUE
                     InkWell(
@@ -1558,15 +1589,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               size: 22,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              context.tr('task_calendar'),
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0B4F7C),
+                            Expanded(
+                              child: Text(
+                                context.tr('task_calendar'),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0B4F7C),
+                                ),
                               ),
                             ),
-                            const Spacer(),
+                            const SizedBox(width: 8),
                             if (isLargeScreen)
                               ElevatedButton.icon(
                                 onPressed: _addTask,
