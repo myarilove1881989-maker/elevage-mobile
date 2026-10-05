@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -56,9 +57,15 @@ class InvoicePdfService {
     final balance = _number(sale['reste']);
     final statusColor = isPaid ? _green : _gold;
     final paleColor = isPaid ? _paleGreen : _paleGold;
+    final regularFont = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final boldFont = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
     final pdf = pw.Document(
       title: '$invoiceNumber - $farmName',
       author: "Elev'Age",
+      theme: pw.ThemeData.withFont(
+        base: pw.Font.ttf(regularFont),
+        bold: pw.Font.ttf(boldFont),
+      ),
     );
 
     pw.Widget infoCell(String label, String value) => pw.Padding(
