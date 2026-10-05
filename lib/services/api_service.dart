@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_elevage/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,10 +25,8 @@ class ApiService {
   // ================= HEADERS =================
   Map<String, String> _headers() {
     final currentToken = token ?? globalToken;
-    print("TOKEN UTILISÉ: $currentToken");
 
     if (currentToken == null) {
-      print("⚠️ Token manquant");
       return {"Content-Type": "application/json"};
     }
 
@@ -44,9 +41,6 @@ class ApiService {
     http.Response response, {
     bool clearSessionOnUnauthorized = true,
   }) async {
-    print("📥 STATUS: ${response.statusCode}");
-    print("📥 RESPONSE: ${response.body}");
-
     // ✅ SUCCÈS
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return true;
@@ -121,8 +115,6 @@ class ApiService {
       throw const ApiConnectionException();
     }
 
-    print("REGISTER RESPONSE: ${response.body}");
-
     return await _handleResponse(response);
   }
 
@@ -179,8 +171,6 @@ class ApiService {
       throw const ApiConnectionException();
     }
 
-    print("LOGIN RESPONSE: ${response.body}");
-
     final data = await _handleResponse(
       response,
       clearSessionOnUnauthorized: false,
@@ -208,17 +198,12 @@ class ApiService {
     if (savedToken != null && savedToken.isNotEmpty) {
       token = savedToken;
       globalToken = savedToken;
-      print("TOKEN CHARGÉ: $savedToken");
-    } else {
-      print("Aucun token trouvé");
     }
   }
 
   // ================= DASHBOARD =================
   Future<Map<String, dynamic>> getDashboard({int? especeId}) async {
     try {
-      print("🌐 AVANT REQUETE");
-
       final uri = Uri.parse("$baseUrl/dashboard/").replace(
         queryParameters: especeId == null
             ? null
@@ -229,11 +214,8 @@ class ApiService {
           .get(uri, headers: _headers())
           .timeout(const Duration(seconds: 30));
 
-      print("✅ APRES REQUETE");
-
       return await _handleResponse(response);
-    } catch (e) {
-      print("❌ ERREUR HTTP: $e");
+    } catch (_) {
       rethrow;
     }
   }
@@ -844,9 +826,6 @@ class ApiService {
       Uri.parse("$baseUrl/tasks/$id/"), // ✅ BONNE URL
       headers: _headers(),
     );
-
-    print("STATUS: ${response.statusCode}");
-    print("BODY: ${response.body}");
 
     await _handleResponse(response);
   }
