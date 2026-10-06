@@ -27,12 +27,18 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
   final TextEditingController quantiteController = TextEditingController();
   final TextEditingController prixController = TextEditingController();
-  final TextEditingController stillbornController = TextEditingController(text: '0');
+  final TextEditingController stillbornController = TextEditingController(
+    text: '0',
+  );
   final TextEditingController birthNoteController = TextEditingController();
   final TextEditingController birthLotNameController = TextEditingController();
   String birthProductionType = 'CHAIR';
-  final TextEditingController traysController = TextEditingController(text: '0');
-  final TextEditingController extraEggsController = TextEditingController(text: '0');
+  final TextEditingController traysController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController extraEggsController = TextEditingController(
+    text: '0',
+  );
   final TextEditingController totalPriceController = TextEditingController();
   int? eggStockAvailable;
   bool eggOriginsComplete = false;
@@ -43,13 +49,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   bool isLoading = true;
   bool isSubmitting = false;
 
-  final List<String> types = [
-    "VENTE",
-    "MORTALITE",
-    "DON",
-    "VOL",
-    "NAISSANCE",
-  ];
+  final List<String> types = ["VENTE", "MORTALITE", "DON", "VOL", "NAISSANCE"];
 
   String movementLabel(String type) {
     switch (type) {
@@ -83,7 +83,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   int? get birthLivePreview {
     final total = int.tryParse(quantiteController.text.trim());
     final stillborn = int.tryParse(stillbornController.text.trim());
-    if (total == null || stillborn == null || stillborn < 0 ||
+    if (total == null ||
+        stillborn == null ||
+        stillborn < 0 ||
         total <= stillborn) {
       return null;
     }
@@ -96,14 +98,13 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
       final lotsResult = await widget.apiService.getLots();
       final clientsResult = await widget.apiService.getClients();
 
-      final parsedLots =
-          (lotsResult as List).map((json) => Lot.fromJson(json)).toList();
+      final parsedLots = lotsResult.map((json) => Lot.fromJson(json)).toList();
 
       if (!mounted) return;
 
       setState(() {
         lots = parsedLots;
-        clients = clientsResult as List<dynamic>;
+        clients = clientsResult;
         isLoading = false;
       });
     } catch (e) {
@@ -114,8 +115,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   }
 
   // ================= GET LOT =================
-  List<Lot> get selectableLots => selectedType == 'VENTE' &&
-          selectedProduct == 'OEUFS'
+  List<Lot> get selectableLots =>
+      selectedType == 'VENTE' && selectedProduct == 'OEUFS'
       ? lots.where((lot) => lot.typeProduction == 'OEUFS').toList()
       : lots;
 
@@ -134,23 +135,23 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     });
     try {
       final stock = await widget.apiService.getDatedEggStock(lotId);
-      if (!mounted || selectedLotId != lotId || selectedProduct != 'OEUFS') return;
+      if (!mounted || selectedLotId != lotId || selectedProduct != 'OEUFS')
+        return;
       setState(() {
         eggStockAvailable = (stock['stock_global'] as num).toInt();
         eggOriginsComplete = stock['origines_completes'] == true;
         eggStockLoading = false;
       });
     } catch (_) {
-      if (!mounted || selectedLotId != lotId || selectedProduct != 'OEUFS') return;
+      if (!mounted || selectedLotId != lotId || selectedProduct != 'OEUFS')
+        return;
       setState(() => eggStockLoading = false);
     }
   }
 
   // ================= MESSAGE =================
   void showMessage(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   // ================= CREATE CLIENT =================
@@ -180,24 +181,30 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: pays.isEmpty ? null : pays,
+
                   isExpanded: true,
+
+                  value: pays.isEmpty ? null : pays,
+
                   decoration: InputDecoration(
                     labelText:
                         '${context.tr('country')} (${context.tr('optional')})',
                   ),
-                  items: AppSettings.sortedCountries(
-                    AppSettings.instance.languageCode,
-                  )
-                      .map(
-                        (country) => DropdownMenuItem<String>(
-                          value: country.code,
-                          child: Text(
-                            country.label(AppSettings.instance.languageCode),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                  items:
+                      AppSettings.sortedCountries(
+                            AppSettings.instance.languageCode,
+                          )
+                          .map(
+                            (country) => DropdownMenuItem<String>(
+                              value: country.code,
+                              child: Text(
+                                country.label(
+                                  AppSettings.instance.languageCode,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
                   onChanged: (value) {
                     setDialogState(() => pays = value ?? '');
                   },
@@ -286,9 +293,13 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
       setState(() => isSubmitting = true);
       try {
         final saved = await widget.apiService.createBirth(
-          lotId: selectedLotId!, totalBirths: total, stillborn: stillborn,
-          newLotName: newLotName, productionType: birthProductionType,
-          date: selectedDate, note: birthNoteController.text.trim(),
+          lotId: selectedLotId!,
+          totalBirths: total,
+          stillborn: stillborn,
+          newLotName: newLotName,
+          productionType: birthProductionType,
+          date: selectedDate,
+          note: birthNoteController.text.trim(),
         );
         if (mounted) {
           setState(() => isSubmitting = false);
@@ -297,9 +308,11 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
             barrierDismissible: false,
             builder: (dialogContext) => AlertDialog(
               title: Text(context.tr('birth_saved')),
-              content: Text('${saved['nouveau_lot']['nom']} : '
-                  '${saved['nes_vivants']} ${context.tr('birth_live').toLowerCase()} · '
-                  '${saved['mort_nes'] ?? stillborn} ${context.tr('birth_stillborn').toLowerCase()}'),
+              content: Text(
+                '${saved['nouveau_lot']['nom']} : '
+                '${saved['nes_vivants']} ${context.tr('birth_live').toLowerCase()} · '
+                '${saved['mort_nes'] ?? stillborn} ${context.tr('birth_stillborn').toLowerCase()}',
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
@@ -311,7 +324,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
           if (mounted) Navigator.pop(context, true);
         }
       } catch (error) {
-        if (mounted) showMessage(error.toString().replaceFirst('Exception: ', ''));
+        if (mounted)
+          showMessage(error.toString().replaceFirst('Exception: ', ''));
       } finally {
         if (mounted) setState(() => isSubmitting = false);
       }
@@ -321,8 +335,12 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
     if (selectedType == "VENTE" && selectedProduct == "OEUFS") {
       final trays = int.tryParse(traysController.text.trim());
       final extra = int.tryParse(extraEggsController.text.trim());
-      if (trays == null || trays < 0 || extra == null || extra < 0 ||
-          extra >= 30 || trays * 30 + extra <= 0) {
+      if (trays == null ||
+          trays < 0 ||
+          extra == null ||
+          extra < 0 ||
+          extra >= 30 ||
+          trays * 30 + extra <= 0) {
         showMessage(context.tr('sale_invalid_quantity'));
         return;
       }
@@ -341,20 +359,26 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
         return;
       }
       if (trays * 30 + extra > eggStockAvailable!) {
-        showMessage('${context.tr('sale_stock_insufficient')} : '
-            '$eggStockAvailable ${context.tr('egg_eggs_short')}');
+        showMessage(
+          '${context.tr('sale_stock_insufficient')} : '
+          '$eggStockAvailable ${context.tr('egg_eggs_short')}',
+        );
         return;
       }
       setState(() => isSubmitting = true);
       try {
         await widget.apiService.createMixedEggSale(
-          lotId: selectedLotId!, clientId: selectedClientId!,
-          fullTrays: trays, extraEggs: extra,
-          totalPrice: price, date: selectedDate,
+          lotId: selectedLotId!,
+          clientId: selectedClientId!,
+          fullTrays: trays,
+          extraEggs: extra,
+          totalPrice: price,
+          date: selectedDate,
         );
         if (mounted) Navigator.pop(context, true);
       } catch (error) {
-        if (mounted) showMessage(error.toString().replaceFirst('Exception: ', ''));
+        if (mounted)
+          showMessage(error.toString().replaceFirst('Exception: ', ''));
       } finally {
         if (mounted) setState(() => isSubmitting = false);
       }
@@ -433,9 +457,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return AbsorbPointer(
@@ -443,9 +465,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
       child: Theme(
         data: terreEtOrTheme(context),
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(context.tr('add_movement')),
-          ),
+          appBar: AppBar(title: Text(context.tr('add_movement'))),
           body: Padding(
             padding: const EdgeInsets.all(16),
             child: SingleChildScrollView(
@@ -463,6 +483,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                       children: [
                         // TYPE
                         DropdownButtonFormField<String>(
+
+                          isExpanded: true,
+
                           key: const Key('movementTypeDropdown'),
                           value: selectedType,
                           items: types.map((t) {
@@ -490,6 +513,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
                         if (selectedType == 'VENTE') ...[
                           DropdownButtonFormField<String>(
+
+                            isExpanded: true,
+
                             key: const Key('saleProductDropdown'),
                             value: selectedProduct,
                             decoration: InputDecoration(
@@ -497,10 +523,14 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                               border: const OutlineInputBorder(),
                             ),
                             items: [
-                              DropdownMenuItem(value: 'ANIMAUX',
-                                  child: Text(context.tr('sale_animals'))),
-                              DropdownMenuItem(value: 'OEUFS',
-                                  child: Text(context.tr('sale_eggs'))),
+                              DropdownMenuItem(
+                                value: 'ANIMAUX',
+                                child: Text(context.tr('sale_animals')),
+                              ),
+                              DropdownMenuItem(
+                                value: 'OEUFS',
+                                child: Text(context.tr('sale_eggs')),
+                              ),
                             ],
                             onChanged: (value) {
                               setState(() {
@@ -516,6 +546,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
                         // LOT
                         DropdownButtonFormField<int>(
+
+                          isExpanded: true,
+
                           key: const Key('movementLotDropdown'),
                           value: selectedLotId,
                           items: selectableLots.map((lot) {
@@ -530,14 +563,16 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                               eggStockAvailable = null;
                               eggOriginsComplete = false;
                             });
-                            if (value != null && selectedType == 'VENTE' &&
+                            if (value != null &&
+                                selectedType == 'VENTE' &&
                                 selectedProduct == 'OEUFS') {
                               loadEggStock(value);
                             }
                           },
                           decoration: InputDecoration(
                             labelText: selectedType == 'NAISSANCE'
-                                ? context.tr('birth_parent') : context.tr('batch'),
+                                ? context.tr('birth_parent')
+                                : context.tr('batch'),
                             border: OutlineInputBorder(),
                           ),
                         ),
@@ -549,7 +584,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                               key: const Key('birthSpecies'),
                             ),
                           ),
-                        if (selectedType == 'VENTE' && selectedProduct == 'OEUFS' &&
+                        if (selectedType == 'VENTE' &&
+                            selectedProduct == 'OEUFS' &&
                             selectableLots.isEmpty)
                           Text(context.tr('egg_stock_empty')),
 
@@ -563,6 +599,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                                 children: [
                                   Expanded(
                                     child: DropdownButtonFormField<int>(
+
+                                      isExpanded: true,
+
                                       key: const Key('movementClientDropdown'),
                                       value: selectedClientId,
                                       items: clients.map((c) {
@@ -584,8 +623,10 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                                   ),
                                   const SizedBox(width: 10),
                                   IconButton(
-                                    icon: const Icon(Icons.add_circle,
-                                        color: Colors.green),
+                                    icon: const Icon(
+                                      Icons.add_circle,
+                                      color: Colors.green,
+                                    ),
                                     onPressed: showCreateClientDialog,
                                   ),
                                 ],
@@ -595,44 +636,53 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                           ),
 
                         // STOCK
-                        if (selectedLot != null && selectedType == 'VENTE' &&
+                        if (selectedLot != null &&
+                            selectedType == 'VENTE' &&
                             selectedProduct == 'OEUFS')
                           Align(
                             alignment: Alignment.centerLeft,
                             child: eggStockLoading
                                 ? const CircularProgressIndicator()
                                 : eggStockAvailable == null
-                                    ? TextButton(
-                                        key: const Key('eggStockRetry'),
-                                        onPressed: () => loadEggStock(selectedLotId!),
-                                        child: Text(context.tr('sale_stock_retry')),
-                                      )
-                                    : Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${context.tr('sale_stock_eggs')} : '
-                                            '$eggStockAvailable ${context.tr('egg_eggs_short')} · '
-                                            '${eggStockAvailable! ~/ 30} ${context.tr('egg_trays_short')} + '
-                                            '${eggStockAvailable! % 30} ${context.tr('egg_eggs_short')}',
-                                            key: const Key('eggSaleStock'),
-                                            style: const TextStyle(fontWeight: FontWeight.bold),
-                                          ),
-                                          if (!eggOriginsComplete)
-                                            Text(
-                                              context.tr('sale_origins_incomplete'),
-                                              key: const Key('eggSaleOriginsIncomplete'),
-                                            ),
-                                        ],
+                                ? TextButton(
+                                    key: const Key('eggStockRetry'),
+                                    onPressed: () =>
+                                        loadEggStock(selectedLotId!),
+                                    child: Text(context.tr('sale_stock_retry')),
+                                  )
+                                : Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${context.tr('sale_stock_eggs')} : '
+                                        '$eggStockAvailable ${context.tr('egg_eggs_short')} · '
+                                        '${eggStockAvailable! ~/ 30} ${context.tr('egg_trays_short')} + '
+                                        '${eggStockAvailable! % 30} ${context.tr('egg_eggs_short')}',
+                                        key: const Key('eggSaleStock'),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
+                                      if (!eggOriginsComplete)
+                                        Text(
+                                          context.tr('sale_origins_incomplete'),
+                                          key: const Key(
+                                            'eggSaleOriginsIncomplete',
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                           )
-                        else if (selectedLot != null && selectedType != 'NAISSANCE')
+                        else if (selectedLot != null &&
+                            selectedType != 'NAISSANCE')
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
                               "Stock disponible: ${selectedLot!.stock}",
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
 
@@ -666,7 +716,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                         const SizedBox(height: 16),
 
                         // QUANTITE
-                        if (selectedType == 'VENTE' && selectedProduct == 'OEUFS') ...[
+                        if (selectedType == 'VENTE' &&
+                            selectedProduct == 'OEUFS') ...[
                           TextField(
                             key: const Key('eggSaleTrays'),
                             controller: traysController,
@@ -699,9 +750,12 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                           TextField(
                             key: const Key('eggSaleTotalPrice'),
                             controller: totalPriceController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             decoration: InputDecoration(
-                              labelText: '${context.tr('sale_total_price')} '
+                              labelText:
+                                  '${context.tr('sale_total_price')} '
                                   '(${AppSettings.instance.currency.symbol})',
                               border: const OutlineInputBorder(),
                             ),
@@ -745,6 +799,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
+
+                            isExpanded: true,
+
                             key: const Key('birthProductionType'),
                             initialValue: birthProductionType,
                             decoration: InputDecoration(
@@ -752,18 +809,26 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                               border: const OutlineInputBorder(),
                             ),
                             items: ['CHAIR', 'OEUFS', 'REPRODUCTION', 'AUTRE']
-                                .map((type) => DropdownMenuItem<String>(
-                                      value: type,
-                                      child: Text(context.tr({
-                                        'CHAIR': 'production_type_meat',
-                                        'OEUFS': 'production_type_eggs',
-                                        'REPRODUCTION': 'production_type_reproduction',
-                                        'AUTRE': 'production_type_other',
-                                      }[type]!)),
-                                    ))
+                                .map(
+                                  (type) => DropdownMenuItem<String>(
+                                    value: type,
+                                    child: Text(
+                                      context.tr(
+                                        {
+                                          'CHAIR': 'production_type_meat',
+                                          'OEUFS': 'production_type_eggs',
+                                          'REPRODUCTION':
+                                              'production_type_reproduction',
+                                          'AUTRE': 'production_type_other',
+                                        }[type]!,
+                                      ),
+                                    ),
+                                  ),
+                                )
                                 .toList(),
-                            onChanged: (value) => setState(() =>
-                                birthProductionType = value ?? 'CHAIR'),
+                            onChanged: (value) => setState(
+                              () => birthProductionType = value ?? 'CHAIR',
+                            ),
                           ),
                           const SizedBox(height: 16),
                           TextField(
@@ -790,7 +855,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                             controller: prixController,
                             keyboardType: TextInputType.number,
                             decoration: InputDecoration(
-                              labelText: '${context.tr('unit_price_auto')} '
+                              labelText:
+                                  '${context.tr('unit_price_auto')} '
                                   '(${AppSettings.instance.currency.symbol})',
                               border: const OutlineInputBorder(),
                             ),
@@ -807,7 +873,8 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                             onPressed: isSubmitting ? null : submit,
                             child: isSubmitting
                                 ? const CircularProgressIndicator(
-                                    color: Colors.white)
+                                    color: Colors.white,
+                                  )
                                 : Text(context.tr('validate')),
                           ),
                         ),

@@ -40,9 +40,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       selectedCity: cityController.text,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.tr('settings_saved'))),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.tr('settings_saved'))));
     Navigator.pop(context, true);
   }
 
@@ -54,22 +54,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           DropdownButtonFormField<String>(
+            isExpanded: true,
             value: countryCode,
             decoration: InputDecoration(
               labelText: '${context.tr('country')} (${context.tr('optional')})',
               border: const OutlineInputBorder(),
             ),
-            items: [
-              const CountryOption('', '—', '—', 'XAF'),
-              ...AppSettings.sortedCountries(language),
-            ]
-                .map(
-                  (item) => DropdownMenuItem(
-                    value: item.code,
-                    child: Text(item.label(language)),
-                  ),
-                )
-                .toList(),
+            items:
+                [
+                      const CountryOption('', '—', '—', 'XAF'),
+                      ...AppSettings.sortedCountries(language),
+                    ]
+                    .map(
+                      (item) => DropdownMenuItem(
+                        value: item.code,
+                        child: Text(item.label(language)),
+                      ),
+                    )
+                    .toList(),
             onChanged: (value) {
               setState(() {
                 countryCode = value ?? '';
@@ -91,6 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             value: language,
             decoration: InputDecoration(
               labelText: context.tr('language'),
@@ -104,6 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             value: currency,
             decoration: InputDecoration(
               labelText: context.tr('currency'),

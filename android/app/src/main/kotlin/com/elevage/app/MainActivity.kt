@@ -1,4 +1,4 @@
-package com.example.elevage_mobile
+package com.elevage.app
 
 import io.flutter.embedding.android.FlutterActivity
 

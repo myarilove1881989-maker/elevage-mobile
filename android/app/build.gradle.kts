@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.elevage_mobile"
+    namespace = "com.elevage.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.elevage_mobile"
+        applicationId = "com.elevage.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -31,6 +31,7 @@ android {
 
     buildTypes {
         release {
+            // APK de test uniquement. Configurer une clé privée pérenne avant publication.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
