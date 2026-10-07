@@ -6,7 +6,8 @@ import '../offline/local_operator_session.dart';
 import '../offline/tablet_controller.dart';
 
 class OfflineTabletScreen extends StatefulWidget {
-  const OfflineTabletScreen({super.key});
+  const OfflineTabletScreen({super.key,this.controller});
+  final TabletController? controller;
   @override
   State<OfflineTabletScreen> createState()=>_OfflineTabletScreenState();
 }
@@ -25,7 +26,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     const secrets=AndroidOperatorSecretStore();
-    tablet=TabletController(api:FoundationApi(baseUrl:Config.validatedApiUrl(Config.apiUrl),
+    tablet=widget.controller ?? TabletController(api:FoundationApi(baseUrl:Config.validatedApiUrl(Config.apiUrl),
       deviceIdentity:AndroidDeviceIdentity(),secrets:secrets),secrets:secrets);
     _run(tablet.initialize);
   }

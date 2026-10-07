@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +11,24 @@ import 'package:app_elevage/offline/foundation_api.dart';
 import 'package:app_elevage/offline/local_operator_session.dart';
 import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/tablet_controller.dart';
+import 'package:app_elevage/screens/offline_tablet_screen.dart';
+
+class DelayedGrantStore implements OperatorSecretStore {
+  final delegate=const AndroidOperatorSecretStore();
+  bool hold=false;
+  final started=Completer<void>();
+  final release=Completer<void>();
+  @override
+  Future<String?> read(String key) async {
+    if(hold && key.startsWith('offline_grant_')) {
+      if(!started.isCompleted) started.complete();
+      await release.future;
+    }
+    return delegate.read(key);
+  }
+  @override
+  Future<void> write(String key,String value)=>delegate.write(key,value);
+}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +43,7 @@ void main() {
     ])}\n-----END PUBLIC KEY-----';
     var user=1;
     final namespace='https://android-test-${DateTime.now().microsecondsSinceEpoch}.invalid/api';
-    const secrets=AndroidOperatorSecretStore();
+    final secrets=DelayedGrantStore();
     MockClient client()=>MockClient((request) async {
       Map<String,dynamic> response;
       final path=request.url.path;
@@ -91,7 +110,36 @@ void main() {
     expect((await tablet.readPage('tasks')).single['data'],containsPair('assigned_to',null));
     await expectLater(tablet.unlockProfile(3,'Paul','123456'),throwsStateError);
     expect(tablet.operators!.session,isNull);
-    tablet.lock();tablet.api.close();tablet.dispose();
+    secrets.hold=true;
+    final pending=tablet.unlockProfile(2,'Jean','123456');
+    final refused=expectLater(pending,throwsStateError);
+    await secrets.started.future;
+    tablet.lock();
+    secrets.release.complete();
+    await refused;
+    expect(tablet.operators!.session,isNull);
+    secrets.hold=false;
+    await tester.pumpWidget(MaterialApp(home:OfflineTabletScreen(controller:tablet)));
+    await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && find.text('Jean').evaluate().isEmpty;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(find.text('Jean'),findsOneWidget);
+    await tester.tap(find.text('Jean'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last,'123456');
+    await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && find.text('Stock confirmé : 10').evaluate().isEmpty;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(find.text('Profil ouvert : Jean'),findsOneWidget);
+    expect(find.text('Stock confirmé : 10'),findsOneWidget);
+    await tester.tap(find.byTooltip('Verrouiller / changer d’opérateur'));
+    await tester.pumpAndSettle();
+    expect(find.text('Profil ouvert : Jean'),findsNothing);
+    expect(find.text('Jean'),findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
     await closeAndroidFarmDatabase(farmId:1,server:Uri.parse(namespace));
   },timeout:const Timeout(Duration(minutes:5)));
 }

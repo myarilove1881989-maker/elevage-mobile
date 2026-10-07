@@ -21,6 +21,12 @@ class DeviceIdentityInstrumentedTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val identity = DeviceIdentity(context)
         val public = identity.identity()
+        val previous = java.io.File(context.filesDir, "native-proof-vector.json")
+        if (previous.exists()) {
+            val persisted = JSONObject(previous.readText())
+            assertEquals(persisted.getString("installation_uuid"), public["installation_uuid"])
+            assertEquals(persisted.getString("public_key"), public["public_key"])
+        }
         assertEquals(false, public["private_key_exportable"])
         assertEquals("P256-SHA256-DER", public["algorithm"])
         assertEquals(public, DeviceIdentity(context).identity())

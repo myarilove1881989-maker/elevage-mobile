@@ -67,7 +67,9 @@ jobs:
           disable-animations: true
           script: |
             flutter test integration_test/offline_foundations_test.dart -d emulator-5554
-            cd android && ./gradlew connectedDebugAndroidTest
+            (cd android && ./gradlew connectedDebugAndroidTest)
+            adb shell am instrument -w com.elevage.app.offlinevalidation.test/androidx.test.runner.AndroidJUnitRunner
+            python3 tool/android_encryption_proof.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -77,4 +79,5 @@ jobs:
             build/app/reports/androidTests/
             build/app/outputs/apk/debug/
             build/app/outputs/apk/androidTest/debug/
+            build/android-foundations-proof/
           retention-days: 7

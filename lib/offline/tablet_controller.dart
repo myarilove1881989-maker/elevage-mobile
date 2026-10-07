@@ -16,9 +16,11 @@ class TabletController extends ChangeNotifier {
   String? selectedName;
   bool _refreshInProgress=false;
   bool _disposed=false;
+  int _lockEpoch=0;
   void _notify() { if(!_disposed) notifyListeners(); }
   @override
   void dispose() {
+    _lockEpoch++;
     operators?.lock();
     _disposed=true;
     super.dispose();
@@ -47,7 +49,7 @@ class TabletController extends ChangeNotifier {
     _notify();
   }
 
-  void lock() {operators?.lock();selectedName=null;_notify();}
+  void lock() {_lockEpoch++;operators?.lock();selectedName=null;_notify();}
 
   Future<void> signIn(String username,String password) async {
     lock();
@@ -106,9 +108,15 @@ class TabletController extends ChangeNotifier {
 
   Future<void> unlockProfile(int user,String name,String pin) async {
     lock();
+    final epoch=_lockEpoch;
     if(farmId==null || operators==null) throw StateError('Tablette non préparée.');
     final grant=await api.loadLocalGrant(farmId:farmId!,userId:user);
+    if(_disposed || epoch!=_lockEpoch) throw StateError('La tablette a été verrouillée.');
     if(!await operators!.unlock(grant,pin)) throw StateError('PIN incorrect ou temporairement bloqué.');
+    if(_disposed || epoch!=_lockEpoch) {
+      operators!.lock();
+      throw StateError('La tablette a été verrouillée.');
+    }
     selectedName=name;
     _notify();
   }
