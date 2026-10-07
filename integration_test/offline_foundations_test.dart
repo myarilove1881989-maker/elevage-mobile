@@ -152,6 +152,29 @@ void main() {
     expect(tablet.outboxRows,hasLength(2));
     expect(tablet.outboxRows.every((row)=>row.authorId==2),isTrue);
     expect((await tablet.readPage('clients')).map((row)=>(row['data'] as Map)['nom']),contains('Client créé sans réseau'));
+    await tester.ensureVisible(find.text('Enregistrer une opération terrain'));
+    await tester.tap(find.text('Enregistrer une opération terrain'));
+    await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && find.text('Opération réalisée sur le terrain').evaluate().isEmpty;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    await tester.tap(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)).first);
+    await tester.pumpAndSettle();await tester.tap(find.text('Achat').last);await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tester.pumpAndSettle();await tester.tap(find.text('Fixture partagée').last);await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('ACHAT-nom_lot')),'Achat natif test');
+    await tester.ensureVisible(find.byKey(const ValueKey('ACHAT-quantite')));
+    await tester.enterText(find.byKey(const ValueKey('ACHAT-quantite')),'3');
+    await tester.ensureVisible(find.byKey(const ValueKey('ACHAT-prix_unitaire')));
+    await tester.enterText(find.byKey(const ValueKey('ACHAT-prix_unitaire')),'13,01');
+    await tester.tap(find.text('Conserver sur la tablette'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.outboxRows.length<3;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(tablet.outboxRows,hasLength(3));
+    final nativePurchase=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='ACHAT');
+    expect(nativePurchase.declaration['payload'],containsPair('prix_total','39.03'));
+    expect((await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'],containsPair('projected_stock',3));
     await tester.tap(find.byTooltip('Verrouiller / changer d’opérateur'));
     await tester.pumpAndSettle();
     expect(find.text('Profil ouvert : Jean'),findsNothing);

@@ -1,5 +1,31 @@
 # Mission offline autonome — journal
 
+## Phase 2E — extension des opérations terrain, EN COURS
+
+Premier lot clients/tâches validé : source `e64ca3f056d4c46425defbd40139d867508f37e8`,
+CI `37627927982`, 145 tests Flutter, Web/APK/API 24 et formulaire client
+sans session Internet passent. Le serveur correspondant a passé 207 tests
+SQLite (5 skips PG) et 207 tests PostgreSQL local (2 skips SQLite).
+
+Extension : dépenses, alimentation, pesées, collectes, mortalité/don/vol,
+achats et naissances disposent d'un formulaire personnel. Les montants sont
+normalisés comme chaînes décimales ; le total d'achat utilise des entiers
+BigInt, sans conversion flottante. Un constat supérieur au stock projeté
+demande un motif et reste conservé. Recherche locale de lot bornée, y compris
+au-delà de la première page. Les projections des lots provisoires et les
+dépendances conservent leurs UUID ; parent de naissance et mort-nés ne
+contribuent pas au stock enfant vivant.
+
+Les reçus de stock confirment exploitation, lot et révision. Leur promotion
+est atomique avec le reçu et les mappings. Un chargement antérieur ne peut
+remplacer une révision plus récente, même si l'horloge locale diffère. Stock
+confirmé, delta local et stock projeté sont affichés séparément. Les œufs
+restent distincts des animaux ; aucune autorité FIFO locale n'est créée.
+
+Tests projections/stock/restart et véritable formulaire achat API 24 en cours
+de validation. La phase 2E complète reste non validée ; aucune phase 2F,
+fusion, politique silencieuse ou production.
+
 ## Phase 2E — premier checkpoint, EN COURS
 
 Clients et comptes rendus de tâches peuvent être saisis avec le PIN personnel,

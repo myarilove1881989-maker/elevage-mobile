@@ -79,7 +79,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
     },
   );
 
-  static const cacheCollections = {'lots', 'clients', 'species', 'tasks', 'dashboard'};
+  static const cacheCollections = {'lots', 'clients', 'species', 'tasks', 'dashboard', 'expense_categories'};
 
   Future<void> _createStaging() => customStatement('CREATE TABLE confirmed_cache_staging '
       '(collection TEXT NOT NULL,entity_id TEXT NOT NULL,payload TEXT NOT NULL, '
@@ -108,9 +108,13 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   }
 
   @override
-  Future<void> commitCacheRefresh(String collection,{int? taskUserId}) async {
+  Future<void> commitCacheRefresh(String collection,{int? taskUserId,int? businessRevision}) async {
     if(!cacheCollections.contains(collection) || (taskUserId!=null && taskUserId<1)) throw ArgumentError('Contexte invalide.');
     await transaction(() async {
+      final newerLots=collection=='lots'?await customSelect("SELECT * FROM confirmed_cache c WHERE collection='lots' "
+        "AND COALESCE(json_extract(c.payload,'\$.confirmed_business_revision'),0)>COALESCE((SELECT json_extract(s.payload,'\$.confirmed_business_revision') "
+        "FROM confirmed_cache_staging s WHERE s.collection=c.collection AND s.entity_id=c.entity_id),?)",
+        variables:[Variable(businessRevision??0)]).get():<QueryRow>[];
       if(collection=='tasks' && taskUserId!=null) {
         await customStatement("DELETE FROM confirmed_cache WHERE collection=? AND "
           "(json_extract(payload,'\$.assigned_to') IS NULL OR json_extract(payload,'\$.assigned_to')=?)",
@@ -121,6 +125,10 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
       await customStatement('INSERT OR REPLACE INTO confirmed_cache '
         'SELECT collection,entity_id,payload,received_at FROM confirmed_cache_staging WHERE collection=?',[collection]);
       await customStatement('DELETE FROM confirmed_cache_staging WHERE collection=?',[collection]);
+      for(final row in newerLots) {
+        await customStatement('INSERT OR REPLACE INTO confirmed_cache VALUES(?,?,?,?)',
+          [row.read<String>('collection'),row.read<String>('entity_id'),row.read<String>('payload'),row.read<int>('received_at')]);
+      }
     });
   }
 
@@ -145,6 +153,12 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   @override
   Future<void> replaceConfirmedCache(String collection, List<Map<String, dynamic>> rows) async {
     if (!cacheCollections.contains(collection)) throw ArgumentError('Collection non autorisée.');
+    if(collection=='lots') {
+      await beginCacheRefresh(collection);await stageConfirmedPage(collection,rows);
+      var revision=0;
+      for(final row in rows) {final value=row['confirmed_business_revision'];if(value is int && value>revision) {revision=value;}}
+      await commitCacheRefresh(collection,businessRevision:revision);return;
+    }
     for (final row in rows) {
       _rejectSecrets(row);
       if (row['id'] == null) throw ArgumentError('Identifiant serveur requis.');

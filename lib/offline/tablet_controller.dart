@@ -171,12 +171,16 @@ class TabletController extends ChangeNotifier {
     final personal=api.personal;
     if(personal==null || cache==null || personal.farmId!=farmId) throw const FoundationApiException(401);
     _refreshInProgress=true;
-    try { for(final collection in ['lots','clients','species','tasks']) {
+    try { for(final collection in ['lots','clients','species','tasks','expense_categories']) {
       var after=0;
+      var businessRevision=0;
       await cache!.beginCacheRefresh(collection);
       while(true) {
         if(!identical(personal,api.personal)) throw const FoundationApiException(401);
         final page=await api.request('GET','/cache-page/?collection=$collection&after=$after&limit=50');
+        final revision=page['confirmed_business_revision'];
+        if(revision!=null && (revision is! int || revision<0)) {throw StateError('Révision serveur invalide.');}
+        if(revision is int && revision>businessRevision) {businessRevision=revision;}
         final rows=(page['results'] as List).map((r)=>Map<String,dynamic>.from(r as Map)).toList();
         if(!identical(personal,api.personal)) throw const FoundationApiException(401);
         await cache!.stageConfirmedPage(collection,rows);
@@ -185,17 +189,18 @@ class TabletController extends ChangeNotifier {
         if(next is! int || next<=after) throw StateError('Page serveur invalide.');
         after=next;
       }
-      await cache!.commitCacheRefresh(collection,taskUserId:personal.role=='OPERATEUR'?personal.userId:null);
+      await cache!.commitCacheRefresh(collection,taskUserId:personal.role=='OPERATEUR'?personal.userId:null,
+        businessRevision:businessRevision);
     } } finally { _refreshInProgress=false; }
     _notify();
   }
 
-  Future<List<Map<String,dynamic>>> readPage(String collection,{int offset=0}) async {
+  Future<List<Map<String,dynamic>>> readPage(String collection,{int offset=0,String search=''}) async {
     final session=operators?.session;
     if(session==null || cache==null) throw StateError('Déverrouiller un profil personnel.');
-    final rows=cache is TerrainStore && {'clients','tasks'}.contains(collection)
+    final rows=cache is TerrainStore && {'clients','tasks','lots'}.contains(collection)
       ? await (cache! as TerrainStore).projectedPage(collection,offset:offset,limit:50,
-          taskUserId:collection=='tasks'?session.userId:null)
+          taskUserId:collection=='tasks'?session.userId:null,search:search)
       : await cache!.cachedPage(collection,offset:offset,limit:50,
           taskUserId:collection=='tasks'?session.userId:null);
     if(_disposed || !identical(session,operators?.session)) {
