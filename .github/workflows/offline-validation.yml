@@ -39,7 +39,6 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
   android-foundations:
-    needs: flutter
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
