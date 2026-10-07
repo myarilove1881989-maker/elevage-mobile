@@ -14,7 +14,6 @@ import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/tablet_controller.dart';
 import 'package:app_elevage/offline/sync_coordinator.dart';
 import 'package:app_elevage/offline/outbox.dart';
-import 'package:app_elevage/offline/outbox_transport.dart';
 import 'package:app_elevage/screens/offline_tablet_screen.dart';
 import 'package:app_elevage/screens/supervision_screen.dart';
 import 'package:app_elevage/services/supervision_service.dart';
@@ -379,10 +378,14 @@ void main() {
     final native=DiagnosticDeviceIdentity();
     final network=StreamController<bool?>.broadcast(sync:true);
     final requestStages=<String>[];
+    var bearerSeen=false;
+    final signedProofs=<bool>[];
     final server=<String,Map<String,dynamic>>{};int posts=0;
     MockClient transportClient()=>MockClient((request) async {
       requestStages.add(request.url.path.endsWith('/transport-challenge/')?'CHALLENGE':'SIGNED_REQUEST');
-      expect(request.headers.keys.map((key)=>key.toLowerCase()),isNot(contains('authorization')));
+      // Background callbacks may run while tester.pump is guarded. Record the
+      // evidence here and assert in the test's awaited control flow instead.
+      bearerSeen|=request.headers.keys.any((key)=>key.toLowerCase()=='authorization');
       final data=jsonDecode(request.body) as Map;
       if(request.url.path.endsWith('/transport-challenge/')) {
         return http.Response(jsonEncode({'id':'00000000-0000-4000-8000-000000000099','device_id':7,
@@ -390,7 +393,7 @@ void main() {
           'path':data['purpose']=='RECEIVE'?'/api/offline/submissions/':'/api/offline/submissions/status/',
           'signature_contract':'ELEVAGE-DEVICE-TRANSPORT-V1'}),201);
       }
-      expect(request.headers['X-Elevage-Signature'],isNotEmpty);
+      signedProofs.add((request.headers['X-Elevage-Signature']??'').isNotEmpty);
       if(data['operations'] is List) {
         posts++;
         for(final value in data['operations'] as List) {
@@ -418,27 +421,9 @@ void main() {
       'states=${diagnosticRows.map((row)=>row.transportStatus).toList()} '
       'codes=${diagnosticRows.map((row)=>row.lastError).toSet()} busy=${tablet.sync!.busy} '
       'error=${tablet.sync!.error!=null}');
-    final receivedBeforeProbe=server.length;
-    if(receivedBeforeProbe==0) {
-      // Diagnose outside the transport's deliberately generic shared error.
-      // This probe cannot turn the failed scheduler assertion into success.
-      final engineApi=tablet.transport!.api;
-      final probe=DeviceOutboxApi(baseUrl:engineApi.baseUrl,identity:native,
-        deviceId:engineApi.deviceId,farmId:engineApi.farmId,generation:engineApi.generation,
-        client:transportClient());
-      try {await probe.receive(diagnosticRows);debugPrint('NATIVE_SHARED_SYNC_PROBE unexpected_success');}
-      catch(error) {
-        final safeMessage=error is StateError && {
-          'Défi de transport hors contexte.','Réponse de transport invalide.',
-          'Réponse de transport trop volumineuse.','Déclarations hors contexte appareil.',
-          'Reçus de transport invalides.',
-        }.contains(error.message)?error.message:'bounded_error';
-        debugPrint('NATIVE_SHARED_SYNC_PROBE type=${error.runtimeType} code=$safeMessage '
-          'device=${engineApi.deviceId} farm=${engineApi.farmId} generation=${engineApi.generation} '
-          'identity=${native.stages}');
-      } finally {probe.close();}
-    }
-    expect(receivedBeforeProbe,7);expect(server,hasLength(7));expect(posts,1);
+    expect(server,hasLength(7));expect(posts,1);
+    expect(bearerSeen,isFalse);expect(signedProofs,isNotEmpty);
+    expect(signedProofs.every((valid)=>valid),isTrue);
     expect(server.values.where((value)=>value['author_user_id']==2),hasLength(6));
     expect(server.values.where((value)=>value['author_user_id']==3),hasLength(1));
     expect(tablet.sync!.summary.pending,0);expect(tablet.sync!.summary.lastSuccess,isNotNull);
@@ -456,6 +441,7 @@ void main() {
     await tester.tap(manualButton);await tester.pumpAndSettle();
     for(var i=0;i<300 && tablet.sync!.busy;i++) {await tester.pump(const Duration(milliseconds:100));}
     expect(tablet.sync!.busy,isFalse);expect(tablet.sync!.error,isNull);expect(posts,1);
+    expect(bearerSeen,isFalse);expect(signedProofs.every((valid)=>valid),isTrue);
     expect(tablet.operators!.session,isNull);expect(tablet.api.personal,isNull);
     // Also exercise the real Android connectivity channel; no HTTP business call uses it here.
     final nativeState=await androidNetworkChanges().first.timeout(const Duration(seconds:10));
