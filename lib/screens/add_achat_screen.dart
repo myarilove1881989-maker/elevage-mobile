@@ -281,6 +281,9 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
                       const SizedBox(height: 16),
 
                       DropdownButtonFormField<String>(
+
+                        isExpanded: true,
+
                         initialValue: selectedProductionType,
                         decoration: const InputDecoration(
                           labelText: 'Type de production',
@@ -319,6 +322,9 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
                       if (selectedProductionType == 'OEUFS') ...[
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
+
+                          isExpanded: true,
+
                           initialValue: selectedProductionStatus,
                           decoration: const InputDecoration(
                             labelText: 'Statut du lot',

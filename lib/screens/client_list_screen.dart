@@ -47,7 +47,6 @@ class _ClientListScreenState extends State<ClientListScreen> {
         loading = false;
       });
     } catch (e) {
-      print("❌ ERREUR CLIENTS: $e");
 
       if (!mounted) return;
 
@@ -87,18 +86,19 @@ class _ClientListScreenState extends State<ClientListScreen> {
                     labelText:
                         '${context.tr('country')} (${context.tr('optional')})',
                   ),
-                  items: AppSettings.sortedCountries(
-                    AppSettings.instance.languageCode,
-                  )
-                      .map(
-                        (item) => DropdownMenuItem(
-                          value: item.code,
-                          child: Text(
-                            item.label(AppSettings.instance.languageCode),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                  items:
+                      AppSettings.sortedCountries(
+                            AppSettings.instance.languageCode,
+                          )
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item.code,
+                              child: Text(
+                                item.label(AppSettings.instance.languageCode),
+                              ),
+                            ),
+                          )
+                          .toList(),
                   onChanged: (value) =>
                       setDialogState(() => pays = value ?? ''),
                 ),
@@ -245,10 +245,10 @@ class _ClientListScreenState extends State<ClientListScreen> {
                                   title: Text(c["nom"] ?? ""),
                                   subtitle: Text(
                                     [
-                                      c["telephone"],
-                                      c["ville"],
-                                      countryName(c["pays"]),
-                                    ]
+                                          c["telephone"],
+                                          c["ville"],
+                                          countryName(c["pays"]),
+                                        ]
                                         .where(
                                           (value) =>
                                               value != null &&
@@ -265,6 +265,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => ClientDetailScreen(
+                                          apiService: widget.apiService,
                                           clientId: c["id"],
                                           nom: c["nom"] ?? "",
                                           telephone: c["telephone"] ?? "",
