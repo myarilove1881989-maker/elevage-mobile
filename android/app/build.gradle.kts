@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.elevage_mobile"
+    namespace = "com.elevage.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,15 +22,21 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.elevage_mobile"
-        minSdk = flutter.minSdkVersion
+        applicationId = "com.elevage.app"
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            // Isolated installation for emulator validation, separate from customer app data.
+            applicationIdSuffix = ".offlinevalidation"
+        }
         release {
+            // APK de test uniquement. Configurer une clé privée pérenne avant publication.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -39,6 +45,11 @@ android {
 // 🔥 AJOUT OBLIGATOIRE
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Android test runtime must match the debug app's consistently resolved graph.
+    debugImplementation("androidx.test.ext:junit:1.3.0")
+    debugImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
 }
 
 flutter {
