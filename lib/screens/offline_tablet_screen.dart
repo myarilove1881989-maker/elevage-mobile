@@ -54,13 +54,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
   }
 
   Future<String?> _pinDialog({String title='PIN personnel'}) async {
-    final pin=TextEditingController();
-    final value=await showDialog<String>(context:context,builder:(dialog)=>AlertDialog(
-      title:Text(title),content:TextField(controller:pin,obscureText:true,keyboardType:TextInputType.number,
-        maxLength:12,autofocus:true,decoration:const InputDecoration(labelText:'6 à 12 chiffres')),
-      actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Annuler')),
-        FilledButton(onPressed:()=>Navigator.pop(dialog,pin.text),child:const Text('Valider'))]));
-    pin.clear();pin.dispose();return value;
+    return showDialog<String>(context:context,builder:(_)=>_PersonalPinDialog(title:title));
   }
 
   Future<void> _read() async {rows=await tablet.readPage(collection,offset:offset);}
@@ -137,4 +131,24 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
       ],
     ]));
   });
+}
+
+class _PersonalPinDialog extends StatefulWidget {
+  const _PersonalPinDialog({required this.title});
+  final String title;
+  @override
+  State<_PersonalPinDialog> createState()=>_PersonalPinDialogState();
+}
+
+class _PersonalPinDialogState extends State<_PersonalPinDialog> {
+  final pin=TextEditingController();
+  @override
+  void dispose() {pin.dispose();super.dispose();}
+  @override
+  Widget build(BuildContext context)=>AlertDialog(
+    title:Text(widget.title),content:TextField(controller:pin,obscureText:true,
+      keyboardType:TextInputType.number,maxLength:12,autofocus:true,
+      decoration:const InputDecoration(labelText:'6 à 12 chiffres')),
+    actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
+      FilledButton(onPressed:()=>Navigator.pop(context,pin.text),child:const Text('Valider'))]);
 }
