@@ -81,7 +81,7 @@ Références :
 
 ## Portes de progression
 
-## Phase 2D — EN COURS, non validée
+## Phase 2D — VALIDÉE
 
 Le schéma local 3 ajoute une Outbox chiffrée et un compteur de séquence.
 Les déclarations originales sont protégées contre UPDATE/DELETE SQL ;
@@ -125,3 +125,29 @@ toujours les erreurs et warnings, mais pas ces conseils existants.
 2D ne commence qu'après validation complète de 2C. Les phases suivantes
 et tout déploiement restent soumis aux portes de la mission. Les politiques
 offline des exploitations existantes restent désactivées.
+## Clôture 2D — 7 octobre 2026
+
+Source mobile : `930f4462cd3c380a630c04e0a7d5d860e234ebef` ; serveur :
+`eab29d096d3b72bad06fc1f36f415bd493553ccf`. Branches `feature/offline-phase-2d`,
+PR brouillons mobile #9 et backend #7, sans fusion.
+
+CI `37620191629` : Flutter, Web release, APK debug et ARM64 release passent.
+L'analyse affiche 61 diagnostics info (56 antérieurs et 5 conseils d'accolades),
+aucune erreur ni warning. Le lockfile strict reste obligatoire. Les tests
+de file locale couvrent atomicité, UUID idempotent, séquence partagée,
+reprise IN_FLIGHT, mauvaise attribution des reçus, réponse perdue et révocation.
+API 24 réelle : parcours Jean/Paul avec deux déclarations d'auteurs distincts
+retrouvées à la réouverture, deux processus Keystore, preuve de fichier natif
+chiffré illisible par SQLite ordinaire. La reprise complète du processus et
+l'actualisation d'APK avec une file métier restent dans les scénarios 2I.
+
+Serveur SQLite : 197 tests, 193 réussis et 4 spécifiques PostgreSQL ignorés.
+PostgreSQL 17.11 temporaire local : 197 tests, 195 réussis et 2 spécifiques
+SQLite ignorés. Migrations additives 0019/0020, trigger terrain UPDATE/DELETE
+SQL refusés et réception simultanée du même UUID sans double effet validés.
+La première exécution PostgreSQL a révélé deux erreurs de fixtures : retour
+du test historique de migrations à 0018 et propriété SQLSTATE du mauvais
+pilote. Corrigées, puis les deux suites complètes relancées avec succès.
+
+Aucun formulaire métier 2E n'était inclus dans ce jalon. Aucun accès de test
+à la production, merge, déploiement ou activation silencieuse de politique.
