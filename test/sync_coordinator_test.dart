@@ -15,6 +15,15 @@ class MemorySyncState implements SyncStateStore {
 }
 
 void main() {
+  testWidgets('a late successful response preserves the newer network loss state',(tester) async {
+    final state=MemorySyncState(),network=StreamController<bool?>.broadcast(sync:true);
+    final response=Completer<bool>();
+    final sync=SyncCoordinator(store:state,networkChanges:()=>network.stream,
+      synchronize:()=>response.future);
+    sync.setForeground(true);network.add(false);response.complete(true);
+    await tester.pump();expect(state.successes,1);expect(sync.networkAvailable,false);
+    sync.dispose();await network.close();
+  });
   testWidgets('startup, manual and network triggers share one request without a personal session',(tester) async {
     final state=MemorySyncState(),network=StreamController<bool?>.broadcast(sync:true);
     final response=Completer<bool>();int requests=0;

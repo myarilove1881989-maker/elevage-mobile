@@ -90,7 +90,8 @@ class SyncCoordinator extends ChangeNotifier {
     try {
       if(await synchronize()) {
         await store.recordSyncSuccess(clock().toUtc());
-        networkAvailable=true;
+        // A response started earlier must not overwrite a later Android loss event.
+        networkAvailable??=true;
       }
     } catch (_) {
       // Keep credentials, URLs and raw server errors out of the shared tablet status.
