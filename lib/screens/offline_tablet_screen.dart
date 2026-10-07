@@ -46,8 +46,10 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
     setState(() {busy=true;message=null;});
     try { await action(); }
     catch(error) {
-      if(mounted) setState(()=>message=error is StateError?error.message.toString():
-        error is FoundationApiException?error.toString():'Connexion ou stockage sécurisé indisponible.');
+      if(mounted) {
+        setState(()=>message=error is StateError?error.message.toString():
+          error is FoundationApiException?error.toString():'Connexion ou stockage sécurisé indisponible.');
+      }
     } finally { if(mounted) setState(()=>busy=false); }
   }
 

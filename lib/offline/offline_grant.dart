@@ -38,7 +38,9 @@ class VerifiedOfflineGrant {
       }
       final nowSeconds = now.toUtc().millisecondsSinceEpoch ~/ 1000;
       if ((payload['iat'] as int) > nowSeconds || (payload['exp'] as int) <= nowSeconds ||
-          (payload['iat'] as int) >= (payload['exp'] as int)) throw const FormatException();
+          (payload['iat'] as int) >= (payload['exp'] as int)) {
+        throw const FormatException();
+      }
       final der = base64.decode(publicKeyPem.replaceAll('-----BEGIN PUBLIC KEY-----', '')
           .replaceAll('-----END PUBLIC KEY-----', '').replaceAll(RegExp(r'\s'), ''));
       const prefix = [0x30,0x2a,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x03,0x21,0x00];

@@ -27,8 +27,7 @@ QueryExecutor encryptedExecutor(File file, String key) => NativeDatabase.createI
 
 /// A shared encrypted farm database. Personal PIN/grant/JWT remain elsewhere.
 class FarmDatabase extends GeneratedDatabase implements FarmCache {
-  FarmDatabase(QueryExecutor executor, {required this.farmId, required this.serverNamespace})
-      : super(executor);
+  FarmDatabase(super.executor, {required this.farmId, required this.serverNamespace});
   final int farmId;
   final String serverNamespace;
 
@@ -127,6 +126,7 @@ class FarmDatabase extends GeneratedDatabase implements FarmCache {
       (await customSelect('SELECT * FROM local_operator_profiles ORDER BY display_name').get())
           .map((row)=>Map<String,dynamic>.from(row.data)).toList();
 
+  @override
   Future<void> replaceConfirmedCache(String collection, List<Map<String, dynamic>> rows) async {
     if (!cacheCollections.contains(collection)) throw ArgumentError('Collection non autorisée.');
     for (final row in rows) {
@@ -143,6 +143,7 @@ class FarmDatabase extends GeneratedDatabase implements FarmCache {
     });
   }
 
+  @override
   Future<List<Map<String, dynamic>>> cachedPage(String collection, {int offset = 0, int limit = 50,int? taskUserId}) async {
     if (!cacheCollections.contains(collection) || offset < 0 || limit < 1 || limit > 200) {
       throw ArgumentError('Page invalide.');

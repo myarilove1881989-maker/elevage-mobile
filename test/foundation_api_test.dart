@@ -44,8 +44,10 @@ void main() {
       client:MockClient((request) async {
         if(request.url.path.endsWith('/token/')) return http.Response('{"access":"a","refresh":"r"}',200);
         if(request.url.path.endsWith('/capabilities/')) return http.Response('{"user":1,"exploitation":2,"role":"OWNER"}',200);
-        if(request.url.path.endsWith('/challenge/')) return http.Response(jsonEncode({
-          'id':'challenge','device_id':7,'user_id':1,'purpose':'ACTIVATE','signature_contract':'ELEVAGE-DEVICE-V1'}),201);
+        if(request.url.path.endsWith('/challenge/')) {
+          return http.Response(jsonEncode({
+            'id':'challenge','device_id':7,'user_id':1,'purpose':'ACTIVATE','signature_contract':'ELEVAGE-DEVICE-V1'}),201);
+        }
         expect(request.headers['X-Elevage-Signature'],'test-proof');
         expect(request.body,'{}');
         return http.Response('{"status":"ACTIVE"}',200);
