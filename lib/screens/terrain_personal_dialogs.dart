@@ -1,5 +1,28 @@
 part of 'offline_tablet_screen.dart';
 
+class _RecoveryReasonDialog extends StatefulWidget {
+  const _RecoveryReasonDialog();
+  @override
+  State<_RecoveryReasonDialog> createState()=>_RecoveryReasonDialogState();
+}
+class _RecoveryReasonDialogState extends State<_RecoveryReasonDialog> {
+  final form=GlobalKey<FormState>();
+  final reason=TextEditingController();
+  @override
+  void dispose() {reason.dispose();super.dispose();}
+  @override
+  Widget build(BuildContext context)=>AlertDialog(title:const Text('Récupération explicite'),
+    content:SingleChildScrollView(child:Form(key:form,child:Column(mainAxisSize:MainAxisSize.min,children:[
+      const Text('Transmettre au maximum 50 déclarations conservées avec leurs auteurs d’origine. '
+        'Cette action ne réactive pas la tablette. Les nouvelles déclarations reçues devront être rapprochées séparément.'),
+      TextFormField(controller:reason,maxLength:10000,maxLines:4,
+        decoration:const InputDecoration(labelText:'Motif de récupération'),
+        validator:(value)=>(value?.trim().length??0)<3?'Indiquez un motif explicite.':null),
+    ]))),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
+      FilledButton(onPressed:(){if(form.currentState!.validate()) Navigator.pop(context,reason.text.trim());},
+        child:const Text('Transmettre pour rapprochement'))]);
+}
+
 String _taskStatus(dynamic status)=>const {'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée','CANCELLED':'Annulée'}[status]??'État inconnu';
 
 class _TerrainClientDialog extends StatefulWidget {

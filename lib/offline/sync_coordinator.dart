@@ -26,6 +26,7 @@ class SyncCoordinator extends ChangeNotifier {
   Timer? _deferred;
   StreamSubscription<bool?>? _subscription;
   Future<void>? _running;
+  Future<void> waitForIdle() async {await _running;}
   DateTime? _lastAttempt;
   int _networkEpoch=0;
   bool _automaticPending=false;

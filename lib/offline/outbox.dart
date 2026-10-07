@@ -54,6 +54,7 @@ abstract interface class OutboxStore {
     Future<void> Function()? project});
   Future<List<OutboxEntry>> leasePending({int limit=50});
   Future<List<OutboxEntry>> awaitingReceipts({int limit=50});
+  Future<List<OutboxEntry>> recoveryBatch({int limit=50});
   Future<void> acceptReceipts(List<Map<String,dynamic>> receipts);
   Future<void> transportFailure(List<String> operationIds,{required String code,bool blocked=false});
   Future<List<OutboxEntry>> listOutbox({int? authorId,int limit=50,int offset=0});

@@ -13,12 +13,17 @@ import 'package:http/http.dart' as http;
 
 class TabletController extends ChangeNotifier {
   TabletController({required this.api,required this.secrets,this.transportClient,
-    this.automaticSyncEnabled=true,this.networkChanges=androidNetworkChanges});
+    this.automaticSyncEnabled=true,this.networkChanges=androidNetworkChanges,
+    this.cacheOpener=openAndroidFarmDatabase,DateTime Function()? clock}) : clock=clock??DateTime.now;
   final FoundationApi api;
   final OperatorSecretStore secrets;
   final http.Client Function()? transportClient;
   final bool automaticSyncEnabled;
   final Stream<bool?> Function() networkChanges;
+  final Future<FarmCache> Function({required int farmId,required Uri server}) cacheOpener;
+  final DateTime Function() clock;
+  bool knownDeviceRevoked=false;
+  bool recovering=false;
   SyncCoordinator? sync;
   bool _foreground=true;
   FarmCache? cache;
@@ -51,13 +56,14 @@ class TabletController extends ChangeNotifier {
     if(identity['installation_uuid']!=context['installation_uuid']) {
       throw StateError('Cette préparation appartient à une autre installation.');
     }
+    knownDeviceRevoked=context['revoked']==true;
     await _openFarm(context['farm_id'] as int,context['device_id'] as int,context['generation'] as int);
   }
 
   Future<void> _openFarm(int farm,int device,int writeGeneration) async {
     lock();
     if(farmId!=null && farmId!=farm) throw StateError('Cette tablette est préparée pour une autre exploitation.');
-    cache=await openAndroidFarmDatabase(farmId:farm,server:Uri.parse(api.baseUrl));
+    cache=await cacheOpener(farmId:farm,server:Uri.parse(api.baseUrl));
     farmId=farm;deviceId=device;generation=writeGeneration;
     if(cache is OutboxStore && (transport==null || transport!.api.deviceId!=device ||
         transport!.api.farmId!=farm || transport!.api.generation!=writeGeneration)) {
@@ -68,7 +74,7 @@ class TabletController extends ChangeNotifier {
         client:transportClient?.call()));
       if(cache is SyncStateStore) {
         final engine=transport!;
-        sync=SyncCoordinator(store:cache! as SyncStateStore,networkChanges:networkChanges,
+        sync=SyncCoordinator(store:cache! as SyncStateStore,networkChanges:networkChanges,clock:clock,
           synchronize:() async {
             await engine.syncOnce();
             if(!_disposed) await refreshOutbox();
@@ -76,7 +82,7 @@ class TabletController extends ChangeNotifier {
           });
         sync!.addListener(_notify);
         await sync!.refreshSummary();
-        if(automaticSyncEnabled) sync!.setForeground(_foreground);
+        if(automaticSyncEnabled && !knownDeviceRevoked) sync!.setForeground(_foreground);
       }
     }
     operators=LocalOperatorSessions(store:secrets,namespace:Uri.encodeComponent(api.baseUrl),
@@ -89,13 +95,70 @@ class TabletController extends ChangeNotifier {
 
   void setForeground(bool value) {
     _foreground=value;
-    if(automaticSyncEnabled) sync?.setForeground(value);
+    if(automaticSyncEnabled) sync?.setForeground(value && !knownDeviceRevoked && !recovering);
   }
 
   Future<void> signIn(String username,String password) async {
     lock();
     await api.logIn(username,password,expectedFarm:farmId);
+    if(api.personal?.role=='OWNER' && deviceId!=null) await inspectDeviceStatus();
     _notify();
+  }
+
+  Future<void> inspectDeviceStatus() async {
+    if(api.personal?.role!='OWNER' || api.personal?.farmId!=farmId || deviceId==null) {
+      throw const FoundationApiException(403);
+    }
+    final listing=await api.request('GET','/devices/');
+    final devices=listing['results'];
+    if(devices is! List) throw StateError('Liste des appareils invalide.');
+    final matches=devices.whereType<Map>().where((d)=>d['id']==deviceId).toList();
+    if(matches.length!=1) throw StateError('Appareil introuvable dans cette exploitation.');
+    if(matches.single['status']=='REVOKED') {
+      knownDeviceRevoked=true;lock();sync?.setForeground(false);
+      final encoded=await secrets.read(_contextKey);
+      if(encoded==null) throw StateError('Préparation de tablette manquante.');
+      final context=Map<String,dynamic>.from(jsonDecode(encoded) as Map);
+      context['revoked']=true;
+      await secrets.write(_contextKey,jsonEncode(context));
+      _notify();
+    }
+  }
+
+  Future<int> recoverPending(String reason) async {
+    if(recovering) throw StateError('Une récupération est déjà en cours.');
+    final owner=api.personal;
+    if(owner==null || owner.role!='OWNER' || owner.farmId!=farmId || deviceId==null || cache is! OutboxStore) {
+      throw const FoundationApiException(403);
+    }
+    final motif=reason.trim();
+    if(motif.length<3 || motif.length>10000) throw StateError('Un motif explicite est requis.');
+    recovering=true;sync?.setForeground(false);_notify();
+    try {
+      await sync?.waitForIdle();
+      await inspectDeviceStatus();
+      if(!knownDeviceRevoked) throw StateError('La récupération concerne uniquement une tablette révoquée.');
+      final store=cache! as OutboxStore;
+      final entries=await store.recoveryBatch();
+      if(entries.isEmpty) return 0;
+      if(!identical(owner,api.personal)) throw const FoundationApiException(401);
+      final result=await api.signedRequest('/offline/recovery/',deviceId:deviceId!,purpose:'RECOVER',
+        data:{'reason':motif,'operations':entries.map((e)=>e.declaration).toList()});
+      final raw=result['receipts'];
+      if(raw is! List || raw.length!=entries.length) throw StateError('Reçus de récupération incomplets.');
+      final receipts=raw.map((r)=>Map<String,dynamic>.from(r as Map)).toList();
+      final ids=entries.map((e)=>e.operationId).toSet();
+      final received=receipts.map((r)=>r['client_operation_id']).toSet();
+      if(received.length!=ids.length || !received.containsAll(ids)) throw StateError('Reçus de récupération hors contexte.');
+      await store.acceptReceipts(receipts);
+      if(cache is SyncStateStore) await (cache! as SyncStateStore).recordSyncSuccess(clock().toUtc());
+      await sync?.refreshSummary();
+      return entries.length;
+    } finally {
+      recovering=false;
+      if(automaticSyncEnabled && !knownDeviceRevoked) sync?.setForeground(_foreground);
+      _notify();
+    }
   }
 
   Future<void> preparePrimaryTablet() async {
@@ -149,6 +212,7 @@ class TabletController extends ChangeNotifier {
 
   Future<void> unlockProfile(int user,String name,String pin) async {
     lock();
+    if(knownDeviceRevoked) throw StateError('Tablette révoquée : récupération par le propriétaire requise.');
     final epoch=_lockEpoch;
     if(farmId==null || operators==null) throw StateError('Tablette non préparée.');
     final grant=await api.loadLocalGrant(farmId:farmId!,userId:user);
@@ -175,6 +239,7 @@ class TabletController extends ChangeNotifier {
     required Map<String,dynamic> payload,required DateTime businessOccurredAt,String? operationId,
     String? localEntityId,List<String> dependencies=const [],String expectedServerVersion='',
     Future<void> Function()? project}) async {
+    if(knownDeviceRevoked || recovering) throw StateError('Cette tablette ne peut plus créer de déclaration.');
     final current=operators?.session;
     if(current==null || cache is! OutboxStore) throw StateError('Profil personnel ouvert requis.');
     final entry=await (cache! as OutboxStore).enqueue(grant:current.grant,
@@ -192,6 +257,7 @@ class TabletController extends ChangeNotifier {
   }
 
   Future<void> syncOutbox() async {
+    if(knownDeviceRevoked || recovering) throw StateError('Tablette révoquée : récupération explicite requise.');
     if(sync!=null) {await sync!.trigger(manual:true);return;}
     final engine=transport;
     if(engine==null) throw StateError('Tablette non préparée.');

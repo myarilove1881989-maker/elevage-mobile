@@ -5,7 +5,7 @@ abstract interface class SyncStateStore {
 }
 
 class SyncSummary {
-  const SyncSummary({this.pending=0,this.conflicts=0,this.blocked=0,this.lastSuccess});
-  final int pending,conflicts,blocked;
+  const SyncSummary({this.pending=0,this.awaitingValidation=0,this.conflicts=0,this.blocked=0,this.lastSuccess});
+  final int pending,awaitingValidation,conflicts,blocked;
   final DateTime? lastSuccess;
 }

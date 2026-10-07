@@ -22,11 +22,12 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
   @override
   Future<SyncSummary> syncSummary() async {
     final row=await customSelect("SELECT COUNT(CASE WHEN transport_status!='SERVER_RECEIVED' THEN 1 END) AS pending,"
+      "COUNT(CASE WHEN transport_status='SERVER_RECEIVED' AND business_status IN ('UNREVIEWED','WAITING_DEPENDENCY') THEN 1 END) AS awaiting_validation,"
       "COUNT(CASE WHEN business_status='NEEDS_RECONCILIATION' THEN 1 END) AS conflicts,"
       "COUNT(CASE WHEN transport_status='TRANSPORT_BLOCKED' THEN 1 END) AS blocked FROM outbox").getSingle();
     final state=await customSelect('SELECT last_success FROM tablet_sync_state WHERE singleton=1').getSingle();
     final time=state.readNullable<int>('last_success');
-    return SyncSummary(pending:row.read<int>('pending'),conflicts:row.read<int>('conflicts'),
+    return SyncSummary(pending:row.read<int>('pending'),awaitingValidation:row.read<int>('awaiting_validation'),conflicts:row.read<int>('conflicts'),
       blocked:row.read<int>('blocked'),lastSuccess:time==null?null:DateTime.fromMillisecondsSinceEpoch(time,isUtc:true));
   }
 
@@ -147,6 +148,14 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
     }
     return result;
   });
+
+  @override
+  Future<List<OutboxEntry>> recoveryBatch({int limit=50}) async {
+    if(limit<1 || limit>50) throw ArgumentError('Lot de récupération invalide.');
+    final rows=await customSelect("SELECT * FROM outbox WHERE transport_status!='SERVER_RECEIVED' ORDER BY local_sequence LIMIT ?",
+      variables:[Variable(limit)]).get();
+    return rows.map(_entry).toList();
+  }
 
   @override
   Future<List<OutboxEntry>> awaitingReceipts({int limit=50}) async {

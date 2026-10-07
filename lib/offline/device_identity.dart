@@ -47,7 +47,7 @@ Future<Map<String, String>> deviceProofHeaders({
   required String pathAndQuery,
   required Uint8List body,
 }) async {
-  if (!{'WRITE', 'ACTIVATE', 'REPLACE', 'GRANT'}.contains(purpose) ||
+  if (!{'WRITE', 'ACTIVATE', 'REPLACE', 'GRANT', 'RECOVER'}.contains(purpose) ||
       deviceId < 1 || userId < 1 || !pathAndQuery.startsWith('/')) {
     throw ArgumentError('Contexte de signature invalide.');
   }

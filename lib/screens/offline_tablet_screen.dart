@@ -65,6 +65,15 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
 
   Future<void> _read() async {rows=await tablet.readPage(collection,offset:offset);}
 
+  Future<void> _recover() async {
+    final reason=await showDialog<String>(context:context,builder:(_)=>const _RecoveryReasonDialog());
+    if(reason==null || !mounted) return;
+    await _run(() async {
+      final count=await tablet.recoverPending(reason);
+      if(mounted) setState(()=>message='$count déclarations récupérées. Les décisions métier restent distinctes.');
+    });
+  }
+
   Future<void> _createClient() async {
     final author=tablet.operators?.session;
     final payload=await showDialog<Map<String,dynamic>>(context:context,builder:(_)=>const _TerrainClientDialog());
@@ -161,10 +170,12 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
           tablet.sync?.networkAvailable==true?'Réseau disponible':tablet.sync?.networkAvailable==false?'Hors ligne':'État du réseau en cours de vérification'),
         Text(tablet.sync?.summary.lastSuccess==null?'Aucune synchronisation réussie enregistrée':
           'Dernière synchronisation : ${tablet.sync!.summary.lastSuccess!.toLocal()}'),
-        Text('${tablet.sync?.summary.pending??0} déclarations en attente • ${tablet.sync?.summary.conflicts??0} conflits à rapprocher'),
+        Text('${tablet.sync?.summary.pending??0} déclarations à transmettre • ${tablet.sync?.summary.conflicts??0} conflits à rapprocher'),
+        Text('${tablet.sync?.summary.awaitingValidation??0} reçues • validation en cours'),
+        if(tablet.knownDeviceRevoked) const Text('Cette tablette est révoquée. Les déclarations conservées nécessitent une récupération explicite par le propriétaire.'),
         if((tablet.sync?.summary.blocked??0)>0) const Text('Transmission bloquée : intervention du propriétaire nécessaire.'),
         if(tablet.sync?.error!=null) Text(tablet.sync!.error!),
-        OutlinedButton(onPressed:busy || tablet.sync?.busy==true?null:()=>_run(() async {
+        OutlinedButton(onPressed:busy || tablet.knownDeviceRevoked || tablet.sync?.busy==true?null:()=>_run(() async {
           await tablet.syncOutbox();
           if(tablet.operators?.session!=null) await _read();
         }),
@@ -173,7 +184,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
       if(session==null) ...[
         for(final profile in tablet.profiles) ListTile(leading:const Icon(Icons.person_outline),
           title:Text(profile['display_name'] as String),subtitle:const Text('Ouvrir avec mon PIN'),
-          enabled:!busy,onTap:() async {
+          enabled:!busy && !tablet.knownDeviceRevoked,onTap:() async {
             final pin=await _pinDialog();
             if(pin==null || !mounted) return;
             await _run(() async {
@@ -190,6 +201,8 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
           try {await tablet.signIn(username.text.trim(),password.text);} finally {password.clear();}
         }),child:const Text('Me connecter')),
         if(tablet.api.personal?.role=='OWNER') ...[
+          if(tablet.knownDeviceRevoked) OutlinedButton(onPressed:busy?null:_recover,
+            child:const Text('Récupérer les déclarations conservées')),
           OutlinedButton(onPressed:busy?null:()=>_run(tablet.preparePrimaryTablet),child:const Text('Préparer cette tablette principale')),
           const Text('L’activation hors ligne de l’exploitation doit être décidée par le propriétaire. '
             'La préparation de tablette ne l’active pas automatiquement.'),

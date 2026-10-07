@@ -437,7 +437,7 @@ void main() {
       await tester.pump(const Duration(milliseconds:100));
     }
     expect(manualButton,findsOneWidget);
-    expect(find.text('0 déclarations en attente • 0 conflits à rapprocher'),findsOneWidget);
+    expect(find.text('0 déclarations à transmettre • 0 conflits à rapprocher'),findsOneWidget);
     await tester.tap(manualButton);await tester.pumpAndSettle();
     for(var i=0;i<300 && tablet.sync!.busy;i++) {await tester.pump(const Duration(milliseconds:100));}
     expect(tablet.sync!.busy,isFalse);expect(tablet.sync!.error,isNull);expect(posts,1);

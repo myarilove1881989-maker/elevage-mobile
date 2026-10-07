@@ -28,7 +28,8 @@ class OnlineOperatorIdentity {
 /// Dedicated personal credentials. Never uses ApiService's global session.
 class FoundationApi {
   FoundationApi({required this.baseUrl, required this.deviceIdentity,
-    required this.secrets, http.Client? client}) : client=client ?? http.Client() {
+    required this.secrets, http.Client? client,DateTime Function()? clock})
+      : client=client ?? http.Client(),clock=clock??DateTime.now {
     final uri=Uri.parse(baseUrl);
     if (uri.scheme!='https' || uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment) {
       throw ArgumentError('La préparation exige HTTPS.');
@@ -38,6 +39,7 @@ class FoundationApi {
   final DeviceIdentity deviceIdentity;
   final OperatorSecretStore secrets;
   final http.Client client;
+  final DateTime Function() clock;
   OnlineOperatorIdentity? personal;
   Future<void>? _refreshing;
   void close() => client.close();
@@ -124,6 +126,7 @@ class FoundationApi {
       challengeId:challenge['id'] as String,deviceId:deviceId,userId:identity.userId,
       purpose:purpose,method:'POST',pathAndQuery:'${Uri.parse(baseUrl).path}$path',
       body:Uint8List.fromList(utf8.encode(jsonEncode(data))));
+    if(!identical(identity,personal)) throw const FoundationApiException(401);
     return request('POST',path,data:data,proof:headers);
   }
 
@@ -142,7 +145,7 @@ class FoundationApi {
       publicKeyPem:response['public_key'] as String,trustedKeyId:response['key_id'] as String,
       farmId:identity.farmId,userId:identity.userId,deviceId:device['id'] as int,
       generation:capabilities['write_generation'] as int,rightsVersion:member['version'] as int,
-      now:DateTime.now().toUtc());
+      now:clock().toUtc());
     final grantRecord=jsonEncode({'token':grant.token,'public_key':response['public_key'],'key_id':response['key_id'],
       'device_id':grant.deviceId,'generation':grant.generation,'rights_version':grant.rightsVersion});
     final namespace=Uri.encodeComponent(baseUrl);
@@ -159,6 +162,6 @@ class FoundationApi {
       publicKeyPem:record['public_key'] as String,trustedKeyId:record['key_id'] as String,
       farmId:farmId,userId:userId,deviceId:record['device_id'] as int,
       generation:record['generation'] as int,rightsVersion:record['rights_version'] as int,
-      now:DateTime.now().toUtc());
+      now:clock().toUtc());
   }
 }
