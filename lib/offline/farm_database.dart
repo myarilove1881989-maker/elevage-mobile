@@ -5,6 +5,7 @@ import 'package:drift/native.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 import 'farm_cache.dart';
 import 'offline_grant.dart';
+import 'outbox_database.dart';
 
 /// Release-mode checks: SQLite silently ignores unknown PRAGMAs, so never assert.
 void configureEncryptedDatabase(sql.Database database, String hexKey) {
@@ -26,13 +27,18 @@ QueryExecutor encryptedExecutor(File file, String key) => NativeDatabase.createI
 );
 
 /// A shared encrypted farm database. Personal PIN/grant/JWT remain elsewhere.
-class FarmDatabase extends GeneratedDatabase implements FarmCache {
-  FarmDatabase(super.executor, {required this.farmId, required this.serverNamespace});
+class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods implements FarmCache {
+  FarmDatabase(super.executor, {required this.farmId, required this.serverNamespace,DateTime Function()? clock})
+    :outboxClock=clock??DateTime.now;
   final int farmId;
   final String serverNamespace;
+  @override
+  int get outboxFarmId=>farmId;
+  @override
+  final DateTime Function() outboxClock;
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
   @override
   Iterable<TableInfo<Table, dynamic>> get allTables => const [];
   @override
@@ -52,14 +58,19 @@ class FarmDatabase extends GeneratedDatabase implements FarmCache {
           'display_name TEXT NOT NULL, rights_version INTEGER NOT NULL, '
           'write_generation INTEGER NOT NULL)');
       await _createStaging();
+      await createOutboxSchema();
     },
-    onUpgrade: (_,from,to) async { if(from==1) await _createStaging(); },
+    onUpgrade: (_,from,to) async {
+      if(from<2) await _createStaging();
+      if(from<3) await createOutboxSchema();
+    },
     beforeOpen: (_) async {
       final identity = await customSelect('SELECT farm_id,server_namespace FROM farm_identity').getSingle();
       if (identity.read<int>('farm_id') != farmId ||
           identity.read<String>('server_namespace') != serverNamespace) {
         throw StateError('Cette base appartient à une autre exploitation.');
       }
+      await recoverInterruptedOutbox();
     },
   );
 

@@ -4,6 +4,8 @@ import 'farm_cache.dart';
 import 'foundation_api.dart';
 import 'local_operator_session.dart';
 import 'offline_database.dart';
+import 'outbox.dart';
+import 'outbox_transport.dart';
 
 class TabletController extends ChangeNotifier {
   TabletController({required this.api,required this.secrets});
@@ -14,6 +16,8 @@ class TabletController extends ChangeNotifier {
   int? farmId,deviceId,generation;
   List<Map<String,dynamic>> profiles=[];
   String? selectedName;
+  OutboxTransport? transport;
+  List<OutboxEntry> outboxRows=[];
   bool _refreshInProgress=false;
   bool _disposed=false;
   int _lockEpoch=0;
@@ -22,6 +26,7 @@ class TabletController extends ChangeNotifier {
   void dispose() {
     _lockEpoch++;
     operators?.lock();
+    transport?.api.close();
     _disposed=true;
     super.dispose();
   }
@@ -43,13 +48,19 @@ class TabletController extends ChangeNotifier {
     if(farmId!=null && farmId!=farm) throw StateError('Cette tablette est préparée pour une autre exploitation.');
     cache=await openAndroidFarmDatabase(farmId:farm,server:Uri.parse(api.baseUrl));
     farmId=farm;deviceId=device;generation=writeGeneration;
+    if(cache is OutboxStore && (transport==null || transport!.api.deviceId!=device ||
+        transport!.api.farmId!=farm || transport!.api.generation!=writeGeneration)) {
+      transport?.api.close();
+      transport=OutboxTransport(store:cache! as OutboxStore,api:DeviceOutboxApi(
+        baseUrl:api.baseUrl,identity:api.deviceIdentity,deviceId:device,farmId:farm,generation:writeGeneration));
+    }
     operators=LocalOperatorSessions(store:secrets,namespace:Uri.encodeComponent(api.baseUrl),
       farmId:farm,deviceId:device,generation:writeGeneration);
     profiles=await cache!.operatorProfiles();
     _notify();
   }
 
-  void lock() {_lockEpoch++;operators?.lock();selectedName=null;_notify();}
+  void lock() {_lockEpoch++;operators?.lock();selectedName=null;outboxRows=[];_notify();}
 
   Future<void> signIn(String username,String password) async {
     lock();
@@ -118,7 +129,40 @@ class TabletController extends ChangeNotifier {
       throw StateError('La tablette a été verrouillée.');
     }
     selectedName=name;
+    await refreshOutbox();
     _notify();
+  }
+
+  Future<void> refreshOutbox() async {
+    final current=operators?.session;
+    if(current==null || cache is! OutboxStore) {outboxRows=[];return;}
+    final rows=await (cache! as OutboxStore).listOutbox(authorId:current.userId);
+    if(_disposed || !identical(current,operators?.session)) throw StateError('Profil verrouillé.');
+    outboxRows=rows;_notify();
+  }
+
+  Future<OutboxEntry> declare({required String entityType,required String operationType,
+    required Map<String,dynamic> payload,required DateTime businessOccurredAt,String? operationId,
+    String? localEntityId,List<String> dependencies=const [],String expectedServerVersion='',
+    Future<void> Function()? project}) async {
+    final current=operators?.session;
+    if(current==null || cache is! OutboxStore) throw StateError('Profil personnel ouvert requis.');
+    final entry=await (cache! as OutboxStore).enqueue(grant:current.grant,
+      isSessionCurrent:()=>!_disposed && identical(current,operators?.session),entityType:entityType,
+      operationType:operationType,payload:payload,businessOccurredAt:businessOccurredAt,
+      operationId:operationId,localEntityId:localEntityId,dependencies:dependencies,
+      expectedServerVersion:expectedServerVersion,project:project);
+    if(!_disposed && identical(current,operators?.session)) {
+      outboxRows=[entry,...outboxRows.where((row)=>row.operationId!=entry.operationId)].take(50).toList();
+      _notify();
+    }
+    return entry;
+  }
+
+  Future<void> syncOutbox() async {
+    final engine=transport;
+    if(engine==null) throw StateError('Tablette non préparée.');
+    try {await engine.syncOnce();} finally {if(!_disposed) await refreshOutbox();}
   }
 
   Future<void> refreshCache() async {

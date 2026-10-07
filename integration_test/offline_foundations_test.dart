@@ -68,7 +68,7 @@ void main() {
         final now=DateTime.now().toUtc();
         final header=base64Url.encode(utf8.encode('{"alg":"EdDSA","kid":"android-test"}')).replaceAll('=','');
         final claims=base64Url.encode(utf8.encode(jsonEncode({'iss':'elevage-offline','aud':'elevage-device',
-          'typ':'offline-authorization','jti':'synthetic-$user','sub':'$user','membership_id':user,
+          'typ':'offline-authorization','jti':'00000000-0000-4000-8000-${user.toString().padLeft(12,'0')}','sub':'$user','membership_id':user,
           'exploitation_id':1,'device_id':7,'rights_version':1,'write_generation':1,
           'capabilities':{'can_create_terrain_operation':true},'iat':now.millisecondsSinceEpoch~/1000,
           'exp':now.add(const Duration(days:3)).millisecondsSinceEpoch~/1000}))).replaceAll('=','');
@@ -96,8 +96,10 @@ void main() {
     await tablet.prepareOperator('654321');
     tablet.api.personal=null; // no server session needed for personal PIN unlock
     await tablet.unlockProfile(2,'Jean','123456');
+    await tablet.declare(entityType:'CLIENT',operationType:'CREATE',payload:{'nom':'Déclaration native Jean'},businessOccurredAt:DateTime.now().toUtc());
     expect((await tablet.readPage('lots')).single['data'],containsPair('stock',10));
     await tablet.unlockProfile(3,'Paul','654321');
+    await tablet.declare(entityType:'CLIENT',operationType:'CREATE',payload:{'nom':'Déclaration native Paul'},businessOccurredAt:DateTime.now().toUtc());
     expect(tablet.operators!.session!.userId,3);
     expect((await tablet.readPage('clients')).single['data'],containsPair('nom','Fixture partagée'));
     tablet.lock();tablet.api.close();tablet.dispose();
@@ -107,6 +109,8 @@ void main() {
     expect(tablet.operators!.session,isNull);
     expect(tablet.profiles.map((p)=>p['display_name']),containsAll(['Jean','Paul']));
     await tablet.unlockProfile(2,'Jean','123456');
+    expect(tablet.outboxRows.single.authorId,2);
+    expect(tablet.outboxRows.single.transportStatus,'LOCAL_PENDING');
     expect((await tablet.readPage('tasks')).single['data'],containsPair('assigned_to',null));
     await expectLater(tablet.unlockProfile(3,'Paul','123456'),throwsStateError);
     expect(tablet.operators!.session,isNull);

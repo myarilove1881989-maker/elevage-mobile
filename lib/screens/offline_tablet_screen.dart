@@ -4,6 +4,7 @@ import '../offline/device_identity.dart';
 import '../offline/foundation_api.dart';
 import '../offline/local_operator_session.dart';
 import '../offline/tablet_controller.dart';
+import '../offline/outbox_transport.dart';
 
 class OfflineTabletScreen extends StatefulWidget {
   const OfflineTabletScreen({super.key,this.controller});
@@ -48,7 +49,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
     catch(error) {
       if(mounted) {
         setState(()=>message=error is StateError?error.message.toString():
-          error is FoundationApiException?error.toString():'Connexion ou stockage sécurisé indisponible.');
+          error is FoundationApiException || error is DeviceTransportException?error.toString():'Connexion ou stockage sécurisé indisponible.');
       }
     } finally { if(mounted) setState(()=>busy=false); }
   }
@@ -71,6 +72,8 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
       Text(tablet.farmId==null?'Cette tablette doit être préparée par le propriétaire.':
         'Exploitation ${tablet.farmId} • données conservées sur cette tablette'),
       const SizedBox(height:16),
+      if(tablet.farmId!=null) OutlinedButton(onPressed:busy?null:()=>_run(tablet.syncOutbox),
+        child:const Text('Transmettre les déclarations')),
       if(session==null) ...[
         for(final profile in tablet.profiles) ListTile(leading:const Icon(Icons.person_outline),
           title:Text(profile['display_name'] as String),subtitle:const Text('Ouvrir avec mon PIN'),
@@ -103,6 +106,15 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
         },child:const Text('Préparer mon accès par PIN')),
       ] else ...[
         Text('Profil ouvert : ${tablet.selectedName}',style:Theme.of(context).textTheme.titleMedium),
+        for(final entry in tablet.outboxRows) ListTile(
+          title:Text('Déclaration ${entry.sequence}'),
+          subtitle:Text(entry.businessStatus=='CONFIRMED'?'Confirmée par le serveur':
+            entry.businessStatus=='NEEDS_RECONCILIATION'?'Reçue • à rapprocher':
+            entry.businessStatus=='NOT_APPLIED'?'Reçue • non appliquée':
+            entry.businessStatus=='SUPERSEDED'?'Reçue • remplacée avec historique':
+            entry.transportStatus=='SERVER_RECEIVED'?'Reçue • confirmation métier en attente':
+            entry.transportStatus=='TRANSPORT_BLOCKED'?'Conservée • transmission bloquée':
+            'Conservée sur cette tablette • transmission en attente')),
         TextButton(onPressed:busy?null:() async {
           final oldPin=await _pinDialog(title:'Mon PIN actuel');
           if(oldPin==null || !mounted) return;

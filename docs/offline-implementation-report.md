@@ -81,6 +81,22 @@ Références :
 
 ## Portes de progression
 
+## Phase 2D — EN COURS, non validée
+
+Le schéma local 3 ajoute une Outbox chiffrée et un compteur de séquence.
+Les déclarations originales sont protégées contre UPDATE/DELETE SQL ;
+les états de transport et métier restent séparés. Le grant est référencé
+par UUID, sans JWT. Projection et déclaration peuvent être enregistrées
+dans une seule transaction. Les tentatives interrompues sont reprises
+avec le même UUID, l'auteur d'origine et une temporisation persistante.
+Le transport utilise une preuve appareil distincte des sessions JWT
+personnelles, avec nonce, exploitation, génération, méthode, chemin et
+empreinte exacte du corps. Un défi expiré est réessayable ; une tablette
+révoquée conserve ses déclarations et bloque le transport normal.
+Les tests Flutter et Android du checkpoint 2D doivent encore passer.
+Les formulaires terrain 2E et les confirmations métier ne sont pas encore
+implémentés. Aucun déploiement ni merge de production n'a lieu.
+
 Clôture du socle 2C, 7 octobre 2026 : checkpoint code
 `9e5937846340e09e51c3c287b5de576e0bb02867`, workflow `37613201556`,
 jobs Flutter et Android tous deux réussis. Flutter 3.47.6 / Dart 3.13.5 :
