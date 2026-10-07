@@ -14,6 +14,7 @@ import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/tablet_controller.dart';
 import 'package:app_elevage/offline/sync_coordinator.dart';
 import 'package:app_elevage/offline/outbox.dart';
+import 'package:app_elevage/offline/outbox_transport.dart';
 import 'package:app_elevage/screens/offline_tablet_screen.dart';
 import 'package:app_elevage/screens/supervision_screen.dart';
 import 'package:app_elevage/services/supervision_service.dart';
@@ -417,7 +418,27 @@ void main() {
       'states=${diagnosticRows.map((row)=>row.transportStatus).toList()} '
       'codes=${diagnosticRows.map((row)=>row.lastError).toSet()} busy=${tablet.sync!.busy} '
       'error=${tablet.sync!.error!=null}');
-    expect(server,hasLength(7));expect(posts,1);
+    final receivedBeforeProbe=server.length;
+    if(receivedBeforeProbe==0) {
+      // Diagnose outside the transport's deliberately generic shared error.
+      // This probe cannot turn the failed scheduler assertion into success.
+      final engineApi=tablet.transport!.api;
+      final probe=DeviceOutboxApi(baseUrl:engineApi.baseUrl,identity:native,
+        deviceId:engineApi.deviceId,farmId:engineApi.farmId,generation:engineApi.generation,
+        client:transportClient());
+      try {await probe.receive(diagnosticRows);debugPrint('NATIVE_SHARED_SYNC_PROBE unexpected_success');}
+      catch(error) {
+        final safeMessage=error is StateError && {
+          'Défi de transport hors contexte.','Réponse de transport invalide.',
+          'Réponse de transport trop volumineuse.','Déclarations hors contexte appareil.',
+          'Reçus de transport invalides.',
+        }.contains(error.message)?error.message:'bounded_error';
+        debugPrint('NATIVE_SHARED_SYNC_PROBE type=${error.runtimeType} code=$safeMessage '
+          'device=${engineApi.deviceId} farm=${engineApi.farmId} generation=${engineApi.generation} '
+          'identity=${native.stages}');
+      } finally {probe.close();}
+    }
+    expect(receivedBeforeProbe,7);expect(server,hasLength(7));expect(posts,1);
     expect(server.values.where((value)=>value['author_user_id']==2),hasLength(6));
     expect(server.values.where((value)=>value['author_user_id']==3),hasLength(1));
     expect(tablet.sync!.summary.pending,0);expect(tablet.sync!.summary.lastSuccess,isNotNull);
