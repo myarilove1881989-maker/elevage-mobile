@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'offline_grant.dart';
 import 'outbox.dart';
-import 'sync_coordinator.dart';
+import 'sync_state.dart';
 
 mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncStateStore {
   int get outboxFarmId;

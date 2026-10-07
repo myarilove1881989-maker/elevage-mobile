@@ -1,17 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-
-abstract interface class SyncStateStore {
-  Future<SyncSummary> syncSummary();
-  Future<void> recordSyncSuccess(DateTime time);
-}
-
-class SyncSummary {
-  const SyncSummary({this.pending=0,this.conflicts=0,this.blocked=0,this.lastSuccess});
-  final int pending,conflicts,blocked;
-  final DateTime? lastSuccess;
-}
+import 'sync_state.dart';
+export 'sync_state.dart';
 
 Stream<bool?> androidNetworkChanges()=>const EventChannel('elevage/network_state')
   .receiveBroadcastStream().map((value)=>value is bool?value:null);
