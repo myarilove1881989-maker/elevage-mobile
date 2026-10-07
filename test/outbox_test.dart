@@ -130,6 +130,7 @@ void main() {
   test('schema 2 upgrades additively preserving confirmed cache and profiles',() async {
     await db.replaceConfirmedCache('clients',[{'id':1,'nom':'Retained'}]);
     await db.saveOperatorProfile(jean,'Jean');
+    await db.customStatement('DROP TABLE terrain_cash_recognition');
     await db.customStatement('DROP TABLE terrain_entity_mapping');
     await db.customStatement('DROP TABLE outbox');await db.customStatement('DROP TABLE local_sequence_counter');
     await db.customStatement('PRAGMA user_version=2');await db.close();db=open();

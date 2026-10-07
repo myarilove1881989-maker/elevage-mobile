@@ -171,7 +171,7 @@ class TabletController extends ChangeNotifier {
     final personal=api.personal;
     if(personal==null || cache==null || personal.farmId!=farmId) throw const FoundationApiException(401);
     _refreshInProgress=true;
-    try { for(final collection in ['lots','clients','species','tasks','expense_categories']) {
+    try { for(final collection in ['lots','clients','species','tasks','expense_categories','sales']) {
       var after=0;
       var businessRevision=0;
       await cache!.beginCacheRefresh(collection);
@@ -198,7 +198,7 @@ class TabletController extends ChangeNotifier {
   Future<List<Map<String,dynamic>>> readPage(String collection,{int offset=0,String search=''}) async {
     final session=operators?.session;
     if(session==null || cache==null) throw StateError('Déverrouiller un profil personnel.');
-    final rows=cache is TerrainStore && {'clients','tasks','lots'}.contains(collection)
+    final rows=cache is TerrainStore && {'clients','tasks','lots','sales','cash'}.contains(collection)
       ? await (cache! as TerrainStore).projectedPage(collection,offset:offset,limit:50,
           taskUserId:collection=='tasks'?session.userId:null,search:search)
       : await cache!.cachedPage(collection,offset:offset,limit:50,

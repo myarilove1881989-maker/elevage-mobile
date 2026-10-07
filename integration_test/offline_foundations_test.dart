@@ -77,7 +77,7 @@ void main() {
           'public_key':pem,'key_id':'android-test'};
       } else if(path.endsWith('/cache-page/')) {
         final collection=request.url.queryParameters['collection'];
-        response={'collection':collection,'next_cursor':null,'results':[
+        response={'collection':collection,'next_cursor':null,'results':collection=='sales'?[]:[
           {'id':1,'nom':'Fixture partagée','stock':10,if(collection=='tasks')...{'title':'Fixture agenda','assigned_to':null,'version':1,'status':'TODO','report':'','date':'2026-10-07'}},
         ]};
       } else {throw StateError('Unexpected synthetic request $path');}
@@ -175,6 +175,45 @@ void main() {
     final nativePurchase=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='ACHAT');
     expect(nativePurchase.declaration['payload'],containsPair('prix_total','39.03'));
     expect((await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'],containsPair('projected_stock',3));
+    await tester.ensureVisible(find.text('Enregistrer une vente ou un encaissement'));
+    await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tester.pumpAndSettle();await tester.tap(find.text('Client créé sans réseau').last);await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tester.pumpAndSettle();await tester.tap(find.text('Achat natif test').last);await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('sale-quantity')));
+    await tester.enterText(find.byKey(const ValueKey('sale-quantity')),'1');
+    await tester.ensureVisible(find.byKey(const ValueKey('sale-price')));
+    await tester.enterText(find.byKey(const ValueKey('sale-price')),'13,01');
+    await tester.tap(find.text('Conserver sur la tablette'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.outboxRows.length<4;attempt++) {await tester.pump(const Duration(milliseconds:100));}
+    expect(tablet.outboxRows,hasLength(4));
+    final nativeSale=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='VENTE_ANIMAUX');
+    expect(nativeSale.declaration['dependencies'],contains(nativePurchase.operationId));
+    expect((await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'],containsPair('projected_stock',2));
+    await tester.ensureVisible(find.text('Enregistrer une vente ou un encaissement'));
+    await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {await tester.pump(const Duration(milliseconds:100));}
+    await tester.tap(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)).first);
+    await tester.pumpAndSettle();await tester.tap(find.text('Encaissement reçu').last);await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tester.pumpAndSettle();await tester.tap(find.text('Client créé sans réseau').last);await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tester.pumpAndSettle();await tester.tap(find.textContaining('Vente animaux ').last);await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('cash-amount')));
+    await tester.enterText(find.byKey(const ValueKey('cash-amount')),'50,00');
+    await tester.tap(find.text('Conserver sur la tablette'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.outboxRows.length<5;attempt++) {await tester.pump(const Duration(milliseconds:100));}
+    expect(tablet.outboxRows,hasLength(5));
+    final nativeCash=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='ENCAISSEMENT');
+    expect(nativeCash.declaration['payload'],containsPair('montant_recu','50.00'));
+    expect(nativeCash.declaration['dependencies'],contains(nativeSale.operationId));
+    expect(tablet.outboxRows.every((entry)=>entry.authorId==2),isTrue);
     await tester.tap(find.byTooltip('Verrouiller / changer d’opérateur'));
     await tester.pumpAndSettle();
     expect(find.text('Profil ouvert : Jean'),findsNothing);

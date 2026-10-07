@@ -8,6 +8,7 @@ import '../offline/outbox_transport.dart';
 import '../offline/outbox.dart';
 part 'terrain_personal_dialogs.dart';
 part 'terrain_operation_dialog.dart';
+part 'terrain_sale_dialog.dart';
 
 class OfflineTabletScreen extends StatefulWidget {
   const OfflineTabletScreen({super.key,this.controller});
@@ -119,6 +120,29 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
     });
   }
 
+  Future<void> _terrainSale() async {
+    final author=tablet.operators?.session;
+    final lots=<Map<String,dynamic>>[],clients=<Map<String,dynamic>>[];
+    var loaded=false;
+    await _run(() async {
+      lots.addAll(await tablet.readPage('lots'));clients.addAll(await tablet.readPage('clients'));loaded=true;
+    });
+    if(!loaded || !mounted || author==null || !identical(author,tablet.operators?.session)) {return;}
+    final declaration=await showDialog<Map<String,dynamic>>(context:context,builder:(_)=>_TerrainSaleDialog(
+      lots:lots,clients:clients,searchLots:(search)=>tablet.readPage('lots',search:search),
+      searchClients:(search)=>tablet.readPage('clients',search:search),clientSales:(client)=>tablet.readPage('sales',search:client)));
+    if(declaration==null || !mounted) {return;}
+    await _run(() async {
+      if(!identical(author,tablet.operators?.session)) {throw StateError('Le profil a été verrouillé. Rouvrez votre PIN.');}
+      await tablet.declare(entityType:declaration['entity_type'] as String,operationType:'CREATE',
+        payload:Map<String,dynamic>.from(declaration['payload'] as Map),dependencies:List<String>.from(declaration['dependencies'] as List),
+        businessOccurredAt:declaration['occurred'] as DateTime);
+      collection=declaration['entity_type']=='ENCAISSEMENT'?'cash':'sales';offset=0;await _read();
+      if(mounted) {setState(()=>message=collection=='sales'?'Vente enregistrée sur la tablette — confirmation serveur en attente.':
+        'Montant reçu conservé sur la tablette — affectation serveur en attente.');}
+    });
+  }
+
   @override
   Widget build(BuildContext context)=>AnimatedBuilder(animation:tablet,builder:(context,_) {
     final session=tablet.operators?.session;
@@ -167,6 +191,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
         Text('Profil ouvert : ${tablet.selectedName}',style:Theme.of(context).textTheme.titleMedium),
         FilledButton.icon(onPressed:busy?null:_createClient,icon:const Icon(Icons.person_add_outlined),label:const Text('Enregistrer un client')),
         FilledButton.icon(onPressed:busy?null:_terrainOperation,icon:const Icon(Icons.add_circle_outline),label:const Text('Enregistrer une opération terrain')),
+        FilledButton.icon(onPressed:busy?null:_terrainSale,icon:const Icon(Icons.point_of_sale),label:const Text('Enregistrer une vente ou un encaissement')),
         for(final entry in tablet.outboxRows) ListTile(
           title:Text('Déclaration ${entry.sequence}'),
           subtitle:Text(entry.businessStatus=='CONFIRMED'?'Confirmée par le serveur':
@@ -192,7 +217,8 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
         const SizedBox(height:12),
         DropdownButtonFormField<String>(key:ValueKey(collection),initialValue:collection,decoration:const InputDecoration(labelText:'Consulter'),
           items:const [DropdownMenuItem(value:'lots',child:Text('Lots')),DropdownMenuItem(value:'clients',child:Text('Clients')),
-            DropdownMenuItem(value:'species',child:Text('Espèces')),DropdownMenuItem(value:'tasks',child:Text('Agenda'))],
+            DropdownMenuItem(value:'species',child:Text('Espèces')),DropdownMenuItem(value:'tasks',child:Text('Agenda')),
+            DropdownMenuItem(value:'sales',child:Text('Ventes')),DropdownMenuItem(value:'cash',child:Text('Encaissements reçus'))],
           onChanged:busy?null:(value) { if(value==null) return;collection=value;offset=0;_run(_read); }),
         for(final row in rows) ListTile(onTap:collection=='tasks' && !busy?()=>_reportTask(row):null,
           title:Text(((row['data'] as Map)['nom']??(row['data'] as Map)['title']??'Donnée').toString()),
@@ -201,7 +227,8 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
             Text('Mouvements locaux : ${(row['data'] as Map)['local_delta']??0} • stock projeté : ${(row['data'] as Map)['projected_stock']??(row['data'] as Map)['stock']}'),
             if((row['data'] as Map)['type_production']=='OEUFS') Text('Œufs confirmés : ${(row['data'] as Map)['stock_oeufs']??0} • œufs projetés : ${(row['data'] as Map)['projected_egg_stock']??0}'),
             if(row['state']=='NEEDS_RECONCILIATION') const Text('Rapprochement nécessaire',style:TextStyle(color:Colors.red)),
-          ]):Text(
+          ]):collection=='cash'?Text('Reçu : ${(row['data'] as Map)['montant_recu']} • affecté : ${(row['data'] as Map)['montant_affecte']??'en attente'} • à rapprocher : ${(row['data'] as Map)['montant_a_rapprocher']??'en attente'}'):
+          collection=='sales'?Text('Montant : ${(row['data'] as Map)['montant_total']} • ${row['state']=='CONFIRMED' || row['state']=='CONFIRMED_CACHE'?'confirmée par le serveur':row['state']=='NEEDS_RECONCILIATION'?'à rapprocher':'document provisoire — confirmation en attente'}'):Text(
             row['state']=='NEEDS_RECONCILIATION'?'Déclaration à rapprocher':
             row['state']!=null && !{'CONFIRMED','CONFIRMED_CACHE'}.contains(row['state'])?'Conservé sur la tablette • confirmation en attente':
             collection=='tasks'?'${(row['data'] as Map)['date']} • ${_taskStatus((row['data'] as Map)['status'])}':'Confirmé par le serveur')),

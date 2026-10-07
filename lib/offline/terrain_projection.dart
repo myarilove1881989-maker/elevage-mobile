@@ -11,6 +11,9 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
       'operation_id TEXT NOT NULL REFERENCES outbox(operation_id),PRIMARY KEY(entity_type,local_entity_id))');
   }
 
+  Future<void> createTerrainCash()=>customStatement('CREATE TABLE terrain_cash_recognition ('
+    'operation_id TEXT PRIMARY KEY REFERENCES outbox(operation_id),payload TEXT NOT NULL CHECK(json_valid(payload)),server_version TEXT NOT NULL)');
+
   Future<void> projectReceipt(Map<String,dynamic> receipt) async {
     final mappings=receipt['entity_mappings']??const [];
     if(mappings is! List || mappings.length>10) {throw StateError('Correspondances serveur invalides.');}
@@ -33,10 +36,43 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
         [item['entity_type'],item['local_entity_id'],item['server_entity_id'],receipt['client_operation_id']]);
     }
     await _projectStockReceipt(receipt,declaration);
+    await _projectCashReceipt(receipt,declaration);
+  }
+
+  Future<void> _projectCashReceipt(Map<String,dynamic> receipt,Map declaration) async {
+    final cash=receipt['cash_recognition'];
+    if(cash==null) {
+      if(declaration['entity_type']=='ENCAISSEMENT' && receipt['business_status']=='CONFIRMED') {throw StateError('Reconnaissance d’encaissement manquante.');}
+      return;
+    }
+    const allowed={'montant_recu','montant_affecte','montant_a_rapprocher','payment_id','mode'};
+    if(declaration['entity_type']!='ENCAISSEMENT' || cash is! Map || cash.length!=allowed.length ||
+      cash.keys.any((key)=>!allowed.contains(key)) || !{'CONFIRMED','NEEDS_RECONCILIATION'}.contains(receipt['business_status']) ||
+      cash['payment_id'] is! int || (cash['payment_id'] as int)<1 || cash['mode']!=(declaration['payload'] as Map)['mode']) {
+      throw StateError('Reconnaissance d’encaissement invalide.');
+    }
+    final original=moneyCents((declaration['payload'] as Map)['montant_recu']);
+    final received=moneyCents(cash['montant_recu']);
+    final assigned=moneyCents(cash['montant_affecte']);final remaining=moneyCents(cash['montant_a_rapprocher']);
+    if(original==null || original<=BigInt.zero || original!=received || assigned==null || remaining==null ||
+      assigned+remaining!=received || (remaining>BigInt.zero && receipt['business_status']=='CONFIRMED')) {
+      throw StateError('Le montant reçu ne correspond pas à son rapprochement.');
+    }
+    final previous=await customSelect('SELECT payload,server_version FROM terrain_cash_recognition WHERE operation_id=?',
+      variables:[Variable(receipt['client_operation_id'] as String)]).getSingleOrNull();
+    if(previous!=null) {
+      final prior=jsonDecode(previous.read<String>('payload')) as Map;
+      if(prior['payment_id']!=cash['payment_id']) {throw StateError('Un encaissement ne peut pas créer un deuxième paiement.');}
+      if(previous.read<String>('server_version')==(receipt['server_version']??'') && allowed.any((key)=>prior[key]!=cash[key])) {
+        throw StateError('Rapprochement contradictoire pour une même révision.');
+      }
+    }
+    await customStatement('INSERT OR REPLACE INTO terrain_cash_recognition VALUES(?,?,?)',
+      [receipt['client_operation_id'],jsonEncode(cash),receipt['server_version']??'']);
   }
 
   Future<void> _projectStockReceipt(Map<String,dynamic> receipt,Map declaration) async {
-    const stockKinds={'ACHAT','NAISSANCE','MORTALITE','DON','VOL','COLLECTE_OEUFS'};
+    const stockKinds={'ACHAT','NAISSANCE','MORTALITE','DON','VOL','COLLECTE_OEUFS','VENTE_ANIMAUX','VENTE_OEUFS'};
     final snapshots=receipt['stock_snapshots']??const [];
     if(snapshots is! List || snapshots.length>1 ||
       (snapshots.isNotEmpty && (!stockKinds.contains(declaration['entity_type']) || receipt['business_status']!='CONFIRMED')) ||
@@ -87,17 +123,31 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
 
   @override
   Future<List<Map<String,dynamic>>> projectedPage(String collection,{int offset=0,int limit=50,int? taskUserId,String search=''}) async {
-    if(!{'clients','tasks','lots'}.contains(collection) || offset<0 || limit<1 || limit>200 || search.length>100 ||
+    if(!{'clients','tasks','lots','sales','cash'}.contains(collection) || offset<0 || limit<1 || limit>200 || search.length>100 ||
       (collection=='tasks' && (taskUserId==null || taskUserId<1))) {throw ArgumentError('Page terrain invalide.');}
     if(collection=='lots') {return _projectedLots(offset,limit,search);}
+    if(collection=='sales') {return _projectedSales(offset,limit,search);}
+    if(collection=='cash') {
+      final rows=await customSelect("SELECT o.declaration,o.business_status,c.payload FROM outbox o LEFT JOIN terrain_cash_recognition c ON c.operation_id=o.operation_id "
+        "WHERE json_extract(o.declaration,'\$.entity_type')='ENCAISSEMENT' ORDER BY o.local_sequence DESC LIMIT ? OFFSET ?",
+        variables:[Variable(limit),Variable(offset)]).get();
+      return rows.map((row) {
+        final declaration=jsonDecode(row.read<String>('declaration')) as Map;
+        final data=Map<String,dynamic>.from(declaration['payload'] as Map)..['nom']='Encaissement terrain';
+        final recognized=row.readNullable<String>('payload');
+        if(recognized!=null) {data.addAll(Map<String,dynamic>.from(jsonDecode(recognized) as Map));}
+        return <String,dynamic>{'data':data,'state':row.read<String>('business_status')};
+      }).toList();
+    }
     if(collection=='clients') {
-      final rows=await customSelect("SELECT payload AS data,'CONFIRMED_CACHE' AS state,NULL AS operation_id,NULL AS local_uuid,received_at FROM confirmed_cache WHERE collection='clients' "
+      final pattern='%${search.replaceAll('\\','\\\\').replaceAll('%','\\%').replaceAll('_','\\_')}%';
+      final rows=await customSelect("SELECT * FROM (SELECT payload AS data,'CONFIRMED_CACHE' AS state,NULL AS operation_id,NULL AS local_uuid,received_at FROM confirmed_cache WHERE collection='clients' "
         "UNION ALL SELECT json_set(json_extract(o.declaration,'\$.payload'),'\$.id',COALESCE(m.server_entity_id,json_extract(o.declaration,'\$.local_entity_id'))) AS data,"
         "o.business_status AS state,o.operation_id,json_extract(o.declaration,'\$.local_entity_id') AS local_uuid,o.received_at "
         "FROM outbox o LEFT JOIN terrain_entity_mapping m ON m.entity_type='CLIENT' AND m.local_entity_id=json_extract(o.declaration,'\$.local_entity_id') "
         "WHERE json_extract(o.declaration,'\$.entity_type')='CLIENT' AND json_extract(o.declaration,'\$.operation_type')='CREATE' "
         "AND o.business_status NOT IN ('NOT_APPLIED','SUPERSEDED') AND NOT EXISTS(SELECT 1 FROM confirmed_cache c WHERE c.collection='clients' AND c.entity_id=CAST(m.server_entity_id AS TEXT)) "
-        'ORDER BY data LIMIT ? OFFSET ?',variables:[Variable(limit),Variable(offset)]).get();
+        ") WHERE json_extract(data,'\$.nom') LIKE ? ESCAPE '\\' ORDER BY data LIMIT ? OFFSET ?",variables:[Variable(pattern),Variable(limit),Variable(offset)]).get();
       return rows.map((row)=>{'data':jsonDecode(row.read<String>('data')),'state':row.read<String>('state'),
         'operation_id':row.readNullable<String>('operation_id'),'local_uuid':row.readNullable<String>('local_uuid'),
         'confirmed_received_at':row.readNullable<int>('received_at')}).toList();
@@ -125,6 +175,36 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
       result.add({'data':data,'state':state,'dependency':dependency,'confirmed_received_at':row.read<int>('received_at')});
     }
     return result;
+  }
+
+  Future<List<Map<String,dynamic>>> _projectedSales(int offset,int limit,String clientSearch) async {
+    final rows=await customSelect("SELECT * FROM (SELECT payload AS data,'CONFIRMED_CACHE' AS state,NULL AS operation_id,NULL AS local_uuid FROM confirmed_cache WHERE collection='sales' "
+      "UNION ALL SELECT json_set(json_extract(o.declaration,'\$.payload'),'\$.id',COALESCE(m.server_entity_id,json_extract(o.declaration,'\$.local_entity_id')),"
+      "'\$.reference_id',COALESCE(m.server_entity_id,json_extract(o.declaration,'\$.local_entity_id')),'\$.entity_type',json_extract(o.declaration,'\$.entity_type'),"
+      "'\$.client_id',COALESCE(json_extract(o.declaration,'\$.payload.client_ref.server_id'),cm.server_entity_id,json_extract(o.declaration,'\$.payload.client_ref.local_uuid'))) AS data,"
+      "o.business_status AS state,o.operation_id,json_extract(o.declaration,'\$.local_entity_id') AS local_uuid FROM outbox o "
+      "LEFT JOIN terrain_entity_mapping m ON m.entity_type=json_extract(o.declaration,'\$.entity_type') AND m.local_entity_id=json_extract(o.declaration,'\$.local_entity_id') "
+      "LEFT JOIN terrain_entity_mapping cm ON cm.entity_type='CLIENT' AND cm.local_entity_id=json_extract(o.declaration,'\$.payload.client_ref.local_uuid') "
+      "WHERE json_extract(o.declaration,'\$.entity_type') IN ('VENTE_ANIMAUX','VENTE_OEUFS') AND json_extract(o.declaration,'\$.operation_type')='CREATE' "
+      "AND o.business_status NOT IN ('NOT_APPLIED','SUPERSEDED') AND NOT EXISTS(SELECT 1 FROM confirmed_cache c WHERE c.collection='sales' "
+      "AND json_extract(c.payload,'\$.entity_type')=m.entity_type AND json_extract(c.payload,'\$.reference_id')=m.server_entity_id)) "
+      "WHERE (?='' OR CAST(json_extract(data,'\$.client_id') AS TEXT)=?) ORDER BY data LIMIT ? OFFSET ?",
+      variables:[Variable(clientSearch),Variable(clientSearch),Variable(limit),Variable(offset)]).get();
+    return rows.map((row) {
+      final data=Map<String,dynamic>.from(jsonDecode(row.read<String>('data')) as Map);
+      final kind=data['entity_type'];
+      data['nom']='${kind=='VENTE_OEUFS'?'Vente d’œufs':'Vente animaux'} ${data['reference_id']}';
+      if(data['montant_total']==null) {
+        final count=kind=='VENTE_OEUFS'?data['conditionnement']=='COMPOSE'?1:data['nombre_conditionnements']:data['quantite'];
+        final price=moneyCents(kind=='VENTE_OEUFS'?data['conditionnement']=='COMPOSE'?data['prix_total']:data['prix_unitaire_conditionnement']:data['prix_unitaire']);
+        if(count is int && price!=null) {
+          final total=price*BigInt.from(count);
+          data['montant_total']='${total~/BigInt.from(100)}.${(total%BigInt.from(100)).toString().padLeft(2,'0')}';
+        }
+      }
+      return <String,dynamic>{'data':data,'state':row.read<String>('state'),'local_uuid':row.readNullable<String>('local_uuid'),
+        'dependency':{'CONFIRMED','CONFIRMED_CACHE'}.contains(row.read<String>('state'))?null:row.readNullable<String>('operation_id')};
+    }).toList();
   }
 
   Future<List<Map<String,dynamic>>> _projectedLots(int offset,int limit,String search) async {
@@ -165,7 +245,8 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
       for(final operation in operations) {
         final declaration=jsonDecode(operation.read<String>('declaration')) as Map;
         final payload=declaration['payload'] as Map;
-        if({'MORTALITE','DON','VOL'}.contains(declaration['entity_type'])) {delta-=_quantity(payload['quantite']);}
+        if({'MORTALITE','DON','VOL','VENTE_ANIMAUX'}.contains(declaration['entity_type'])) {delta-=_quantity(payload['quantite']);}
+        if(declaration['entity_type']=='VENTE_OEUFS') {eggDelta-=eggQuantity(payload);}
         if(declaration['entity_type']=='COLLECTE_OEUFS') {
           final collected=payload['nombre_collecte']??(_quantity(payload['nombre_alveoles'])*30+_quantity(payload['oeufs_restants']));
           eggDelta+=_quantity(collected)-_quantity(payload['nombre_casses'])-_quantity(payload['nombre_declasses'])-_quantity(payload['nombre_consommes_donnes']);
@@ -181,4 +262,16 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
   }
 
   int _quantity(dynamic value)=>value is int?value:int.tryParse(value?.toString()??'')??0;
+}
+
+BigInt? moneyCents(dynamic value) {
+  if(value is! String || !RegExp(r'^[0-9]{1,10}\.[0-9]{2}$').hasMatch(value)) {return null;}
+  return BigInt.parse(value.replaceAll('.',''));
+}
+
+int eggQuantity(Map payload) {
+  final kind=payload['conditionnement'];
+  if(kind=='COMPOSE') {return ((payload['nombre_alveoles']??0) as int)*30+((payload['oeufs_supplementaires']??0) as int);}
+  final size={'UNITE':1,'DOUZAINE':12,'PLATEAU':30}[kind]??payload['oeufs_par_conditionnement']??0;
+  return ((payload['nombre_conditionnements']??0) as int)*(size as int);
 }

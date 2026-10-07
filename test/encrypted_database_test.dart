@@ -78,6 +78,7 @@ void main() {
     var db=open();
     await db.replaceConfirmedCache('clients',[{'id':1,'name':'retained'}]);
     // Recreate the exact previous schema using this synthetic test database.
+    await db.customStatement('DROP TABLE terrain_cash_recognition');
     await db.customStatement('DROP TABLE terrain_entity_mapping');
     await db.customStatement('DROP TABLE outbox');
     await db.customStatement('DROP TABLE local_sequence_counter');

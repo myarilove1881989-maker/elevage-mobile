@@ -39,7 +39,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   final DateTime Function() outboxClock;
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
   @override
   Future<void> applyProjectionReceipt(Map<String,dynamic> receipt)=>projectReceipt(receipt);
   @override
@@ -63,11 +63,13 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
       await _createStaging();
       await createOutboxSchema();
       await createTerrainMappings();
+      await createTerrainCash();
     },
     onUpgrade: (_,from,to) async {
       if(from<2) await _createStaging();
       if(from<3) await createOutboxSchema();
       if(from<4) await createTerrainMappings();
+      if(from<5) await createTerrainCash();
     },
     beforeOpen: (_) async {
       final identity = await customSelect('SELECT farm_id,server_namespace FROM farm_identity').getSingle();
@@ -79,7 +81,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
     },
   );
 
-  static const cacheCollections = {'lots', 'clients', 'species', 'tasks', 'dashboard', 'expense_categories'};
+  static const cacheCollections = {'lots', 'clients', 'species', 'tasks', 'dashboard', 'expense_categories', 'sales'};
 
   Future<void> _createStaging() => customStatement('CREATE TABLE confirmed_cache_staging '
       '(collection TEXT NOT NULL,entity_id TEXT NOT NULL,payload TEXT NOT NULL, '

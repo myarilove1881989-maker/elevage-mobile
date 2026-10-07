@@ -132,7 +132,10 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
       final id=receipt['client_operation_id'];
       if(id is! String || !operationUuidPattern.hasMatch(id) || receipt['transport_status']!='SERVER_RECEIVED' || !businessStates.contains(receipt['business_status'])) throw StateError('Reçu serveur invalide.');
       final row=await customSelect('SELECT * FROM outbox WHERE operation_id=?',variables:[Variable(id)]).getSingleOrNull();
-      if(row==null || row.read<int>('author_user_id')!=receipt['author_user_id']) throw StateError('Reçu hors contexte.');
+        if(row==null || row.read<int>('author_user_id')!=receipt['author_user_id']) throw StateError('Reçu hors contexte.');
+        final previousRevision=RegExp(r'^farm:([0-9]+)$').firstMatch(row.read<String>('server_version'));
+        final nextRevision=RegExp(r'^farm:([0-9]+)$').firstMatch((receipt['server_version']??'').toString());
+        if(previousRevision!=null && nextRevision!=null && BigInt.parse(nextRevision[1]!)<BigInt.parse(previousRevision[1]!)) {continue;}
       if({'CONFIRMED','NOT_APPLIED','SUPERSEDED'}.contains(row.read<String>('business_status')) &&
         {'UNREVIEWED','WAITING_DEPENDENCY'}.contains(receipt['business_status'])) throw StateError('Reçu métier obsolète.');
       final reason=receipt['reason_code']??'';
