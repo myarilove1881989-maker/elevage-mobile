@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -33,6 +34,23 @@ class DelayedGrantStore implements OperatorSecretStore {
   }
   @override
   Future<void> write(String key,String value)=>delegate.write(key,value);
+}
+
+/// Only records bounded stage names, never signatures or private material.
+class DiagnosticDeviceIdentity extends AndroidDeviceIdentity {
+  final stages=<String>[];
+  @override
+  Future<Map<String,dynamic>> publicIdentity() async {
+    stages.add('IDENTITY_START');
+    try {final result=await super.publicIdentity();stages.add('IDENTITY_OK');return result;}
+    catch(error) {stages.add('IDENTITY_ERROR_${error.runtimeType}');rethrow;}
+  }
+  @override
+  Future<String> sign(Uint8List message) async {
+    stages.add('SIGN_START');
+    try {final result=await super.sign(message);stages.add('SIGN_OK');return result;}
+    catch(error) {stages.add('SIGN_ERROR_${error.runtimeType}');rethrow;}
+  }
 }
 
 void main() {
@@ -357,10 +375,12 @@ void main() {
     binding.reportData={...binding.reportData??{},'stage':'SHARED_SYNC_START','shared_sync_complete':false};
     final namespace=terrainNamespace!;
     const secrets=AndroidOperatorSecretStore();
-    final native=AndroidDeviceIdentity();
+    final native=DiagnosticDeviceIdentity();
     final network=StreamController<bool?>.broadcast(sync:true);
+    final requestStages=<String>[];
     final server=<String,Map<String,dynamic>>{};int posts=0;
     MockClient transportClient()=>MockClient((request) async {
+      requestStages.add(request.url.path.endsWith('/transport-challenge/')?'CHALLENGE':'SIGNED_REQUEST');
       expect(request.headers.keys.map((key)=>key.toLowerCase()),isNot(contains('authorization')));
       final data=jsonDecode(request.body) as Map;
       if(request.url.path.endsWith('/transport-challenge/')) {
@@ -391,7 +411,13 @@ void main() {
     final manual=tablet.syncOutbox();
     expect(tablet.api.personal,isNull);expect(tablet.operators!.session,isNull);
     for(var i=0;i<300 && tablet.sync!.summary.pending>0;i++) {await tester.pump(const Duration(milliseconds:100));}
-    await manual;expect(server,hasLength(7));expect(posts,1);
+    await manual;
+    final diagnosticRows=await (tablet.cache! as OutboxStore).listOutbox();
+    debugPrint('NATIVE_SHARED_SYNC_DIAGNOSTIC identity=${native.stages} requests=$requestStages '
+      'states=${diagnosticRows.map((row)=>row.transportStatus).toList()} '
+      'codes=${diagnosticRows.map((row)=>row.lastError).toSet()} busy=${tablet.sync!.busy} '
+      'error=${tablet.sync!.error!=null}');
+    expect(server,hasLength(7));expect(posts,1);
     expect(server.values.where((value)=>value['author_user_id']==2),hasLength(6));
     expect(server.values.where((value)=>value['author_user_id']==3),hasLength(1));
     expect(tablet.sync!.summary.pending,0);expect(tablet.sync!.summary.lastSuccess,isNotNull);
