@@ -82,4 +82,38 @@ void main() {
     await db.acceptReceipts([receipt(entry)]);
     expect((await db.projectedPage('clients')).single['data'],containsPair('id',42));
   });
+
+  test('archived server client stays hidden after stale cache refresh and encrypted restart',() async {
+    final entry=await client(jean,'Client Jean');final original=receipt(entry);
+    await db.acceptReceipts([original]);
+    await db.replaceConfirmedCache('clients',[{'id':42,'nom':'Client Jean'}]);
+    final reversed={...original,'business_status':'SUPERSEDED','decision_version':1,
+      'decision_action':'REVERSE','decision_actor_id':1};
+    await db.acceptReceipts([reversed]);await db.close();db=open();
+    await db.replaceConfirmedCache('clients',[{'id':42,'nom':'Client Jean'}]);
+    await db.acceptReceipts([original]);expect(await db.projectedPage('clients'),isEmpty);
+    expect((await db.listOutbox()).single.declaration,entry.declaration);
+  });
+
+  test('current task correction updates cache without replacing original Jean report or newer owner plan',() async {
+    await db.replaceConfirmedCache('tasks',[{'id':10,'title':'Visite','assigned_to':2,'status':'TODO','version':1,'report':''}]);
+    final entry=await db.enqueue(grant:jean,isSessionCurrent:()=>true,entityType:'TASK',operationType:'UPDATE',
+      payload:{'task_id':10,'status':'IN_PROGRESS','report':'Original Jean'},expectedServerVersion:'1',businessOccurredAt:now);
+    final task={'id':10,'exploitation':1,'title':'Plan propriétaire conservé','assigned_to':2,'status':'TODO',
+      'version':4,'report':'Compte rendu corrigé'};
+    final corrected={'client_operation_id':entry.operationId,'author_user_id':2,'transport_status':'SERVER_RECEIVED',
+      'business_status':'CONFIRMED','server_entity_id':'10','server_version':'4','received_at':now.toIso8601String(),
+      'applied_at':now.toIso8601String(),'decision_version':1,'decision_action':'CORRECTION','decision_actor_id':1,
+      'task_snapshot':task};
+    await db.acceptReceipts([corrected]);await db.close();db=open();
+    var current=(await db.projectedPage('tasks',taskUserId:2)).single['data'] as Map;
+    expect(current['status'],'TODO');expect(current['report'],'Compte rendu corrigé');expect(current['version'],4);
+    expect((await db.listOutbox()).single.declaration['payload'],containsPair('report','Original Jean'));
+    await expectLater(db.acceptReceipts([{...corrected,'task_snapshot':{...task,'exploitation':2}}]),throwsStateError);
+    await expectLater(db.acceptReceipts([{...corrected,'task_snapshot':{...task,'report':'Contradiction'}}]),throwsStateError);
+    await db.replaceConfirmedCache('tasks',[{...task,'title':'Plan suivant','version':5}]);
+    await db.acceptReceipts([corrected]);
+    current=(await db.projectedPage('tasks',taskUserId:2)).single['data'] as Map;
+    expect(current['title'],'Plan suivant');expect(current['version'],5);
+  });
 }

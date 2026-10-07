@@ -3,6 +3,7 @@ import re
 import unittest
 
 MARKER='NATIVE_JOURNEY_COMPLETE own_operations=6 author=2'
+OWNER_MARKER='NATIVE_OWNER_SUPERVISION_COMPLETE original_author=2 decision_actor=1'
 
 
 def require_native_journey(logs):
@@ -10,11 +11,13 @@ def require_native_journey(logs):
         raise RuntimeError('Native Flutter test failure/timeout in actual application logs')
     if MARKER not in logs:
         raise RuntimeError('Native journey completion evidence is missing')
+    if OWNER_MARKER not in logs:
+        raise RuntimeError('Native owner supervision completion evidence is missing')
 
 
 class EvidenceGuardTests(unittest.TestCase):
     def test_complete_journey_is_accepted(self):
-        require_native_journey(MARKER+'\nAll tests passed.')
+        require_native_journey(MARKER+'\n'+OWNER_MARKER+'\nAll tests passed.')
 
     def test_framework_false_green_is_refused_even_with_a_marker(self):
         with self.assertRaises(RuntimeError):
@@ -22,6 +25,9 @@ class EvidenceGuardTests(unittest.TestCase):
 
     def test_missing_completion_is_refused(self):
         with self.assertRaises(RuntimeError):require_native_journey('All tests passed.')
+
+    def test_missing_owner_supervision_is_refused(self):
+        with self.assertRaises(RuntimeError):require_native_journey(MARKER+'\nAll tests passed.')
 
 
 def self_test():

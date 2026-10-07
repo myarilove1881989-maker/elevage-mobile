@@ -12,6 +12,9 @@ import 'package:app_elevage/offline/local_operator_session.dart';
 import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/tablet_controller.dart';
 import 'package:app_elevage/screens/offline_tablet_screen.dart';
+import 'package:app_elevage/screens/supervision_screen.dart';
+import 'package:app_elevage/services/supervision_service.dart';
+import 'package:app_elevage/services/api_service.dart';
 
 class DelayedGrantStore implements OperatorSecretStore {
   final delegate=const AndroidOperatorSecretStore();
@@ -268,5 +271,74 @@ void main() {
     binding.reportData={'journey_complete':true,'stage':'COMPLETE','own_pending_operations':6,
       'original_author_user_id':2,'oversale_note_preserved':true};
     debugPrint('NATIVE_JOURNEY_COMPLETE own_operations=6 author=2');
+  },timeout:const Timeout(Duration(minutes:5)));
+
+  testWidgets('Android owner supervision preserves Jean original and requires an explicit reason', (tester) async {
+    expect(binding.reportData?['journey_complete'],isTrue);
+    binding.reportData={...binding.reportData??{},'stage':'OWNER_SUPERVISION_START','owner_supervision_complete':false};
+    const operation='d4608303-99bc-43ef-a938-b51087277e65';
+    final now=DateTime.now().toUtc().toIso8601String();
+    bool cancelled=false;Map<String,dynamic>? saved;
+    Map<String,dynamic> declaration()=>{
+      'operation_uuid':operation,'entity_type':'CLIENT','original_author_id':2,'device_id':7,
+      'business_occurred_at':now,'received_at':now,'original_payload':{'nom':'Client original Jean, conservé'},
+      'decision_version':cancelled?1:0,'decisions':[],'decisions_next_page':null,
+      'receipt':{'business_status':cancelled?'NOT_APPLIED':'NEEDS_RECONCILIATION','applied_at':null,
+        'reason_text':cancelled?saved!['reason']:'','reason_code':cancelled?'CANCELLED_BY_DECISION':'AUTHOR_RIGHTS_CHANGED'},
+    };
+    final previousToken=ApiService.token,previousGlobal=globalToken;
+    ApiService.token='synthetic-native-owner-session';globalToken=null;
+    final api=ApiService(client:MockClient((request) async {
+      dynamic response;
+      final path=request.url.path;
+      if(path.endsWith('/capabilities/')) {
+        response={'user':1,'exploitation':1,'role':'OWNER','capabilities':{'can_reconcile':true},
+          'membership':{'username':'Propriétaire'}};
+      } else if(path.endsWith('/memberships/')) {
+        response=[{'user':1,'username':'Propriétaire'},{'user':2,'username':'Jean'},{'user':3,'username':'Paul'}];
+      } else if(path.endsWith('/audit-events/')) {
+        response={'count':cancelled?1:0,'next':null,'results':cancelled?[{
+          'exploitation_id':1,'actor_user_id':2,'decision_actor_id':1,'operation_id':operation,
+          'action':'CANCEL','occurred_at':now,'reason_text':saved!['reason'],
+          'before_data':{'nom':'Client original Jean, conservé'},'after_data':{'nom':'Client original Jean, conservé'},
+        }]:[]};
+      } else if(request.method=='POST') {
+        expect(request.headers['authorization'],contains('synthetic-native-owner-session'));
+        saved=Map<String,dynamic>.from(jsonDecode(request.body) as Map);
+        expect(saved!['action'],'CANCEL');expect(saved!['expected_decision_version'],0);
+        expect(saved!['payload'],isEmpty);expect(saved!['reason'],'Doublon vérifié avec Jean sur tablette.');
+        cancelled=true;response={'decision_uuid':saved!['decision_uuid'],'decision_actor_id':1,
+          'original_author_id':2,'receipt':declaration()['receipt']};
+      } else if(path.endsWith('/reconciliation/')) {
+        response={'count':cancelled?0:1,'results':cancelled?[]:[declaration()],'next':null};
+      } else if(path.endsWith('/$operation/')) {
+        response=declaration();
+      } else {throw StateError('Unexpected native supervision request $path');}
+      return http.Response(jsonEncode(response),200,headers:{'content-type':'application/json'});
+    }));
+    addTearDown(() {api.close();ApiService.token=previousToken;globalToken=previousGlobal;});
+    Future<void> tapVisible(Finder target) async {
+      await Scrollable.ensureVisible(tester.element(target),alignment:0.5);
+      await tester.pumpAndSettle();await tester.tap(target);await tester.pumpAndSettle();
+    }
+    await tester.pumpWidget(MaterialApp(home:SupervisionScreen(service:SupervisionService(api:api))));
+    await tester.pumpAndSettle();await tapVisible(find.text('Client'));
+    expect(find.text('Auteur original : Jean'),findsOneWidget);
+    await tapVisible(find.text('Prendre une décision avec motif'));
+    await tapVisible(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)));
+    await tester.tap(find.text('Annuler sans supprimer').last);await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer la décision'));await tester.pumpAndSettle();
+    expect(find.text('Indiquez le motif de votre décision.'),findsOneWidget);expect(saved,isNull);
+    await Scrollable.ensureVisible(tester.element(find.byKey(const ValueKey('decision-reason'))),alignment:0.5);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('decision-reason')),'Doublon vérifié avec Jean sur tablette.');
+    await tester.pumpAndSettle();await tester.tap(find.text('Enregistrer la décision'));await tester.pumpAndSettle();
+    expect(cancelled,isTrue);expect(find.text('Auteur original : Jean'),findsOneWidget);
+    expect(find.text('Non appliqué'),findsOneWidget);
+    expect(find.text('Nom : Client original Jean, conservé'),findsWidgets);
+    expect(tester.takeException(),isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    binding.reportData={...binding.reportData??{},'stage':'COMPLETE','owner_supervision_complete':true};
+    debugPrint('NATIVE_OWNER_SUPERVISION_COMPLETE original_author=2 decision_actor=1');
   },timeout:const Timeout(Duration(minutes:5)));
 }

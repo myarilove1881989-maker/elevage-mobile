@@ -60,9 +60,11 @@ class SupervisionService {
     }
     return result;
   }
-  Future<Map<String,dynamic>> detail(String operationId) async {
-    if(!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(operationId)) {throw ArgumentError('Opération invalide.');}
-    return _get('/offline/reconciliation/$operationId/');
+  Future<Map<String,dynamic>> detail(String operationId,{int page=1}) async {
+    if(!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(operationId) || page<1) {throw ArgumentError('Opération invalide.');}
+    final result=await _get('/offline/reconciliation/$operationId/?decision_page=$page');
+    if(result['decisions'] is! List || (result['decisions'] as List).length>50) {throw StateError('Historique de décisions invalide.');}
+    return result;
   }
   Future<Map<String,dynamic>> cashSales(String operationId,{int page=1}) async {
     if(!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(operationId) || page<1) {throw ArgumentError('Opération invalide.');}

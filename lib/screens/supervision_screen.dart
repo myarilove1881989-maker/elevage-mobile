@@ -157,9 +157,9 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
   Future<void> load() async {
     setState(()=>loading=true);
     try {
-      final detail=await widget.service.detail(widget.operationId);
+      final detail=await widget.service.detail(widget.operationId,page:widget.service.owner?1:page);
       final activity=widget.service.owner?await widget.service.activity(operationId:widget.operationId,page:page):null;
-      if(mounted) {setState(() {row=detail;error=null;events=[for(final event in activity?['results'] as List? ??[])Map<String,dynamic>.from(event as Map)];more=activity?['next']!=null;});}
+      if(mounted) {setState(() {row=detail;error=null;events=[for(final event in activity?['results'] as List? ??[])Map<String,dynamic>.from(event as Map)];more=widget.service.owner?activity?['next']!=null:detail['decisions_next_page']!=null;});}
     } catch (_) {if(mounted) {setState(() {row=null;error='Impossible de charger cette déclaration. Rouvrez la supervision.';});}}
     finally {if(mounted) {setState(()=>loading=false);}}
   }
@@ -185,15 +185,18 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
         if(recognized!=null) ...[const Divider(),_facts(recognized)],
         if((receipt['reason_text']?.toString()??'').isNotEmpty) Text('Dernier motif : ${receipt['reason_text']}'),
         if(!loading && receipt['business_status']!='SUPERSEDED' && receipt['business_status']!='NOT_APPLIED' &&
-          (!applied || recognized!=null || {'VENTE_ANIMAUX','VENTE_OEUFS','MORTALITE','DON','VOL'}.contains(row!['entity_type'])))
+          (!applied || recognized!=null || {'CLIENT','TASK','VENTE_ANIMAUX','VENTE_OEUFS','MORTALITE','DON','VOL','DEPENSE','ALIMENTATION','PESEE','COLLECTE_OEUFS','ACHAT','NAISSANCE'}.contains(row!['entity_type'])))
           FilledButton(onPressed:decide,child:const Text('Prendre une décision avec motif')),
         const Divider(),const Text('Historique de cette opération',style:TextStyle(fontWeight:FontWeight.bold)),
         if(widget.service.owner) ...[
           for(final event in events) _ActivityCard(event:event,author:(id)=>widget.names[id]??'Utilisateur $id'),
           Wrap(spacing:12,children:[Text('Page $page'),TextButton(onPressed:loading || page<=1?null:(){page--;load();},child:const Text('Précédente')),
             TextButton(onPressed:loading || !more?null:(){page++;load();},child:const Text('Suivante'))]),
-        ] else for(final decision in row!['decisions'] as List? ??[]) ListTile(
+        ] else ...[for(final decision in row!['decisions'] as List? ??[]) ListTile(
           title:Text(_actions[(decision as Map)['action']]??'Décision'),subtitle:Text('${_date(decision['decided_at'])}\n${decision['reason']}')),
+          Wrap(spacing:12,children:[Text('Page $page'),TextButton(onPressed:loading || page<=1?null:(){page--;load();},child:const Text('Précédente')),
+            TextButton(onPressed:loading || !more?null:(){page++;load();},child:const Text('Suivante'))]),
+        ],
       ],
     ]));
   }
@@ -217,7 +220,7 @@ class _DecisionDialogState extends State<_DecisionDialog> {
       return [if(cash['montant_a_rapprocher']!='0.00') 'CASH_ALLOCATION',
         if(cash['montant_affecte']!='0.00') 'REVERSE'];
     }
-    return receipt['applied_at']!=null?['REVERSE']:['APPLY_ORIGINAL','CORRECTION','CANCEL'];
+    return receipt['applied_at']!=null?(widget.row['entity_type']=='TASK'?['CORRECTION']:['REVERSE']):['APPLY_ORIGINAL','CORRECTION','CANCEL'];
   }
   Map<String,dynamic>? sale;
   List<Map<String,dynamic>> sales=[];

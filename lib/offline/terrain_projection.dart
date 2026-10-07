@@ -47,6 +47,32 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
     }
     await _projectStockReceipt(receipt,declaration);
     await _projectCashReceipt(receipt,declaration);
+    await _projectTaskReceipt(receipt,declaration);
+  }
+
+  Future<void> _projectTaskReceipt(Map<String,dynamic> receipt,Map declaration) async {
+    final task=receipt['task_snapshot'];
+    if(task==null) {return;}
+    const allowed={'id','title','date','description','priority','status','assigned_to','created_by',
+      'created_at','updated_at','completed_by','completed_at','report','version','exploitation'};
+    if(declaration['entity_type']!='TASK' || task is! Map || task.keys.any((key)=>!allowed.contains(key)) ||
+      task['id'] is! int || (task['id'] as int)<1 ||
+      task['id']!=(declaration['payload'] as Map)['task_id'] || task['exploitation']!=declaration['exploitation_id'] ||
+      task['version'] is! int || (task['version'] as int)<1 || task['title'] is! String || task['report'] is! String ||
+      !{'TODO','IN_PROGRESS','DONE','CANCELLED'}.contains(task['status'])) {
+      throw StateError('État serveur de tâche hors déclaration.');
+    }
+    final previous=await customSelect("SELECT payload FROM confirmed_cache WHERE collection='tasks' AND entity_id=?",
+      variables:[Variable(task['id'].toString())]).getSingleOrNull();
+    if(previous!=null) {
+      final prior=jsonDecode(previous.read<String>('payload')) as Map;
+      if(prior['version']>(task['version'] as int)) {return;}
+      if(prior['version']==task['version'] && prior.keys.any((key)=>task.containsKey(key) && prior[key]!=task[key])) {
+        throw StateError('État de tâche contradictoire pour une même version.');
+      }
+    }
+    await customStatement("INSERT OR REPLACE INTO confirmed_cache VALUES('tasks',?,?,?)",
+      [task['id'].toString(),jsonEncode(task),DateTime.now().toUtc().millisecondsSinceEpoch]);
   }
 
   Future<void> _projectCashReceipt(Map<String,dynamic> receipt,Map declaration) async {
@@ -152,7 +178,9 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
     }
     if(collection=='clients') {
       final pattern='%${search.replaceAll('\\','\\\\').replaceAll('%','\\%').replaceAll('_','\\_')}%';
-      final rows=await customSelect("SELECT * FROM (SELECT payload AS data,'CONFIRMED_CACHE' AS state,NULL AS operation_id,NULL AS local_uuid,received_at FROM confirmed_cache WHERE collection='clients' "
+      final rows=await customSelect("SELECT * FROM (SELECT payload AS data,'CONFIRMED_CACHE' AS state,NULL AS operation_id,NULL AS local_uuid,received_at FROM confirmed_cache c WHERE collection='clients' "
+        "AND NOT EXISTS(SELECT 1 FROM terrain_entity_mapping m JOIN outbox o ON o.operation_id=m.operation_id "
+        "WHERE o.business_status='SUPERSEDED' AND m.entity_type='CLIENT' AND m.server_entity_id=CAST(c.entity_id AS INTEGER)) "
         "UNION ALL SELECT json_set(json_extract(o.declaration,'\$.payload'),'\$.id',COALESCE(m.server_entity_id,json_extract(o.declaration,'\$.local_entity_id'))) AS data,"
         "o.business_status AS state,o.operation_id,json_extract(o.declaration,'\$.local_entity_id') AS local_uuid,o.received_at "
         "FROM outbox o LEFT JOIN terrain_entity_mapping m ON m.entity_type='CLIENT' AND m.local_entity_id=json_extract(o.declaration,'\$.local_entity_id') "
