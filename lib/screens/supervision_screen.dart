@@ -158,7 +158,7 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
     setState(()=>loading=true);
     try {
       final detail=await widget.service.detail(widget.operationId,page:widget.service.owner?1:page);
-      final activity=widget.service.owner?await widget.service.activity(operationId:widget.operationId,page:page):null;
+      final activity=widget.service.owner?await widget.service.activity(operationId:widget.operationId,page:page,includeRelatedObject:true):null;
       final hasMore=widget.service.owner ? (activity?['next']!=null) : (detail['decisions_next_page']!=null);
       if(mounted) {setState(() {row=detail;error=null;events=[for(final event in activity?['results'] as List? ??[])Map<String,dynamic>.from(event as Map)];more=hasMore;});}
     } catch (_) {if(mounted) {setState(() {row=null;error='Impossible de charger cette déclaration. Rouvrez la supervision.';});}}

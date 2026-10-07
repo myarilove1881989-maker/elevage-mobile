@@ -74,10 +74,12 @@ class SupervisionService {
     if(taskId<1) {throw ArgumentError('Tâche invalide.');}
     return _get('/tasks/$taskId/');
   }
-  Future<Map<String,dynamic>> activity({int page=1,String? operationId,String? action,
+  Future<Map<String,dynamic>> activity({int page=1,String? operationId,String? action,bool includeRelatedObject=false,
     int? author,int? decider,DateTime? since,DateTime? until}) async {
     if(!owner || page<1) {throw StateError('Journal réservé au propriétaire.');}
+    if(includeRelatedObject && operationId==null) {throw ArgumentError('Opération requise pour le journal de cet objet.');}
     final query=Uri(queryParameters:{'page':'$page',if(operationId!=null)'operation_id':operationId,
+      if(includeRelatedObject)'include_related_object':'true',
       if(action!=null && action.isNotEmpty)'action':action,
       if(author!=null)'actor_user_id':'$author',if(decider!=null)'decision_actor_id':'$decider',
       if(since!=null)'since':since.toUtc().toIso8601String(),if(until!=null)'until':until.toUtc().toIso8601String(),

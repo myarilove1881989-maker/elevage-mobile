@@ -80,6 +80,19 @@ void main() {
     await expectLater(service.activity(page:2,author:2),throwsStateError);api.close();
   });
 
+  test('object timeline requests server-derived related history for the selected operation',() async {
+    final api=ApiService(client:MockClient((request) async {
+      if(request.url.path.endsWith('/capabilities/')) {return response(capabilities());}
+      expect(request.url.queryParameters['operation_id'],operation);
+      expect(request.url.queryParameters['include_related_object'],'true');
+      return response({'results':[{'exploitation_id':1,'source':'ONLINE'}],'count':1,'next':null});
+    }));
+    final service=SupervisionService(api:api);await service.initialize();
+    expect((await service.activity(operationId:operation,includeRelatedObject:true))['count'],1);
+    await expectLater(service.activity(includeRelatedObject:true),throwsArgumentError);
+    api.close();
+  });
+
   test('delegated decision signs actual body and path with primary installation',() async {
     final identity=NativeIdentityFake();int decisions=0;String? actualPath;
     final pending=PendingReconciliationDecision(operationId:operation,version:0,action:'CANCEL',reason:'Doublon physique vérifié.');
