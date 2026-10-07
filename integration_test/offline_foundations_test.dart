@@ -78,7 +78,7 @@ void main() {
       } else if(path.endsWith('/cache-page/')) {
         final collection=request.url.queryParameters['collection'];
         response={'collection':collection,'next_cursor':null,'results':[
-          {'id':1,'nom':'Fixture partagée','stock':10,if(collection=='tasks')...{'title':'Fixture agenda','assigned_to':null}},
+          {'id':1,'nom':'Fixture partagée','stock':10,if(collection=='tasks')...{'title':'Fixture agenda','assigned_to':null,'version':1,'status':'TODO','report':'','date':'2026-10-07'}},
         ]};
       } else {throw StateError('Unexpected synthetic request $path');}
       return http.Response(jsonEncode(response),200);
@@ -101,7 +101,9 @@ void main() {
     await tablet.unlockProfile(3,'Paul','654321');
     await tablet.declare(entityType:'CLIENT',operationType:'CREATE',payload:{'nom':'Déclaration native Paul'},businessOccurredAt:DateTime.now().toUtc());
     expect(tablet.operators!.session!.userId,3);
-    expect((await tablet.readPage('clients')).single['data'],containsPair('nom','Fixture partagée'));
+    final sharedClients=await tablet.readPage('clients');
+    expect(sharedClients,hasLength(3));
+    expect(sharedClients.map((row)=>(row['data'] as Map)['nom']),containsAll(['Fixture partagée','Déclaration native Jean','Déclaration native Paul']));
     tablet.lock();tablet.api.close();tablet.dispose();
     await closeAndroidFarmDatabase(farmId:1,server:Uri.parse(namespace));
     tablet=controller();
@@ -139,6 +141,17 @@ void main() {
     }
     expect(find.text('Profil ouvert : Jean'),findsOneWidget);
     expect(find.text('Stock confirmé : 10'),findsOneWidget);
+    await tester.tap(find.text('Enregistrer un client'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first,'Client créé sans réseau');
+    await tester.tap(find.text('Enregistrer sur la tablette'));
+    await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.outboxRows.length<2;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(tablet.outboxRows,hasLength(2));
+    expect(tablet.outboxRows.every((row)=>row.authorId==2),isTrue);
+    expect((await tablet.readPage('clients')).map((row)=>(row['data'] as Map)['nom']),contains('Client créé sans réseau'));
     await tester.tap(find.byTooltip('Verrouiller / changer d’opérateur'));
     await tester.pumpAndSettle();
     expect(find.text('Profil ouvert : Jean'),findsNothing);

@@ -6,6 +6,7 @@ import 'local_operator_session.dart';
 import 'offline_database.dart';
 import 'outbox.dart';
 import 'outbox_transport.dart';
+import 'terrain_store.dart';
 
 class TabletController extends ChangeNotifier {
   TabletController({required this.api,required this.secrets});
@@ -192,8 +193,11 @@ class TabletController extends ChangeNotifier {
   Future<List<Map<String,dynamic>>> readPage(String collection,{int offset=0}) async {
     final session=operators?.session;
     if(session==null || cache==null) throw StateError('Déverrouiller un profil personnel.');
-    final rows=await cache!.cachedPage(collection,offset:offset,limit:50,
-      taskUserId:collection=='tasks'?session.userId:null);
+    final rows=cache is TerrainStore && {'clients','tasks'}.contains(collection)
+      ? await (cache! as TerrainStore).projectedPage(collection,offset:offset,limit:50,
+          taskUserId:collection=='tasks'?session.userId:null)
+      : await cache!.cachedPage(collection,offset:offset,limit:50,
+          taskUserId:collection=='tasks'?session.userId:null);
     if(_disposed || !identical(session,operators?.session)) {
       throw StateError('Le profil a été verrouillé pendant la lecture.');
     }

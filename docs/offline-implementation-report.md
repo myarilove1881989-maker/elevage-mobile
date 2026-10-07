@@ -1,5 +1,19 @@
 # Mission offline autonome — journal
 
+## Phase 2E — premier checkpoint, EN COURS
+
+Clients et comptes rendus de tâches peuvent être saisis avec le PIN personnel,
+sans réseau. La projection est calculée depuis la déclaration durable : aucun
+état projeté ne peut précéder le commit de l'Outbox. La migration locale 3 vers
+4 ajoute uniquement les correspondances UUID local/identifiant serveur et
+préserve la file existante. Reçu et correspondance sont enregistrés dans une
+même transaction ; une correspondance étrangère ou contradictoire est refusée.
+Les tâches locales prévoient leur version suivante et une dépendance pour le
+second compte rendu. Les données d'autres opérateurs restent filtrées.
+
+Validation Flutter et native en cours. Ce checkpoint ne valide pas les autres
+modules terrain et ne permet pas de commencer 2F. Aucun déploiement ni fusion.
+
 ## État initial, 7 octobre 2026
 
 - Backend 2B.1 : `c3c5ff455ac01be61fd6992d1310368a34d0b0a2`.

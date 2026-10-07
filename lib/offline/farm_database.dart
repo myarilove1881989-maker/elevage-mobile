@@ -6,6 +6,7 @@ import 'package:sqlite3/sqlite3.dart' as sql;
 import 'farm_cache.dart';
 import 'offline_grant.dart';
 import 'outbox_database.dart';
+import 'terrain_projection.dart';
 
 /// Release-mode checks: SQLite silently ignores unknown PRAGMAs, so never assert.
 void configureEncryptedDatabase(sql.Database database, String hexKey) {
@@ -27,7 +28,7 @@ QueryExecutor encryptedExecutor(File file, String key) => NativeDatabase.createI
 );
 
 /// A shared encrypted farm database. Personal PIN/grant/JWT remain elsewhere.
-class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods implements FarmCache {
+class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, TerrainProjection implements FarmCache {
   FarmDatabase(super.executor, {required this.farmId, required this.serverNamespace,DateTime Function()? clock})
     :outboxClock=clock??DateTime.now;
   final int farmId;
@@ -38,7 +39,9 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods implemen
   final DateTime Function() outboxClock;
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
+  @override
+  Future<void> applyProjectionReceipt(Map<String,dynamic> receipt)=>projectReceipt(receipt);
   @override
   Iterable<TableInfo<Table, dynamic>> get allTables => const [];
   @override
@@ -59,10 +62,12 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods implemen
           'write_generation INTEGER NOT NULL)');
       await _createStaging();
       await createOutboxSchema();
+      await createTerrainMappings();
     },
     onUpgrade: (_,from,to) async {
       if(from<2) await _createStaging();
       if(from<3) await createOutboxSchema();
+      if(from<4) await createTerrainMappings();
     },
     beforeOpen: (_) async {
       final identity = await customSelect('SELECT farm_id,server_namespace FROM farm_identity').getSingle();

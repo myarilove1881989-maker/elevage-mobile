@@ -6,6 +6,7 @@ import 'outbox.dart';
 mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
   int get outboxFarmId;
   DateTime Function() get outboxClock;
+  Future<void> applyProjectionReceipt(Map<String,dynamic> receipt) async {}
 
   Future<void> createOutboxSchema() async {
     await customStatement('CREATE TABLE local_sequence_counter (singleton INTEGER PRIMARY KEY CHECK(singleton=1),next_sequence INTEGER NOT NULL)');
@@ -142,6 +143,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
       await customStatement("UPDATE outbox SET transport_status='SERVER_RECEIVED',business_status=?,last_error=?,retry_at=NULL,received_at=?,applied_at=?,server_entity_id=?,server_version=?,updated_at=? WHERE operation_id=?",
         [receipt['business_status'],receipt['reason_code']??'',received.millisecondsSinceEpoch,applied?.millisecondsSinceEpoch,
           receipt['server_entity_id']??'',receipt['server_version']??'',outboxClock().toUtc().millisecondsSinceEpoch,id]);
+      await applyProjectionReceipt(receipt);
     }
   });
 

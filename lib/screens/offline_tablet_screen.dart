@@ -5,6 +5,7 @@ import '../offline/foundation_api.dart';
 import '../offline/local_operator_session.dart';
 import '../offline/tablet_controller.dart';
 import '../offline/outbox_transport.dart';
+part 'terrain_personal_dialogs.dart';
 
 class OfflineTabletScreen extends StatefulWidget {
   const OfflineTabletScreen({super.key,this.controller});
@@ -60,6 +61,34 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
 
   Future<void> _read() async {rows=await tablet.readPage(collection,offset:offset);}
 
+  Future<void> _createClient() async {
+    final author=tablet.operators?.session;
+    final payload=await showDialog<Map<String,dynamic>>(context:context,builder:(_)=>const _TerrainClientDialog());
+    if(payload==null || !mounted) {return;}
+    await _run(() async {
+      if(author==null || !identical(author,tablet.operators?.session)) {throw StateError('Le profil a été verrouillé. Rouvrez votre PIN.');}
+      await tablet.declare(entityType:'CLIENT',operationType:'CREATE',payload:payload,businessOccurredAt:DateTime.now().toUtc());
+      collection='clients';offset=0;await _read();
+      if(mounted) {setState(()=>message='Client enregistré sur la tablette — confirmation serveur en attente.');}
+    });
+  }
+
+  Future<void> _reportTask(Map<String,dynamic> row) async {
+    final author=tablet.operators?.session;
+    final task=Map<String,dynamic>.from(row['data'] as Map);
+    if(task['status']=='CANCELLED') {return;}
+    final report=await showDialog<Map<String,dynamic>>(context:context,builder:(_)=>_TerrainTaskDialog(task:task));
+    if(report==null || !mounted) {return;}
+    await _run(() async {
+      if(author==null || !identical(author,tablet.operators?.session)) {throw StateError('Le profil a été verrouillé. Rouvrez votre PIN.');}
+      await tablet.declare(entityType:'TASK',operationType:'UPDATE',payload:{'task_id':task['id'],...report},
+        expectedServerVersion:task['version'].toString(),dependencies:row['dependency']==null?[]:[row['dependency'] as String],
+        businessOccurredAt:DateTime.now().toUtc());
+      await _read();
+      if(mounted) {setState(()=>message='Compte rendu conservé sur la tablette — confirmation serveur en attente.');}
+    });
+  }
+
   @override
   Widget build(BuildContext context)=>AnimatedBuilder(animation:tablet,builder:(context,_) {
     final session=tablet.operators?.session;
@@ -106,6 +135,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
         },child:const Text('Préparer mon accès par PIN')),
       ] else ...[
         Text('Profil ouvert : ${tablet.selectedName}',style:Theme.of(context).textTheme.titleMedium),
+        FilledButton.icon(onPressed:busy?null:_createClient,icon:const Icon(Icons.person_add_outlined),label:const Text('Enregistrer un client')),
         for(final entry in tablet.outboxRows) ListTile(
           title:Text('Déclaration ${entry.sequence}'),
           subtitle:Text(entry.businessStatus=='CONFIRMED'?'Confirmée par le serveur':
@@ -127,15 +157,18 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
             tablet.lock();rows=[];
           });
         },child:const Text('Changer mon PIN')),
-        const Text('Données confirmées lors du dernier chargement. Une connexion est nécessaire pour les actualiser.'),
+        const Text('Les données confirmées et les déclarations de cette tablette restent distinctes.'),
         const SizedBox(height:12),
-        DropdownButtonFormField<String>(initialValue:collection,decoration:const InputDecoration(labelText:'Consulter'),
+        DropdownButtonFormField<String>(key:ValueKey(collection),initialValue:collection,decoration:const InputDecoration(labelText:'Consulter'),
           items:const [DropdownMenuItem(value:'lots',child:Text('Lots')),DropdownMenuItem(value:'clients',child:Text('Clients')),
             DropdownMenuItem(value:'species',child:Text('Espèces')),DropdownMenuItem(value:'tasks',child:Text('Agenda'))],
           onChanged:busy?null:(value) { if(value==null) return;collection=value;offset=0;_run(_read); }),
-        for(final row in rows) ListTile(title:Text(((row['data'] as Map)['nom']??(row['data'] as Map)['title']??'Donnée').toString()),
+        for(final row in rows) ListTile(onTap:collection=='tasks' && !busy?()=>_reportTask(row):null,
+          title:Text(((row['data'] as Map)['nom']??(row['data'] as Map)['title']??'Donnée').toString()),
           subtitle:Text(collection=='lots'?'Stock confirmé : ${(row['data'] as Map)['stock']}':
-            collection=='tasks'?'${(row['data'] as Map)['date']} • ${(row['data'] as Map)['status']}':'Confirmé lors du dernier chargement')),
+            row['state']=='NEEDS_RECONCILIATION'?'Déclaration à rapprocher':
+            row['state']!=null && !{'CONFIRMED','CONFIRMED_CACHE'}.contains(row['state'])?'Conservé sur la tablette • confirmation en attente':
+            collection=='tasks'?'${(row['data'] as Map)['date']} • ${_taskStatus((row['data'] as Map)['status'])}':'Confirmé par le serveur')),
         if(rows.isEmpty) const Padding(padding:EdgeInsets.all(16),child:Text('Aucune donnée confirmée sur cette page.')),
         Row(children:[TextButton(onPressed:busy || offset==0?null:()=>_run(() async {offset-=50;await _read();}),child:const Text('Précédent')),
           TextButton(onPressed:busy || rows.length<50?null:()=>_run(() async {offset+=50;await _read();}),child:const Text('Suivant'))]),
