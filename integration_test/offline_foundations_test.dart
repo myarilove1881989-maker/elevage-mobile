@@ -152,11 +152,14 @@ void main() {
     await tester.enterText(find.byType(TextField).last,'123456');
     await tester.tap(find.text('Valider'));
     await tester.pumpAndSettle();
-    for(var attempt=0;attempt<300 && find.text('Stock confirmé : 10').evaluate().isEmpty;attempt++) {
+    for(var attempt=0;attempt<300 && find.text('Profil ouvert : Jean').evaluate().isEmpty;attempt++) {
       await tester.pump(const Duration(milliseconds:100));
     }
     expect(find.text('Profil ouvert : Jean'),findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Stock confirmé : 10'),200,maxScrolls:20);
+    await tester.pumpAndSettle();
     expect(find.text('Stock confirmé : 10'),findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Enregistrer un client'),-200,maxScrolls:20);
     await tapVisible(find.text('Enregistrer un client'));
     await tester.enterText(find.byType(TextFormField).first,'Client créé sans réseau');
     await tester.tap(find.text('Enregistrer sur la tablette'));
@@ -268,6 +271,7 @@ void main() {
     await tester.tap(find.byTooltip('Verrouiller / changer d’opérateur'));
     await tester.pumpAndSettle();
     expect(find.text('Profil ouvert : Jean'),findsNothing);
+    await tester.scrollUntilVisible(find.text('Jean'),-200,maxScrolls:20);
     expect(find.text('Jean'),findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await closeAndroidFarmDatabase(farmId:1,server:Uri.parse(namespace));
@@ -391,10 +395,22 @@ void main() {
     final originals=await (tablet.cache! as OutboxStore).listOutbox();
     expect(originals.every((entry)=>entry.transportStatus=='SERVER_RECEIVED'),isTrue);
     expect(tablet.operators!.session,isNull);expect(tablet.api.personal,isNull);
+    await tester.pumpWidget(MaterialApp(home:OfflineTabletScreen(controller:tablet)));
+    final manualButton=find.widgetWithText(OutlinedButton,'Synchroniser maintenant');
+    for(var i=0;i<300 && (manualButton.evaluate().isEmpty ||
+        tester.widget<OutlinedButton>(manualButton).onPressed==null);i++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(manualButton,findsOneWidget);
+    expect(find.text('0 déclarations en attente • 0 conflits à rapprocher'),findsOneWidget);
+    await tester.tap(manualButton);await tester.pumpAndSettle();
+    for(var i=0;i<300 && tablet.sync!.busy;i++) {await tester.pump(const Duration(milliseconds:100));}
+    expect(tablet.sync!.busy,isFalse);expect(tablet.sync!.error,isNull);expect(posts,1);
+    expect(tablet.operators!.session,isNull);expect(tablet.api.personal,isNull);
     // Also exercise the real Android connectivity channel; no HTTP business call uses it here.
     final nativeState=await androidNetworkChanges().first.timeout(const Duration(seconds:10));
     expect(nativeState,isA<bool>());
-    tablet.dispose();tablet.api.close();await network.close();
+    await tester.pumpWidget(const SizedBox.shrink());await network.close();
     await closeAndroidFarmDatabase(farmId:1,server:Uri.parse(namespace));
     binding.reportData={...binding.reportData??{},'stage':'COMPLETE','shared_sync_complete':true};
     debugPrint('NATIVE_SHARED_SYNC_COMPLETE jean=6 paul=1 personal_session=closed');
