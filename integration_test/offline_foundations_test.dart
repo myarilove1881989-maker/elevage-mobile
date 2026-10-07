@@ -34,6 +34,12 @@ void main() {
   final binding=IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   void stage(String value) {binding.reportData={'journey_complete':false,'stage':value};}
   testWidgets('Android Keystore encrypted shared cache Jean Paul PIN and restart', (tester) async {
+    Future<void> tapVisible(Finder target) async {
+      await Scrollable.ensureVisible(tester.element(target),alignment:0.5);
+      await tester.pumpAndSettle();
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
     stage('START');
     final native=AndroidDeviceIdentity();
     final installation=await native.publicIdentity();
@@ -188,10 +194,10 @@ void main() {
       await tester.pump(const Duration(milliseconds:100));
     }
     expect(find.text('Vente ou encaissement terrain'),findsOneWidget);
-    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tapVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
     await tester.pumpAndSettle();await tester.tap(find.text('Client créé sans réseau').last);await tester.pumpAndSettle();
     await tester.ensureVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
-    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tapVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
     await tester.pumpAndSettle();await tester.tap(find.text('Achat natif test').last);await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const ValueKey('sale-quantity')));
     await tester.enterText(find.byKey(const ValueKey('sale-quantity')),'1');
@@ -210,12 +216,12 @@ void main() {
     await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
     for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {await tester.pump(const Duration(milliseconds:100));}
     expect(find.text('Vente ou encaissement terrain'),findsOneWidget);
-    await tester.tap(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)).first);
+    await tapVisible(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)).first);
     await tester.pumpAndSettle();await tester.tap(find.text('Encaissement reçu').last);await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tapVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
     await tester.pumpAndSettle();await tester.tap(find.text('Client créé sans réseau').last);await tester.pumpAndSettle();
     await tester.ensureVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
-    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tapVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
     await tester.pumpAndSettle();await tester.tap(find.textContaining('Vente animaux ').last);await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const ValueKey('cash-amount')));
     await tester.enterText(find.byKey(const ValueKey('cash-amount')),'50,00');
@@ -232,10 +238,10 @@ void main() {
     await tester.pumpAndSettle();await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
     for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {await tester.pump(const Duration(milliseconds:100));}
     expect(find.text('Vente ou encaissement terrain'),findsOneWidget);
-    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tapVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
     await tester.pumpAndSettle();await tester.tap(find.text('Client créé sans réseau').last);await tester.pumpAndSettle();
     await tester.ensureVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
-    await tester.pumpAndSettle();await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tester.pumpAndSettle();await tapVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
     await tester.pumpAndSettle();await tester.tap(find.text('Achat natif test').last);await tester.pumpAndSettle();
     await tester.ensureVisible(find.byKey(const ValueKey('sale-quantity')));
     await tester.enterText(find.byKey(const ValueKey('sale-quantity')),'3');await tester.pumpAndSettle();
