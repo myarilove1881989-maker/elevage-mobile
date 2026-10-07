@@ -30,6 +30,15 @@ strict, l'analyse, la suite Flutter, la preuve de fichier illisible avec
 SQLite Python standard, le Web release et les APK debug/ARM64 release.
 L'exécution Android API 24 est encore en cours, donc 2C reste non validée.
 
+Le premier job API 24 a atteint 45 minutes : la compilation de l'APK
+avait réussi en 275,8 secondes, puis son installation est restée bloquée.
+Les assertions Android n'ont donc pas été exécutées. Le même APK s'est
+installé sur l'émulateur local API 36 en quelques secondes avec l'option
+ADB officielle `--no-streaming`. La relance API 24 utilise cette option,
+puis le pilote Flutter officiel `--use-existing-app`; les SDK locaux ne
+sont pas modifiés. `--keep-app-running` évite la désinstallation de la
+fixture avant les preuves de chiffrement et les assertions natives.
+
 La préparation utilise une connexion HTTP personnelle distincte de la
 session historique. Les PIN, JWT, grants et clés sont dans le coffre
 Android ; le cache partagé chiffré contient seulement les données métier
