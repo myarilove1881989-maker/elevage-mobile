@@ -52,7 +52,7 @@ void main() {
           'typ':'offline-authorization','jti':'synthetic-$user','sub':'$user','membership_id':user,
           'exploitation_id':1,'device_id':7,'rights_version':1,'write_generation':1,
           'capabilities':{'can_create_terrain_operation':true},'iat':now.millisecondsSinceEpoch~/1000,
-          'exp':now.add(const Duration(days:3)).millisecondsSinceEpoch~/1000})))).replaceAll('=','');
+          'exp':now.add(const Duration(days:3)).millisecondsSinceEpoch~/1000}))).replaceAll('=','');
         final signature=await Ed25519().sign(utf8.encode('$header.$claims'),keyPair:serverKey);
         response={'authorization':'$header.$claims.${base64Url.encode(signature.bytes).replaceAll('=','')}',
           'public_key':pem,'key_id':'android-test'};
