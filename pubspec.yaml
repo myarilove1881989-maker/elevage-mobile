@@ -17,6 +17,10 @@ dependencies:
   http: ^1.2.1
   shared_preferences: ^2.2.3
   flutter_secure_storage: ^11.2.0
+  drift: 2.35.1
+  sqlite3: 3.7.0
+  cryptography: 2.9.0
+  path_provider: 2.1.6
   fl_chart: ^1.2.0
   table_calendar: ^3.0.9
   flutter_local_notifications: ^17.0.0
@@ -40,3 +44,8 @@ flutter:
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
     - assets/fonts/Roboto_LICENSE.txt
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc

@@ -28,6 +28,8 @@ jobs:
       - run: flutter pub get --enforce-lockfile
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
+      - run: dart run tool/encryption_proof.dart
+      - run: python3 tool/check_encryption.py
       - run: flutter build web --release
       - run: flutter build apk --debug
       - run: flutter build apk --release --target-platform android-arm64
