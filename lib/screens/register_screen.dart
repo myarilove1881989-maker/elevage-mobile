@@ -5,10 +5,7 @@ import 'package:app_elevage/services/api_service.dart';
 class RegisterScreen extends StatefulWidget {
   final ApiService apiService;
 
-  const RegisterScreen({
-    super.key,
-    required this.apiService,
-  });
+  const RegisterScreen({super.key, required this.apiService});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -84,11 +81,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.tr('account_created')),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.tr('account_created'))));
 
       Navigator.pop(context);
     } on ApiConnectionException {
@@ -122,27 +117,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(context.tr('create_account')),
-      ),
-      body: Padding(
+      appBar: AppBar(title: Text(context.tr('create_account'))),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             TextField(
               controller: usernameController,
-              decoration: InputDecoration(
-                labelText: context.tr('username'),
-              ),
+              decoration: InputDecoration(labelText: context.tr('username')),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
-              decoration: InputDecoration(
-                labelText: context.tr('email'),
-              ),
+              decoration: InputDecoration(labelText: context.tr('email')),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -154,9 +143,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   tooltip: _obscurePassword
                       ? "Afficher le mot de passe"
                       : "Masquer le mot de passe",
-                  onPressed: () => setState(
-                    () => _obscurePassword = !_obscurePassword,
-                  ),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                   icon: Icon(
                     _obscurePassword
                         ? Icons.visibility_outlined
@@ -200,9 +188,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(context.tr('create_my_account')),
             ),

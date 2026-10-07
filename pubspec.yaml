@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"
+  sdk: ">=3.8.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -16,6 +16,11 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^1.2.1
   shared_preferences: ^2.2.3
+  flutter_secure_storage: ^11.2.0
+  drift: 2.35.1
+  sqlite3: 3.7.0
+  cryptography: 2.9.0
+  path_provider: 2.1.6
   fl_chart: ^1.2.0
   table_calendar: ^3.0.9
   flutter_local_notifications: ^17.0.0
@@ -27,14 +32,22 @@ dependencies:
   printing: ^5.14.2
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
-  
+
   assets:
     - assets/images/elevage_logo.png
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
+    - assets/fonts/Roboto_LICENSE.txt
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc

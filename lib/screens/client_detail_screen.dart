@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'invoice_preview_screen.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
@@ -7,12 +9,14 @@ import '../theme/terre_et_or_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ClientDetailScreen extends StatefulWidget {
+  final ApiService? apiService;
   final int clientId;
   final String nom;
   final String telephone;
 
   const ClientDetailScreen({
     super.key,
+    this.apiService,
     required this.clientId,
     required this.nom,
     required this.telephone,
@@ -23,7 +27,7 @@ class ClientDetailScreen extends StatefulWidget {
 }
 
 class _ClientDetailScreenState extends State<ClientDetailScreen> {
-  final api = ApiService();
+  late final ApiService api = widget.apiService ?? ApiService();
 
   double balance = 0;
   double totalFacture = 0;
@@ -33,6 +37,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   List payments = [];
 
   bool loading = true;
+  String? loadError;
   bool isPaying = false;
 
   @override
@@ -42,6 +47,10 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   }
 
   Future<void> load() async {
+    setState(() {
+      loading = true;
+      loadError = null;
+    });
     try {
       final b = await api.getClientBalance(widget.clientId);
       final v = await api.getClientVentes(widget.clientId);
@@ -49,7 +58,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
       if (!mounted) return;
 
-      final ventesData = v ?? [];
+      final ventesData = v;
 
       double facture = 0;
       double paye = 0;
@@ -70,14 +79,14 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         loading = false;
       });
     } catch (e) {
-      print("ERREUR LOAD CLIENT: $e");
 
       if (!mounted) return;
 
       setState(() {
         loading = false;
-        ventes = [];
-        payments = [];
+        loadError = e is ApiConnectionException
+            ? context.tr('server_unreachable')
+            : e.toString();
       });
     }
   }
@@ -143,10 +152,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     children: [
                       const Text(
                         "Reste à payer sur cette vente",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -252,14 +258,11 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                             ),
                           );
                         } catch (e) {
-                          print("ERREUR PAIEMENT: $e");
 
                           if (!mounted) return;
 
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Erreur : $e"),
-                            ),
+                            SnackBar(content: Text("Erreur : $e")),
                           );
                         }
 
@@ -273,9 +276,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Text(context.tr('validate')),
               ),
@@ -323,12 +324,14 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: const Border(
-            left: BorderSide(color: TerreEtOrColors.gold, width: 5)),
+          left: BorderSide(color: TerreEtOrColors.gold, width: 5),
+        ),
         boxShadow: [
           BoxShadow(
-              color: TerreEtOrColors.navy.withValues(alpha: 0.07),
-              blurRadius: 20,
-              offset: const Offset(0, 6))
+            color: TerreEtOrColors.navy.withValues(alpha: 0.07),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Wrap(
@@ -337,50 +340,78 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
         spacing: 18,
         runSpacing: 14,
         children: [
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(
-                radius: 27,
-                backgroundColor:
-                    (hasDebt ? TerreEtOrColors.gold : TerreEtOrColors.green)
-                        .withValues(alpha: .14),
-                child: Icon(Icons.person_outline,
+          SizedBox(
+            width: MediaQuery.sizeOf(context).width < 500
+                ? MediaQuery.sizeOf(context).width - 64
+                : 340,
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 27,
+                  backgroundColor:
+                      (hasDebt ? TerreEtOrColors.gold : TerreEtOrColors.green)
+                          .withValues(alpha: .14),
+                  child: Icon(
+                    Icons.person_outline,
                     size: 29,
                     color: hasDebt
                         ? TerreEtOrColors.gold
-                        : TerreEtOrColors.green)),
-            const SizedBox(width: 12),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(widget.nom,
-                  style: const TextStyle(
-                      color: TerreEtOrColors.ink,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold)),
-              if (widget.telephone.trim().isNotEmpty)
-                Text(widget.telephone,
-                    style: const TextStyle(color: TerreEtOrColors.muted)),
-            ]),
-          ]),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            const Text('Reste à payer',
-                style: TextStyle(color: TerreEtOrColors.muted, fontSize: 12)),
-            const SizedBox(height: 3),
-            Text(formatMoney(balance),
+                        : TerreEtOrColors.green,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.nom,
+                        style: const TextStyle(
+                          color: TerreEtOrColors.ink,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (widget.telephone.trim().isNotEmpty)
+                        Text(
+                          widget.telephone,
+                          style: const TextStyle(color: TerreEtOrColors.muted),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Text(
+                'Reste à payer',
+                style: TextStyle(color: TerreEtOrColors.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                formatMoney(balance),
                 style: TextStyle(
-                    fontSize: 23,
-                    fontWeight: FontWeight.bold,
-                    color: hasDebt
-                        ? const Color(0xFFD85B4B)
-                        : TerreEtOrColors.green)),
-          ]),
-          Row(
-            mainAxisSize: MainAxisSize.min,
+                  fontSize: 23,
+                  fontWeight: FontWeight.bold,
+                  color: hasDebt
+                      ? const Color(0xFFD85B4B)
+                      : TerreEtOrColors.green,
+                ),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
             children: [
               OutlinedButton.icon(
                 onPressed: appeler,
                 icon: const Icon(Icons.phone, size: 18),
                 label: Text(context.tr('call')),
               ),
-              const SizedBox(width: 10),
               OutlinedButton.icon(
                 onPressed: sms,
                 icon: const Icon(Icons.sms, size: 18),
@@ -398,34 +429,38 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   Widget buildFinancialSummary() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
-      child: LayoutBuilder(builder: (context, constraints) {
-        final cards = [
-          buildSummaryCard(
-            title: "FACTURÉ",
-            value: totalFacture,
-            color: const Color(0xFF3D7FA1),
-          ),
-          buildSummaryCard(
-            title: "PAYÉ",
-            value: totalPaye,
-            color: TerreEtOrColors.green,
-          ),
-          buildSummaryCard(
-            title: "RESTE",
-            value: balance,
-            color:
-                balance > 0 ? const Color(0xFFD85B4B) : TerreEtOrColors.green,
-          ),
-        ];
-        return GridView.count(
-            crossAxisCount: 3,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cards = [
+            buildSummaryCard(
+              title: "FACTURÉ",
+              value: totalFacture,
+              color: const Color(0xFF3D7FA1),
+            ),
+            buildSummaryCard(
+              title: "PAYÉ",
+              value: totalPaye,
+              color: TerreEtOrColors.green,
+            ),
+            buildSummaryCard(
+              title: "RESTE",
+              value: balance,
+              color: balance > 0
+                  ? const Color(0xFFD85B4B)
+                  : TerreEtOrColors.green,
+            ),
+          ];
+          return GridView.count(
+            crossAxisCount: constraints.maxWidth < 500 ? 1 : 3,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
-            childAspectRatio: constraints.maxWidth < 500 ? 1.15 : 2.2,
-            children: cards);
-      }),
+            childAspectRatio: constraints.maxWidth < 500 ? 3.0 : 2.2,
+            children: cards,
+          );
+        },
+      ),
     );
   }
 
@@ -438,8 +473,10 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const ListTile(
-              title: Text('Choisir la langue de la facture',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              title: Text(
+                'Choisir la langue de la facture',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
             ListTile(
               leading: const CircleAvatar(child: Text('FR')),
@@ -461,12 +498,33 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
     if (languageCode == null || !mounted) return;
 
-    await InvoicePdfService.openInvoice(
-      sale: Map<String, dynamic>.from(sale as Map),
-      customerName: widget.nom,
-      customerPhone: widget.telephone,
-      languageCode: languageCode,
-    );
+    final invoice = Map<String, dynamic>.from(sale as Map);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InvoicePreviewScreen(
+            sale: invoice,
+            customerName: widget.nom,
+            customerPhone: widget.telephone,
+            languageCode: languageCode,
+          ),
+        ),
+      );
+    } else {
+      try {
+        await InvoicePdfService.openInvoice(
+          sale: invoice,
+          customerName: widget.nom,
+          customerPhone: widget.telephone,
+          languageCode: languageCode,
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.tr('invoice_unavailable'))),
+        );
+      }
+    }
   }
 
   Widget buildSummaryCard({
@@ -475,16 +533,11 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 12,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: TerreEtOrColors.border,
-        ),
+        border: Border.all(color: TerreEtOrColors.border),
         boxShadow: [
           BoxShadow(
             color: TerreEtOrColors.navy.withValues(alpha: 0.06),
@@ -520,26 +573,16 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
   // ================= SECTION TITLE =================
 
-  Widget buildSectionTitle(
-    String title, {
-    required IconData icon,
-  }) {
+  Widget buildSectionTitle(String title, {required IconData icon}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 18, 14, 8),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: Colors.blueGrey.shade700,
-          ),
+          Icon(icon, size: 20, color: Colors.blueGrey.shade700),
           const SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -565,17 +608,15 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     final eggCount = (v['nombre_oeufs'] as num?)?.toInt() ?? 0;
     final quantityLabel = eggSale
         ? '$eggCount ${context.tr('egg_eggs_short')} · '
-            '${eggCount ~/ 30} ${context.tr('egg_trays_short')} + '
-            '${eggCount % 30} ${context.tr('egg_eggs_short')}'
+              '${eggCount ~/ 30} ${context.tr('egg_trays_short')} + '
+              '${eggCount % 30} ${context.tr('egg_eggs_short')}'
         : '$quantite ${context.tr('sale_animals').toLowerCase()}';
     final date = v["date"] ?? "";
 
     return Card(
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -605,7 +646,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                         eggSale
                             ? context.tr('sale_eggs')
                             : '${context.tr('sale_animals')} · '
-                                '${espece.toString().isNotEmpty ? espece : "Espèce inconnue"}',
+                                  '${espece.toString().isNotEmpty ? espece : "Espèce inconnue"}',
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -651,17 +692,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
               ),
               child: Row(
                 children: [
+                  Expanded(child: buildVenteInfo("Quantité", quantityLabel)),
                   Expanded(
-                    child: buildVenteInfo(
-                      "Quantité",
-                      quantityLabel,
-                    ),
-                  ),
-                  Expanded(
-                    child: buildVenteInfo(
-                      "Facturé",
-                      formatMoney(montantTotal),
-                    ),
+                    child: buildVenteInfo("Facturé", formatMoney(montantTotal)),
                   ),
                 ],
               ),
@@ -670,11 +703,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             Row(
               children: [
                 Expanded(
-                  child: buildAmountLine(
-                    "Payé",
-                    montantPaye,
-                    Colors.green,
-                  ),
+                  child: buildAmountLine("Payé", montantPaye, Colors.green),
                 ),
                 Expanded(
                   child: buildAmountLine(
@@ -696,10 +725,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 const SizedBox(width: 5),
                 Text(
                   date.toString(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
@@ -711,7 +737,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                   onPressed: () => openInvoice(v),
                   icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
                   label: Text(
-                      status == 'PAYE' ? 'Facture payée' : 'Facture partielle'),
+                    status == 'PAYE' ? 'Facture payée' : 'Facture partielle',
+                  ),
                 ),
               ),
             ],
@@ -720,10 +747,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => payer(
-                    (venteId as num).toInt(),
-                    reste,
-                  ),
+                  onPressed: () => payer((venteId as num).toInt(), reste),
                   icon: const Icon(Icons.payment, size: 18),
                   label: Text(context.tr('pay')),
                 ),
@@ -741,43 +765,25 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 3),
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );
   }
 
-  Widget buildAmountLine(
-    String label,
-    double value,
-    Color color,
-  ) {
+  Widget buildAmountLine(String label, double value, Color color) {
     return Row(
       children: [
         Text(
           "$label : ",
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey.shade700,
-          ),
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
         ),
         Flexible(
           child: Text(
             formatMoney(value),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: color),
           ),
         ),
       ],
@@ -795,9 +801,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       elevation: 1,
       color: Colors.green.shade50,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -809,10 +813,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 color: Colors.green.shade100,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.check,
-                color: Colors.green.shade700,
-              ),
+              child: Icon(Icons.check, color: Colors.green.shade700),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -830,10 +831,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                   const SizedBox(height: 3),
                   Text(
                     date.toString(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   if (note != null && note.toString().trim().isNotEmpty) ...[
                     const SizedBox(height: 4),
@@ -859,13 +857,26 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.nom),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: Text(widget.nom), elevation: 0),
       body: loading
-          ? const Center(
-              child: CircularProgressIndicator(),
+          ? const Center(child: CircularProgressIndicator())
+          : loadError != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(loadError!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: load,
+                      icon: const Icon(Icons.refresh),
+                      label: Text(context.tr('refresh')),
+                    ),
+                  ],
+                ),
+              ),
             )
           : RefreshIndicator(
               onRefresh: load,
@@ -877,7 +888,6 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                   buildFinancialSummary(),
 
                   // ================= VENTES =================
-
                   buildSectionTitle(
                     "Ventes",
                     icon: Icons.shopping_cart_outlined,
@@ -896,24 +906,16 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                           const SizedBox(height: 8),
                           Text(
                             "Aucune vente",
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                            ),
+                            style: TextStyle(color: Colors.grey.shade600),
                           ),
                         ],
                       ),
                     ),
 
-                  ...ventes.map(
-                    (v) => buildVenteCard(v),
-                  ),
+                  ...ventes.map((v) => buildVenteCard(v)),
 
                   // ================= PAIEMENTS =================
-
-                  buildSectionTitle(
-                    "Paiements",
-                    icon: Icons.payments_outlined,
-                  ),
+                  buildSectionTitle("Paiements", icon: Icons.payments_outlined),
 
                   if (payments.isEmpty)
                     Padding(
@@ -928,17 +930,13 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                           const SizedBox(height: 8),
                           Text(
                             "Aucun paiement enregistré",
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                            ),
+                            style: TextStyle(color: Colors.grey.shade600),
                           ),
                         ],
                       ),
                     ),
 
-                  ...payments.map(
-                    (p) => buildPaymentCard(p),
-                  ),
+                  ...payments.map((p) => buildPaymentCard(p)),
 
                   const SizedBox(height: 90),
                 ],

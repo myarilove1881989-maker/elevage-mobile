@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'token_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_elevage/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,15 +12,59 @@ String? globalToken;
 /// Réponse absente du serveur (connexion, adresse API ou CORS).
 class ApiConnectionException implements Exception {
   const ApiConnectionException();
+
+  @override
+  String toString() =>
+      'Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.';
+}
+
+/// Une seule tentative, bornée pendant l'envoi et la lecture de réponse.
+/// Aucune écriture n'est relancée automatiquement après un délai dépassé.
+class _ApiClient extends http.BaseClient {
+  _ApiClient(this.inner, this.requestTimeout);
+  final http.Client inner;
+  final Duration requestTimeout;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    try {
+      final response = await inner.send(request).timeout(requestTimeout);
+      final bytes = await response.stream.toBytes().timeout(requestTimeout);
+      return http.StreamedResponse(
+        Stream.value(bytes),
+        response.statusCode,
+        headers: response.headers,
+        request: response.request,
+        reasonPhrase: response.reasonPhrase,
+        isRedirect: response.isRedirect,
+      );
+    } on TimeoutException {
+      throw const ApiConnectionException();
+    } on http.ClientException {
+      throw const ApiConnectionException();
+    }
+  }
+
+  @override
+  void close() => inner.close();
 }
 
 class ApiService {
+  ApiService({
+    http.Client? client,
+    TokenStore? tokenStore,
+    Duration requestTimeout = const Duration(seconds: 30),
+  }) : _client = _ApiClient(client ?? http.Client(), requestTimeout),
+       _tokenStore = tokenStore ?? TokenService();
+
+  final http.Client _client;
+  final TokenStore _tokenStore;
+  static final sessionExpired = ValueNotifier<int>(0);
+
+  void close() => _client.close();
   // ✅ URL API centralisée (compatible local + Render)
   static String get baseUrl {
-    final configuredUrl = Config.apiUrl.trim();
-    return configuredUrl.endsWith('/')
-        ? configuredUrl.substring(0, configuredUrl.length - 1)
-        : configuredUrl;
+    return Config.validatedApiUrl(Config.apiUrl);
   }
 
   static String? token;
@@ -49,11 +96,12 @@ class ApiService {
 
     // 🔒 TOKEN EXPIRÉ
     if (response.statusCode == 401 && clearSessionOnUnauthorized) {
-      token = null;
-      globalToken = null;
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove("token");
+      final hadSession = token != null || globalToken != null;
+      try {
+        await logout();
+      } finally {
+        if (hadSession) sessionExpired.value++;
+      }
 
       throw Exception("Session expirée, reconnectez-vous 🔒");
     }
@@ -64,30 +112,30 @@ class ApiService {
 
       if (data is Map) {
         if (data.containsKey("message")) {
-          return Future.error(Exception(data["message"]));
+          return await Future.error(Exception(data["message"]));
         }
 
         if (data.containsKey("error")) {
-          return Future.error(Exception(data["error"]));
+          return await Future.error(Exception(data["error"]));
         }
 
         if (data.containsKey("errors")) {
-          return Future.error(Exception(data["errors"].toString()));
+          return await Future.error(Exception(data["errors"].toString()));
         }
 
         // Les validations Django utilisent directement le nom du champ
         // (username, email, password...). On restitue leur message précis.
         for (final value in data.values) {
           if (value is List && value.isNotEmpty) {
-            return Future.error(Exception(value.join(' ')));
+            return await Future.error(Exception(value.join(' ')));
           }
           if (value is String && value.trim().isNotEmpty) {
-            return Future.error(Exception(value));
+            return await Future.error(Exception(value));
           }
         }
       }
 
-      return Future.error(Exception(data.toString()));
+      return await Future.error(Exception(data.toString()));
     } on FormatException {
       // Réponse non JSON : message générique mais compréhensible.
       throw Exception("Erreur API (${response.statusCode})");
@@ -102,7 +150,7 @@ class ApiService {
   ) async {
     late final http.Response response;
     try {
-      response = await http.post(
+      response = await _client.post(
         Uri.parse("$baseUrl/register/"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
@@ -120,7 +168,7 @@ class ApiService {
 
   // ================= PASSWORD RESET =================
   Future<void> requestPasswordReset(String email) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/password-reset/request/"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({"email": email}),
@@ -129,7 +177,7 @@ class ApiService {
   }
 
   Future<String> verifyPasswordReset(String email, String code) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/password-reset/verify/"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({"email": email, "code": code}),
@@ -146,7 +194,7 @@ class ApiService {
     String resetToken,
     String newPassword,
   ) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/password-reset/confirm/"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
@@ -162,7 +210,7 @@ class ApiService {
   Future<bool> login(String username, String password) async {
     late final http.Response response;
     try {
-      response = await http.post(
+      response = await _client.post(
         Uri.parse("$baseUrl/token/"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"username": username, "password": password}),
@@ -176,15 +224,12 @@ class ApiService {
       clearSessionOnUnauthorized: false,
     );
 
-    // 🔥 Nettoyage ancien token
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove("token");
+    final access = data["access"] as String;
+    await _tokenStore.saveToken(access);
+    token = access;
+    globalToken = access;
 
-    // ✅ Nouveau token
-    token = data["access"];
-    globalToken = token;
-
-    await prefs.setString("token", token!);
     await prefs.setString("username", username);
 
     return true;
@@ -192,13 +237,17 @@ class ApiService {
 
   // ================= LOAD TOKEN =================
   Future<void> loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedToken = prefs.getString("token");
+    final savedToken = await _tokenStore.getToken();
+    token = savedToken == null || savedToken.isEmpty ? null : savedToken;
+    globalToken = token;
+  }
 
-    if (savedToken != null && savedToken.isNotEmpty) {
-      token = savedToken;
-      globalToken = savedToken;
-    }
+  Future<void> logout() async {
+    token = null;
+    globalToken = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('username');
+    await _tokenStore.clearToken();
   }
 
   // ================= DASHBOARD =================
@@ -210,9 +259,7 @@ class ApiService {
             : {"espece": especeId.toString()},
       );
 
-      final response = await http
-          .get(uri, headers: _headers())
-          .timeout(const Duration(seconds: 30));
+      final response = await _client.get(uri, headers: _headers());
 
       return await _handleResponse(response);
     } catch (_) {
@@ -222,7 +269,7 @@ class ApiService {
 
   // ================= LOTS =================
   Future<List<dynamic>> getLots() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/lots/"),
       headers: _headers(),
     );
@@ -230,7 +277,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getLotDetail(int lotId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/lots/$lotId/"),
       headers: _headers(),
     );
@@ -239,7 +286,7 @@ class ApiService {
 
   // ================= ESPECES =================
   Future<List<dynamic>> getEspeces() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/especes/"),
       headers: _headers(),
     );
@@ -247,7 +294,7 @@ class ApiService {
   }
 
   Future<dynamic> createEspece(String nom) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/especes/"),
       headers: _headers(),
       body: jsonEncode({"nom": nom}),
@@ -257,7 +304,7 @@ class ApiService {
 
   // ================= DELETE DEPENSE =================
   Future<bool> deleteDepense(int id) async {
-    final response = await http.delete(
+    final response = await _client.delete(
       Uri.parse("$baseUrl/depenses/delete/$id/"),
       headers: _headers(),
     );
@@ -268,7 +315,7 @@ class ApiService {
 
   // ================= STOCK DETAIL =================
   Future<Map<String, dynamic>> getStockDetail(int lotId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/stock-detail/?lot=$lotId"),
       headers: _headers(),
     );
@@ -278,7 +325,7 @@ class ApiService {
 
   // ================= DEPENSE =================
   Future<List<dynamic>> getCategoriesDepense() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/categories-depense/"),
       headers: _headers(),
     );
@@ -300,7 +347,7 @@ class ApiService {
       if (note != null && note.isNotEmpty) "note": note,
     };
 
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/depenses/create/"),
       headers: _headers(),
       body: jsonEncode(body),
@@ -312,7 +359,7 @@ class ApiService {
 
   // ================= TOTAL DETTES =================
   Future<double> getTotalDettes() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/clients/total-dettes/"),
       headers: _headers(),
     );
@@ -361,7 +408,7 @@ class ApiService {
         "date_debut_ponte": dateDebutPonte.toIso8601String().split("T")[0],
     };
 
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/achats/create/"),
       headers: _headers(),
       body: jsonEncode(body),
@@ -387,7 +434,7 @@ class ApiService {
     final uri = Uri.parse(
       "$baseUrl/oeufs/collectes/",
     ).replace(queryParameters: query);
-    final response = await http.get(uri, headers: _headers());
+    final response = await _client.get(uri, headers: _headers());
     return await _handleResponse(response);
   }
 
@@ -402,7 +449,7 @@ class ApiService {
     int consumedOrDonated = 0,
     String note = '',
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/oeufs/collectes/"),
       headers: _headers(),
       body: jsonEncode({
@@ -435,15 +482,15 @@ class ApiService {
     final uri = Uri.parse(
       "$baseUrl/oeufs/statistiques/",
     ).replace(queryParameters: query);
-    final response = await http.get(uri, headers: _headers());
+    final response = await _client.get(uri, headers: _headers());
     return await _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> getDatedEggStock(int lotId) async {
-    final uri = Uri.parse("$baseUrl/oeufs/stock-date/").replace(
-      queryParameters: {"lot": lotId.toString()},
-    );
-    final response = await http.get(uri, headers: _headers());
+    final uri = Uri.parse(
+      "$baseUrl/oeufs/stock-date/",
+    ).replace(queryParameters: {"lot": lotId.toString()});
+    final response = await _client.get(uri, headers: _headers());
     return await _handleResponse(response);
   }
 
@@ -457,8 +504,10 @@ class ApiService {
       query["date_debut"] = start.toIso8601String().split("T")[0];
       query["date_fin"] = end.toIso8601String().split("T")[0];
     }
-    final uri = Uri.parse("$baseUrl/oeufs/kpi/").replace(queryParameters: query);
-    final response = await http.get(uri, headers: _headers());
+    final uri = Uri.parse(
+      "$baseUrl/oeufs/kpi/",
+    ).replace(queryParameters: query);
+    final response = await _client.get(uri, headers: _headers());
     return await _handleResponse(response);
   }
 
@@ -471,7 +520,7 @@ class ApiService {
     int? eggsPerPackage,
     DateTime? date,
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/oeufs/ventes/"),
       headers: _headers(),
       body: jsonEncode({
@@ -495,7 +544,7 @@ class ApiService {
     required String totalPrice,
     required DateTime date,
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/oeufs/ventes/"),
       headers: _headers(),
       body: jsonEncode({
@@ -519,7 +568,7 @@ class ApiService {
     DateTime? date,
     String note = '',
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/oeufs/alimentation/"),
       headers: _headers(),
       body: jsonEncode({
@@ -535,10 +584,10 @@ class ApiService {
   }
 
   Future<List<dynamic>> getFeedDistributions(int lotId) async {
-    final response = await http.get(
-      Uri.parse("$baseUrl/alimentation/distributions/").replace(
-        queryParameters: {'lot': '$lotId'},
-      ),
+    final response = await _client.get(
+      Uri.parse(
+        "$baseUrl/alimentation/distributions/",
+      ).replace(queryParameters: {'lot': '$lotId'}),
       headers: _headers(),
     );
     return List<dynamic>.from(await _handleResponse(response) as List);
@@ -553,7 +602,7 @@ class ApiService {
     int? expenseId,
     String note = '',
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/alimentation/distributions/"),
       headers: _headers(),
       body: jsonEncode({
@@ -570,10 +619,10 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getProductionWeights(int lotId) async {
-    final response = await http.get(
-      Uri.parse("$baseUrl/production/pesees/").replace(
-        queryParameters: {'lot': '$lotId'},
-      ),
+    final response = await _client.get(
+      Uri.parse(
+        "$baseUrl/production/pesees/",
+      ).replace(queryParameters: {'lot': '$lotId'}),
       headers: _headers(),
     );
     return Map<String, dynamic>.from(await _handleResponse(response) as Map);
@@ -586,7 +635,7 @@ class ApiService {
     required double sampleWeightKg,
     String note = '',
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/production/pesees/"),
       headers: _headers(),
       body: jsonEncode({
@@ -610,7 +659,7 @@ class ApiService {
     required DateTime date,
     String note = '',
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/mouvements/create/"),
       headers: _headers(),
       body: jsonEncode({
@@ -652,7 +701,7 @@ class ApiService {
       body["client"] = clientId;
     }
 
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/mouvements/create/"),
       headers: _headers(),
       body: jsonEncode(body),
@@ -663,7 +712,7 @@ class ApiService {
   }
 
   Future<List<dynamic>> getClients() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/clients/"),
       headers: _headers(),
     );
@@ -677,7 +726,7 @@ class ApiService {
     String pays = '',
     String ville = '',
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/clients/create/"),
       headers: _headers(),
       body: jsonEncode({
@@ -713,7 +762,7 @@ class ApiService {
 
   // ================= DELETE =================
   Future<bool> deleteAchat(int id) async {
-    final response = await http.delete(
+    final response = await _client.delete(
       Uri.parse("$baseUrl/achats/delete/$id/"),
       headers: _headers(),
     );
@@ -722,7 +771,7 @@ class ApiService {
   }
 
   Future<bool> deleteMouvement(int id) async {
-    final response = await http.delete(
+    final response = await _client.delete(
       Uri.parse("$baseUrl/mouvements/delete/$id/"),
       headers: _headers(),
     );
@@ -734,7 +783,7 @@ class ApiService {
   Future<dynamic> get(String endpoint) async {
     final normalizedBase = baseUrl.replaceFirst(RegExp(r'/+$'), '');
     final normalizedEndpoint = endpoint.replaceFirst(RegExp(r'^/+'), '');
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$normalizedBase/$normalizedEndpoint"),
       headers: _headers(),
     );
@@ -746,7 +795,7 @@ class ApiService {
   Future<dynamic> post(String endpoint, Map<String, dynamic> data) async {
     final normalizedBase = baseUrl.replaceFirst(RegExp(r'/+$'), '');
     final normalizedEndpoint = endpoint.replaceFirst(RegExp(r'^/+'), '');
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$normalizedBase/$normalizedEndpoint"),
       headers: _headers(),
       body: jsonEncode(data),
@@ -755,8 +804,25 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<dynamic> postWithProof(String endpoint, Map<String, dynamic> data,
+      Map<String, String> proof) async {
+    if (proof.keys.any((key) => !const {
+      'X-Elevage-Device', 'X-Elevage-Challenge', 'X-Elevage-Signature',
+    }.contains(key))) {
+      throw ArgumentError('Preuve de tablette invalide.');
+    }
+    final normalizedBase = baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    final normalizedEndpoint = endpoint.replaceFirst(RegExp(r'^/+'), '');
+    final response = await _client.post(
+      Uri.parse('$normalizedBase/$normalizedEndpoint'),
+      headers: {..._headers(), ...proof},
+      body: jsonEncode(data),
+    );
+    return await _handleResponse(response);
+  }
+
   Future<List<dynamic>> getCA(int especeId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/ca-par-lot/?espece=$especeId"),
       headers: _headers(),
     );
@@ -764,7 +830,7 @@ class ApiService {
   }
 
   Future<List<dynamic>> getDepenses(int lotId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/depenses-detail/?lot=$lotId"),
       headers: _headers(),
     );
@@ -772,7 +838,7 @@ class ApiService {
   }
 
   Future<List<dynamic>> getMarge(int especeId) async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/marge-par-lot/?espece=$especeId"),
       headers: _headers(),
     );
@@ -791,7 +857,7 @@ class ApiService {
   }
 
   Future<List<dynamic>> getTasks() async {
-    final response = await http.get(
+    final response = await _client.get(
       Uri.parse("$baseUrl/tasks/"),
       headers: _headers(), // ✅ CORRECT
     );
@@ -804,7 +870,7 @@ class ApiService {
   }
 
   Future<void> createTask(String title, DateTime date) async {
-    final response = await http.post(
+    final response = await _client.post(
       Uri.parse("$baseUrl/tasks/"),
       headers: {
         "Authorization": "Bearer $globalToken",
@@ -822,7 +888,7 @@ class ApiService {
   }
 
   Future<void> deleteTask(int id) async {
-    final response = await http.delete(
+    final response = await _client.delete(
       Uri.parse("$baseUrl/tasks/$id/"), // ✅ BONNE URL
       headers: _headers(),
     );

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'offline_tablet_screen.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/screens/dashboard_screen.dart';
 import 'package:app_elevage/screens/register_screen.dart';
@@ -7,10 +9,14 @@ import 'package:app_elevage/l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   final ApiService apiService;
+  final bool sessionExpired;
+  final bool restoreFailed;
 
   const LoginScreen({
     super.key,
     required this.apiService,
+    this.sessionExpired = false,
+    this.restoreFailed = false,
   });
 
   @override
@@ -34,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final success = await widget.apiService.login(
         usernameController.text.trim(),
-        passwordController.text.trim(),
+        passwordController.text,
       );
 
       if (!mounted) return;
@@ -47,9 +53,8 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => DashboardScreen(
-              apiService: widget.apiService,
-            ),
+            builder: (context) =>
+                DashboardScreen(apiService: widget.apiService),
           ),
         );
       } else {
@@ -73,27 +78,38 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void dispose() {
+    usernameController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final statusMessage = errorMessage.isNotEmpty
+        ? errorMessage
+        : widget.sessionExpired
+        ? context.tr('session_expired')
+        : widget.restoreFailed
+        ? context.tr('session_restore_failed')
+        : '';
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 28,
-              vertical: 24,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 450,
-              ),
+              constraints: const BoxConstraints(maxWidth: 450),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset(
-                    'assets/images/elevage_logo.png',
-                    height: 180,
-                  ),
+                  if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android)
+                    OutlinedButton.icon(icon:const Icon(Icons.tablet_android),
+                      label:const Text('Ouvrir mon profil sur cette tablette'),
+                      onPressed:isLoading?null:()=>Navigator.push(context,
+                        MaterialPageRoute(builder:(_)=>const OfflineTabletScreen()))),
+                  Image.asset('assets/images/elevage_logo.png', height: 180),
                   const SizedBox(height: 40),
                   TextField(
                     controller: usernameController,
@@ -148,15 +164,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Text(context.tr('forgot_password')),
                     ),
                   ),
-                  if (errorMessage.isNotEmpty)
+                  if (statusMessage.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Text(
-                        errorMessage,
+                        statusMessage,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.red,
-                        ),
+                        style: const TextStyle(color: Colors.red),
                       ),
                     ),
                   SizedBox(
