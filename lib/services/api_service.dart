@@ -804,6 +804,23 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<dynamic> postWithProof(String endpoint, Map<String, dynamic> data,
+      Map<String, String> proof) async {
+    if (proof.keys.any((key) => !const {
+      'X-Elevage-Device', 'X-Elevage-Challenge', 'X-Elevage-Signature',
+    }.contains(key))) {
+      throw ArgumentError('Preuve de tablette invalide.');
+    }
+    final normalizedBase = baseUrl.replaceFirst(RegExp(r'/+$'), '');
+    final normalizedEndpoint = endpoint.replaceFirst(RegExp(r'^/+'), '');
+    final response = await _client.post(
+      Uri.parse('$normalizedBase/$normalizedEndpoint'),
+      headers: {..._headers(), ...proof},
+      body: jsonEncode(data),
+    );
+    return await _handleResponse(response);
+  }
+
   Future<List<dynamic>> getCA(int especeId) async {
     final response = await _client.get(
       Uri.parse("$baseUrl/ca-par-lot/?espece=$especeId"),

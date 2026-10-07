@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'offline_tablet_screen.dart';
+import 'supervision_screen.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/app_settings.dart';
@@ -55,6 +56,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          ListTile(leading:const Icon(Icons.fact_check),title:const Text('Supervision et journal d’activité'),
+            onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SupervisionScreen()))),
           if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android)
             ListTile(leading:const Icon(Icons.tablet_android),title:const Text('Tablette de l’exploitation'),
               onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const OfflineTabletScreen()))),
