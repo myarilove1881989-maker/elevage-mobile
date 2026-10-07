@@ -121,4 +121,18 @@ void main() {
       expect(sessions.session,isNull);
     }
   });
+  test('an open personal session locks when the clock goes backwards or grant expires',() async {
+    final grant=await grantFor(1);
+    var time=now.add(const Duration(minutes:1));
+    final sessions=LocalOperatorSessions(store:MemorySecrets(),namespace:'clock-test',
+      farmId:1,deviceId:7,generation:2,clock:()=>time);
+    await sessions.enroll(grant,'123456');
+    expect(await sessions.unlock(grant,'123456'),isTrue);
+    time=now.add(const Duration(seconds:30));
+    expect(sessions.session,isNull);
+    time=now.add(const Duration(minutes:2));
+    expect(await sessions.unlock(grant,'123456'),isTrue);
+    time=now.add(const Duration(days:4));
+    expect(sessions.session,isNull);
+  });
 }

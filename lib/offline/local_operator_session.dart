@@ -48,7 +48,10 @@ class LocalOperatorSessions {
   final DateTime Function() clock;
   LocalOperatorSession? _session;
   LocalOperatorSession? get session {
-    if(_session!=null && !clock().toUtc().isBefore(_session!.grant.expiresAt)) lock();
+    final now=clock().toUtc();
+    if(_session!=null && (now.isBefore(_session!.openedAt) || !now.isBefore(_session!.grant.expiresAt))) {
+      lock();
+    }
     return _session;
   }
   int _lockEpoch=0;
@@ -120,7 +123,7 @@ class LocalOperatorSessions {
     record['blocked_until'] = 0;
     await store.write(_key(grant), jsonEncode(record));
     _validateGrant(grant);
-    if(epoch!=_lockEpoch) return false;
+    if(epoch!=_lockEpoch || clock().toUtc().millisecondsSinceEpoch<now) return false;
     _session = LocalOperatorSession(grant: grant, openedAt: clock().toUtc());
     return true;
   }
