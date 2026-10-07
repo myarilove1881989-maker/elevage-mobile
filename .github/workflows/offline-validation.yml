@@ -66,7 +66,7 @@ jobs:
           target: default
           disable-animations: true
           script: |
-            flutter test integration_test/offline_foundations_test.dart -d emulator-5554
+            timeout --signal=TERM --kill-after=30s 20m flutter test integration_test/offline_foundations_test.dart -d emulator-5554
             (cd android && ./gradlew connectedDebugAndroidTest)
             adb shell am instrument -w com.elevage.app.offlinevalidation.test/androidx.test.runner.AndroidJUnitRunner
             python3 tool/android_encryption_proof.py
