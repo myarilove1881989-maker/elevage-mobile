@@ -34,6 +34,11 @@ Références :
 
 ## Portes de progression
 
+La première CI a réellement installé Flutter 3.47.6 et résolu le lockfile.
+L'analyse du code initial retourne 56 diagnostics de niveau `info`, sans
+erreur ni warning. Ils restent visibles dans les logs ; l'analyse bloque
+toujours les erreurs et warnings, mais pas ces conseils existants.
+
 2D ne commence qu'après validation complète de 2C. Les phases suivantes
 et tout déploiement restent soumis aux portes de la mission. Les politiques
 offline des exploitations existantes restent désactivées.
