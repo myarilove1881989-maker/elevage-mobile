@@ -39,7 +39,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   final DateTime Function() outboxClock;
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
   @override
   Future<void> applyProjectionReceipt(Map<String,dynamic> receipt)=>projectReceipt(receipt);
   @override
@@ -64,12 +64,14 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
       await createOutboxSchema();
       await createTerrainMappings();
       await createTerrainCash();
+      await createDecisionReceiptColumns();
     },
     onUpgrade: (_,from,to) async {
       if(from<2) await _createStaging();
       if(from<3) await createOutboxSchema();
       if(from<4) await createTerrainMappings();
       if(from<5) await createTerrainCash();
+      if(from<6) await createDecisionReceiptColumns();
     },
     beforeOpen: (_) async {
       final identity = await customSelect('SELECT farm_id,server_namespace FROM farm_identity').getSingle();

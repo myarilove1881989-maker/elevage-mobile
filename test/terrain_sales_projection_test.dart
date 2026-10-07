@@ -105,4 +105,39 @@ void main() {
     expect((await db.projectedPage('clients',search:'100%')).single['data'],containsPair('id',1));
     expect(await db.projectedPage('cash'),isEmpty);
   });
+
+  test('reasoned sale reversal restores stock and hides stale cached debt after encrypted restart',() async {
+    final sale=await enqueue('VENTE_ANIMAUX',{'lot_ref':{'server_id':7},'client_ref':{'server_id':9},'quantite':3,'prix_unitaire':'10000.00'});
+    final confirmed=receipt(sale)..['stock_snapshots']=[lot(17,revision:1)]
+      ..['entity_mappings']=[{'entity_type':'VENTE_ANIMAUX','local_entity_id':sale.declaration['local_entity_id'],'server_entity_id':42}];
+    await db.acceptReceipts([confirmed]);
+    final cached={'id':42,'reference_id':42,'entity_type':'VENTE_ANIMAUX','client_id':9,'montant_total':'30000.00','reste_a_payer':'30000.00'};
+    await db.replaceConfirmedCache('sales',[cached]);
+    final reversed=receipt(sale,status:'SUPERSEDED',revision:2)..['stock_snapshots']=[lot(20,revision:2)]
+      ..['entity_mappings']=confirmed['entity_mappings']..['decision_version']=1
+      ..['decision_action']='REVERSE'..['decision_actor_id']=1;
+    await db.acceptReceipts([reversed]);await db.close();db=open();
+    await db.acceptReceipts([confirmed]);
+    await db.replaceConfirmedCache('sales',[cached]);
+    expect(await db.projectedPage('sales'),isEmpty);
+    expect((await db.projectedPage('lots')).single['data'],containsPair('stock',20));
+    expect((await db.listOutbox()).single.businessStatus,'SUPERSEDED');
+    expect((await db.listOutbox()).single.declaration,sale.declaration);
+    expect(await db.awaitingReceipts(),hasLength(1));
+  });
+
+  test('allocation reversal updates cash review without reducing the physical amount or creating another payment',() async {
+    final cash=await enqueue('ENCAISSEMENT',{'client_ref':{'server_id':9},'montant_recu':'50000.00','mode':'ESPECES'});
+    final confirmed=receipt(cash)..['cash_recognition']=recognition(assigned:'50000.00',remaining:'0.00');
+    await db.acceptReceipts([confirmed]);
+    final reversal=receipt(cash,status:'NEEDS_RECONCILIATION',revision:2)
+      ..['cash_recognition']=recognition(assigned:'0.00',remaining:'50000.00')
+      ..['decision_version']=1..['decision_action']='REVERSE'..['decision_actor_id']=1;
+    await db.acceptReceipts([reversal]);await db.close();db=open();
+    await db.acceptReceipts([confirmed]);
+    final data=(await db.projectedPage('cash')).single['data'] as Map;
+    expect(data['montant_recu'],'50000.00');expect(data['payment_id'],42);
+    expect(data['montant_affecte'],'0.00');expect(data['montant_a_rapprocher'],'50000.00');
+    expect((await db.listOutbox()).single.businessStatus,'NEEDS_RECONCILIATION');
+  });
 }

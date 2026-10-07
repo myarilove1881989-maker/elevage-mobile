@@ -17,7 +17,12 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
   Future<void> projectReceipt(Map<String,dynamic> receipt) async {
     final mappings=receipt['entity_mappings']??const [];
     if(mappings is! List || mappings.length>10) {throw StateError('Correspondances serveur invalides.');}
-    if(mappings.isNotEmpty && receipt['business_status']!='CONFIRMED') {throw StateError('Correspondance non confirmée.');}
+    final reversed=receipt['business_status']=='SUPERSEDED' && receipt['decision_action']=='REVERSE' &&
+      receipt['decision_version'] is int && (receipt['decision_version'] as int)>0;
+    if(mappings.isNotEmpty && receipt['business_status']!='CONFIRMED' && !reversed &&
+      !(receipt['business_status']=='NEEDS_RECONCILIATION' && receipt['cash_recognition']!=null)) {
+      throw StateError('Correspondance non confirmée.');
+    }
     final operation=await customSelect('SELECT declaration FROM outbox WHERE operation_id=?',
       variables:[Variable(receipt['client_operation_id'] as String)]).getSingle();
     final declaration=jsonDecode(operation.read<String>('declaration')) as Map;
@@ -34,6 +39,11 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
       if(previous!=null && previous.read<int>('server_entity_id')!=item['server_entity_id']) {throw StateError('Correspondance serveur contradictoire.');}
       await customStatement('INSERT OR IGNORE INTO terrain_entity_mapping VALUES(?,?,?,?)',
         [item['entity_type'],item['local_entity_id'],item['server_entity_id'],receipt['client_operation_id']]);
+    }
+    if(reversed && {'VENTE_ANIMAUX','VENTE_OEUFS'}.contains(kind)) {
+      await customStatement("DELETE FROM confirmed_cache WHERE collection='sales' AND "
+        "json_extract(payload,'\$.entity_type')=? AND json_extract(payload,'\$.reference_id')=?",
+        [kind,int.tryParse((receipt['server_entity_id']??'').toString())]);
     }
     await _projectStockReceipt(receipt,declaration);
     await _projectCashReceipt(receipt,declaration);
@@ -75,7 +85,8 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
     const stockKinds={'ACHAT','NAISSANCE','MORTALITE','DON','VOL','COLLECTE_OEUFS','VENTE_ANIMAUX','VENTE_OEUFS'};
     final snapshots=receipt['stock_snapshots']??const [];
     if(snapshots is! List || snapshots.length>1 ||
-      (snapshots.isNotEmpty && (!stockKinds.contains(declaration['entity_type']) || receipt['business_status']!='CONFIRMED')) ||
+      (snapshots.isNotEmpty && (!stockKinds.contains(declaration['entity_type']) ||
+        (receipt['business_status']!='CONFIRMED' && !(receipt['business_status']=='SUPERSEDED' && receipt['decision_action']=='REVERSE')))) ||
       (stockKinds.contains(declaration['entity_type']) && receipt['business_status']=='CONFIRMED' && snapshots.length!=1)) {
       throw StateError('Stock confirmé hors déclaration.');
     }
@@ -178,7 +189,9 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
   }
 
   Future<List<Map<String,dynamic>>> _projectedSales(int offset,int limit,String clientSearch) async {
-    final rows=await customSelect("SELECT * FROM (SELECT payload AS data,'CONFIRMED_CACHE' AS state,NULL AS operation_id,NULL AS local_uuid FROM confirmed_cache WHERE collection='sales' "
+    final rows=await customSelect("SELECT * FROM (SELECT payload AS data,'CONFIRMED_CACHE' AS state,NULL AS operation_id,NULL AS local_uuid FROM confirmed_cache c WHERE collection='sales' "
+      "AND NOT EXISTS(SELECT 1 FROM terrain_entity_mapping m JOIN outbox o ON o.operation_id=m.operation_id "
+      "WHERE o.business_status='SUPERSEDED' AND m.entity_type=json_extract(c.payload,'\$.entity_type') AND m.server_entity_id=json_extract(c.payload,'\$.reference_id')) "
       "UNION ALL SELECT json_set(json_extract(o.declaration,'\$.payload'),'\$.id',COALESCE(m.server_entity_id,json_extract(o.declaration,'\$.local_entity_id')),"
       "'\$.reference_id',COALESCE(m.server_entity_id,json_extract(o.declaration,'\$.local_entity_id')),'\$.entity_type',json_extract(o.declaration,'\$.entity_type'),"
       "'\$.client_id',COALESCE(json_extract(o.declaration,'\$.payload.client_ref.server_id'),cm.server_entity_id,json_extract(o.declaration,'\$.payload.client_ref.local_uuid'))) AS data,"

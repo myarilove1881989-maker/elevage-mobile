@@ -138,4 +138,35 @@ void main() {
     expect((await db.operatorProfiles()).single['display_name'],'Jean');
     expect((await enqueue()).sequence,1);
   });
+
+  test('confirmed declarations keep polling fairly and later decisions cannot restore stale originals',() async {
+    final entries=[await enqueue(),await enqueue(),await enqueue()];
+    Map<String,dynamic> receipt(OutboxEntry entry,{int version=0,String action='',String state='CONFIRMED'})=>{
+      'client_operation_id':entry.operationId,'transport_status':'SERVER_RECEIVED','business_status':state,
+      'author_user_id':2,'received_at':clock.toIso8601String(),'applied_at':state=='CONFIRMED'?clock.toIso8601String():null,
+      'server_entity_id':'42','server_version':'1','decision_version':version,'decision_action':action,
+      'decision_actor_id':version>0?1:null};
+    await db.acceptReceipts([receipt(entries[0]),receipt(entries[1],state:'UNREVIEWED'),receipt(entries[2])]);
+    expect((await db.awaitingReceipts(limit:1)).single.operationId,entries.first.operationId);
+    await db.acceptReceipts([receipt(entries.first)]);
+    expect((await db.awaitingReceipts(limit:1)).single.operationId,entries[1].operationId);
+    final cancelled=receipt(entries[1],version:1,action:'CANCEL',state:'NOT_APPLIED');
+    await db.acceptReceipts([cancelled]);
+    await db.close();db=open();
+    await db.acceptReceipts([receipt(entries[1])]);
+    expect((await db.listOutbox()).singleWhere((e)=>e.operationId==entries[1].operationId).businessStatus,'NOT_APPLIED');
+    await expectLater(db.acceptReceipts([receipt(entries[1],version:1,action:'APPLY_ORIGINAL')]),throwsStateError);
+    expect((await db.listOutbox()).last.authorId,2);
+  });
+
+  test('schema five upgrades retain pending original declarations and encrypted profiles',() async {
+    final original=await enqueue();await db.saveOperatorProfile(jean,'Jean');
+    for(final name in ['decision_version','decision_action','decision_actor_id','receipt_poll_order']) {
+      await db.customStatement('ALTER TABLE outbox DROP COLUMN $name');
+    }
+    await db.customStatement('PRAGMA user_version=5');await db.close();db=open();
+    expect((await db.listOutbox()).single.declaration,original.declaration);
+    expect((await db.operatorProfiles()).single['display_name'],'Jean');
+    expect((await db.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version'),6);
+  });
 }

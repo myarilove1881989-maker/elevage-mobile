@@ -184,7 +184,8 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
         _facts(row!['original_payload'] as Map),
         if(recognized!=null) ...[const Divider(),_facts(recognized)],
         if((receipt['reason_text']?.toString()??'').isNotEmpty) Text('Dernier motif : ${receipt['reason_text']}'),
-        if(!loading && (!applied || recognized!=null && recognized['montant_a_rapprocher']!='0.00'))
+        if(!loading && receipt?['business_status']!='SUPERSEDED' && receipt?['business_status']!='NOT_APPLIED' &&
+          (!applied || recognized!=null || {'VENTE_ANIMAUX','VENTE_OEUFS','MORTALITE','DON','VOL'}.contains(row!['entity_type'])))
           FilledButton(onPressed:decide,child:const Text('Prendre une décision avec motif')),
         const Divider(),const Text('Historique de cette opération',style:TextStyle(fontWeight:FontWeight.bold)),
         if(widget.service.owner) ...[
@@ -208,7 +209,16 @@ class _DecisionDialog extends StatefulWidget {
 class _DecisionDialogState extends State<_DecisionDialog> {
   final form=GlobalKey<FormState>(),reason=TextEditingController(),amount=TextEditingController();
   final editors=<String,TextEditingController>{};
-  late String action=(widget.row['receipt'] as Map)['cash_recognition']!=null?'CASH_ALLOCATION':'APPLY_ORIGINAL';
+  late String action=availableActions.first;
+  List<String> get availableActions {
+    final receipt=widget.row['receipt'] as Map;
+    final cash=receipt['cash_recognition'];
+    if(cash is Map) {
+      return [if(cash['montant_a_rapprocher']!='0.00') 'CASH_ALLOCATION',
+        if(cash['montant_affecte']!='0.00') 'REVERSE'];
+    }
+    return receipt['applied_at']!=null?['REVERSE']:['APPLY_ORIGINAL','CORRECTION','CANCEL'];
+  }
   Map<String,dynamic>? sale;
   List<Map<String,dynamic>> sales=[];
   int salesPage=1;bool moreSales=false,busy=false;
@@ -281,9 +291,12 @@ class _DecisionDialogState extends State<_DecisionDialog> {
   Widget build(BuildContext context)=>AlertDialog(title:const Text('Décision de rapprochement'),
     content:SizedBox(width:460,child:SingleChildScrollView(child:Form(key:form,child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('L’auteur et la déclaration d’origine restent conservés. Votre décision sera enregistrée avec son motif.'),
-      if(action!='CASH_ALLOCATION') DropdownButtonFormField<String>(isExpanded:true,initialValue:action,
-        decoration:const InputDecoration(labelText:'Décision'),items:[for(final value in ['APPLY_ORIGINAL','CORRECTION','CANCEL'])DropdownMenuItem(value:value,child:Text(_actions[value]!))],
-        onChanged:busy || pending!=null?null:(value){if(value!=null) {setState(()=>action=value);}}),
+      DropdownButtonFormField<String>(isExpanded:true,initialValue:action,
+        decoration:const InputDecoration(labelText:'Décision'),items:[for(final value in availableActions)DropdownMenuItem(value:value,child:Text(_actions[value]!))],
+        onChanged:busy || pending!=null?null:(value){if(value!=null) {setState(()=>action=value);if(value=='CASH_ALLOCATION' && sales.isEmpty) {loadSales();}}}),
+      if(action=='REVERSE') Text((widget.row['receipt'] as Map)['cash_recognition']!=null?
+        'Les affectations seront annulées. Le paiement et le montant physique reçu restent conservés.':
+        'L’effet appliqué sera compensé. La déclaration et ses écritures d’origine restent dans l’historique.'),
       if(currentTask!=null) Text('État actuel de la tâche : ${{'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée','CANCELLED':'Annulée'}[currentTask!['status']]??'À vérifier'}'),
       if(action=='CORRECTION') for(final entry in editors.entries)if(entry.key=='status')
         DropdownButtonFormField<String>(isExpanded:true,initialValue:entry.value.text,decoration:const InputDecoration(labelText:'État observé de la tâche'),

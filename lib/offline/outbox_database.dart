@@ -34,6 +34,14 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
     await customStatement("UPDATE outbox SET transport_status='RETRY_WAIT',last_error='INTERRUPTED_REQUEST',retry_at=?,updated_at=? WHERE transport_status='IN_FLIGHT'",[now,now]);
   }
 
+  Future<void> createDecisionReceiptColumns() async {
+    final columns=(await customSelect('PRAGMA table_info(outbox)').get()).map((row)=>row.read<String>('name')).toSet();
+    if(!columns.contains('decision_version')) {await customStatement('ALTER TABLE outbox ADD COLUMN decision_version INTEGER NOT NULL DEFAULT 0 CHECK(decision_version>=0)');}
+    if(!columns.contains('decision_action')) {await customStatement("ALTER TABLE outbox ADD COLUMN decision_action TEXT NOT NULL DEFAULT ''");}
+    if(!columns.contains('decision_actor_id')) {await customStatement('ALTER TABLE outbox ADD COLUMN decision_actor_id INTEGER');}
+    if(!columns.contains('receipt_poll_order')) {await customStatement('ALTER TABLE outbox ADD COLUMN receipt_poll_order INTEGER NOT NULL DEFAULT 0');}
+  }
+
   void _rejectPayloadSecrets(dynamic value,[int depth=0]) {
     if(depth>16) throw ArgumentError('Déclaration trop profonde.');
     if(value is Map) {
@@ -121,7 +129,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
   @override
   Future<List<OutboxEntry>> awaitingReceipts({int limit=50}) async {
     if(limit<1 || limit>50) throw ArgumentError('Page invalide.');
-    final rows=await customSelect("SELECT * FROM outbox WHERE transport_status='SERVER_RECEIVED' AND business_status NOT IN ('CONFIRMED','NOT_APPLIED','SUPERSEDED') ORDER BY updated_at,local_sequence LIMIT ?",variables:[Variable(limit)]).get();
+    final rows=await customSelect("SELECT * FROM outbox WHERE transport_status='SERVER_RECEIVED' ORDER BY receipt_poll_order,local_sequence LIMIT ?",variables:[Variable(limit)]).get();
     return rows.map(_entry).toList();
   }
 
@@ -133,6 +141,30 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
       if(id is! String || !operationUuidPattern.hasMatch(id) || receipt['transport_status']!='SERVER_RECEIVED' || !businessStates.contains(receipt['business_status'])) throw StateError('Reçu serveur invalide.');
       final row=await customSelect('SELECT * FROM outbox WHERE operation_id=?',variables:[Variable(id)]).getSingleOrNull();
         if(row==null || row.read<int>('author_user_id')!=receipt['author_user_id']) throw StateError('Reçu hors contexte.');
+      final decisionVersion=receipt['decision_version']??0;
+      final action=receipt['decision_action']??'';
+      final actor=receipt['decision_actor_id'];
+      final priorDecision=row.read<int>('decision_version');
+      const decisions={
+        'APPLY_ORIGINAL':{'CONFIRMED','NEEDS_RECONCILIATION'},
+        'CORRECTION':{'CONFIRMED','NEEDS_RECONCILIATION'},
+        'CASH_ALLOCATION':{'CONFIRMED','NEEDS_RECONCILIATION'},
+        'CANCEL':{'NOT_APPLIED'},
+        'REVERSE':{'SUPERSEDED','NEEDS_RECONCILIATION'},
+      };
+      if(decisionVersion is! int || decisionVersion<0 ||
+        (decisionVersion==0 && (action!='' || actor!=null)) ||
+        (decisionVersion>0 && (actor is! int || actor<1 || !decisions.containsKey(action) ||
+          !decisions[action]!.contains(receipt['business_status'])))) {
+        throw StateError('Décision serveur invalide.');
+      }
+      await customStatement('UPDATE outbox SET receipt_poll_order=(SELECT COALESCE(MAX(receipt_poll_order),0)+1 FROM outbox) WHERE operation_id=?',[id]);
+      if(decisionVersion<priorDecision) {continue;}
+      if(decisionVersion==priorDecision && decisionVersion>0 &&
+        (action!=row.read<String>('decision_action') || actor!=row.readNullable<int>('decision_actor_id') ||
+          receipt['business_status']!=row.read<String>('business_status'))) {
+        throw StateError('Décision serveur contradictoire.');
+      }
         final previousRevision=RegExp(r'^farm:([0-9]+)$').firstMatch(row.read<String>('server_version'));
         final nextRevision=RegExp(r'^farm:([0-9]+)$').firstMatch((receipt['server_version']??'').toString());
         if(previousRevision!=null && nextRevision!=null && BigInt.parse(nextRevision[1]!)<BigInt.parse(previousRevision[1]!)) {continue;}
@@ -143,9 +175,9 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
       final received=DateTime.parse(receipt['received_at'] as String).toUtc();
       final applied=receipt['applied_at']==null?null:DateTime.parse(receipt['applied_at'] as String).toUtc();
       if(receipt['business_status']=='CONFIRMED' && (applied==null || receipt['server_entity_id']==null || receipt['server_entity_id']=='') ) throw StateError('Confirmation métier incomplète.');
-      await customStatement("UPDATE outbox SET transport_status='SERVER_RECEIVED',business_status=?,last_error=?,retry_at=NULL,received_at=?,applied_at=?,server_entity_id=?,server_version=?,updated_at=? WHERE operation_id=?",
+      await customStatement("UPDATE outbox SET transport_status='SERVER_RECEIVED',business_status=?,last_error=?,retry_at=NULL,received_at=?,applied_at=?,server_entity_id=?,server_version=?,decision_version=?,decision_action=?,decision_actor_id=?,updated_at=? WHERE operation_id=?",
         [receipt['business_status'],receipt['reason_code']??'',received.millisecondsSinceEpoch,applied?.millisecondsSinceEpoch,
-          receipt['server_entity_id']??'',receipt['server_version']??'',outboxClock().toUtc().millisecondsSinceEpoch,id]);
+          receipt['server_entity_id']??'',receipt['server_version']??'',decisionVersion,action,actor,outboxClock().toUtc().millisecondsSinceEpoch,id]);
       await applyProjectionReceipt(receipt);
     }
   });
