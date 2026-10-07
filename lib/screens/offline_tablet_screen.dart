@@ -37,6 +37,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
   }
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    tablet.setForeground(state==AppLifecycleState.resumed);
     if(state!=AppLifecycleState.resumed) { tablet.lock(); if(mounted) setState(()=>rows=[]); }
   }
   @override
@@ -155,8 +156,20 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
       Text(tablet.farmId==null?'Cette tablette doit être préparée par le propriétaire.':
         'Exploitation ${tablet.farmId} • données conservées sur cette tablette'),
       const SizedBox(height:16),
-      if(tablet.farmId!=null) OutlinedButton(onPressed:busy?null:()=>_run(tablet.syncOutbox),
-        child:const Text('Transmettre les déclarations')),
+      if(tablet.farmId!=null) ...[
+        Text(tablet.sync?.busy==true?'Synchronisation en cours…':
+          tablet.sync?.networkAvailable==true?'Réseau disponible':tablet.sync?.networkAvailable==false?'Hors ligne':'État du réseau en cours de vérification'),
+        Text(tablet.sync?.summary.lastSuccess==null?'Aucune synchronisation réussie enregistrée':
+          'Dernière synchronisation : ${tablet.sync!.summary.lastSuccess!.toLocal()}'),
+        Text('${tablet.sync?.summary.pending??0} déclarations en attente • ${tablet.sync?.summary.conflicts??0} conflits à rapprocher'),
+        if((tablet.sync?.summary.blocked??0)>0) const Text('Transmission bloquée : intervention du propriétaire nécessaire.'),
+        if(tablet.sync?.error!=null) Text(tablet.sync!.error!),
+        OutlinedButton(onPressed:busy || tablet.sync?.busy==true?null:()=>_run(() async {
+          await tablet.syncOutbox();
+          if(tablet.operators?.session!=null) await _read();
+        }),
+          child:const Text('Synchroniser maintenant')),
+      ],
       if(session==null) ...[
         for(final profile in tablet.profiles) ListTile(leading:const Icon(Icons.person_outline),
           title:Text(profile['display_name'] as String),subtitle:const Text('Ouvrir avec mon PIN'),

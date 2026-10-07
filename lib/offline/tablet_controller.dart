@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'farm_cache.dart';
 import 'foundation_api.dart';
@@ -7,11 +8,19 @@ import 'offline_database.dart';
 import 'outbox.dart';
 import 'outbox_transport.dart';
 import 'terrain_store.dart';
+import 'sync_coordinator.dart';
+import 'package:http/http.dart' as http;
 
 class TabletController extends ChangeNotifier {
-  TabletController({required this.api,required this.secrets});
+  TabletController({required this.api,required this.secrets,this.transportClient,
+    this.automaticSyncEnabled=true,this.networkChanges=androidNetworkChanges});
   final FoundationApi api;
   final OperatorSecretStore secrets;
+  final http.Client Function()? transportClient;
+  final bool automaticSyncEnabled;
+  final Stream<bool?> Function() networkChanges;
+  SyncCoordinator? sync;
+  bool _foreground=true;
   FarmCache? cache;
   LocalOperatorSessions? operators;
   int? farmId,deviceId,generation;
@@ -27,6 +36,7 @@ class TabletController extends ChangeNotifier {
   void dispose() {
     _lockEpoch++;
     operators?.lock();
+    sync?.removeListener(_notify);sync?.dispose();
     transport?.api.close();
     _disposed=true;
     super.dispose();
@@ -52,8 +62,22 @@ class TabletController extends ChangeNotifier {
     if(cache is OutboxStore && (transport==null || transport!.api.deviceId!=device ||
         transport!.api.farmId!=farm || transport!.api.generation!=writeGeneration)) {
       transport?.api.close();
+      sync?.removeListener(_notify);sync?.dispose();
       transport=OutboxTransport(store:cache! as OutboxStore,api:DeviceOutboxApi(
-        baseUrl:api.baseUrl,identity:api.deviceIdentity,deviceId:device,farmId:farm,generation:writeGeneration));
+        baseUrl:api.baseUrl,identity:api.deviceIdentity,deviceId:device,farmId:farm,generation:writeGeneration,
+        client:transportClient?.call()));
+      if(cache is SyncStateStore) {
+        final engine=transport!;
+        sync=SyncCoordinator(store:cache! as SyncStateStore,networkChanges:networkChanges,
+          synchronize:() async {
+            await engine.syncOnce();
+            if(!_disposed) await refreshOutbox();
+            return engine.lastRunContactedServer;
+          });
+        sync!.addListener(_notify);
+        await sync!.refreshSummary();
+        if(automaticSyncEnabled) sync!.setForeground(_foreground);
+      }
     }
     operators=LocalOperatorSessions(store:secrets,namespace:Uri.encodeComponent(api.baseUrl),
       farmId:farm,deviceId:device,generation:writeGeneration);
@@ -62,6 +86,11 @@ class TabletController extends ChangeNotifier {
   }
 
   void lock() {_lockEpoch++;operators?.lock();selectedName=null;outboxRows=[];_notify();}
+
+  void setForeground(bool value) {
+    _foreground=value;
+    if(automaticSyncEnabled) sync?.setForeground(value);
+  }
 
   Future<void> signIn(String username,String password) async {
     lock();
@@ -138,7 +167,7 @@ class TabletController extends ChangeNotifier {
     final current=operators?.session;
     if(current==null || cache is! OutboxStore) {outboxRows=[];return;}
     final rows=await (cache! as OutboxStore).listOutbox(authorId:current.userId);
-    if(_disposed || !identical(current,operators?.session)) throw StateError('Profil verrouillé.');
+    if(_disposed || !identical(current,operators?.session)) return;
     outboxRows=rows;_notify();
   }
 
@@ -157,10 +186,13 @@ class TabletController extends ChangeNotifier {
       outboxRows=[entry,...outboxRows.where((row)=>row.operationId!=entry.operationId)].take(50).toList();
       _notify();
     }
+    await sync?.refreshSummary();
+    if(automaticSyncEnabled && sync!=null) unawaited(sync!.trigger());
     return entry;
   }
 
   Future<void> syncOutbox() async {
+    if(sync!=null) {await sync!.trigger(manual:true);return;}
     final engine=transport;
     if(engine==null) throw StateError('Tablette non préparée.');
     try {await engine.syncOnce();} finally {if(!_disposed) await refreshOutbox();}

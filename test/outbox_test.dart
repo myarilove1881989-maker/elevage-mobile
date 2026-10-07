@@ -167,6 +167,22 @@ void main() {
     await db.customStatement('PRAGMA user_version=5');await db.close();db=open();
     expect((await db.listOutbox()).single.declaration,original.declaration);
     expect((await db.operatorProfiles()).single['display_name'],'Jean');
-    expect((await db.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version'),6);
+    expect((await db.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version'),7);
+  });
+
+  test('shared sync counts all authors and schema six upgrade preserves their originals',() async {
+    final first=await enqueue(),second=await enqueue(grant:paul);
+    await db.acceptReceipts([{'client_operation_id':first.operationId,'transport_status':'SERVER_RECEIVED',
+      'business_status':'NEEDS_RECONCILIATION','author_user_id':2,'received_at':clock.toIso8601String(),
+      'applied_at':null,'server_entity_id':'','server_version':''}]);
+    await db.leasePending();await db.transportFailure([second.operationId],code:'HTTP_403',blocked:true);
+    final before=await db.syncSummary();expect(before.pending,1);expect(before.blocked,1);expect(before.conflicts,1);
+    await db.customStatement('DROP TABLE tablet_sync_state');await db.customStatement('PRAGMA user_version=6');
+    await db.close();db=open();
+    expect((await db.listOutbox()).map((row)=>row.authorId),containsAll([2,3]));
+    final after=await db.syncSummary();expect(after.pending,1);expect(after.blocked,1);expect(after.conflicts,1);
+    await db.recordSyncSuccess(clock);await db.close();db=open();
+    expect((await db.syncSummary()).lastSuccess,clock);
+    expect((await db.listOutbox()).singleWhere((row)=>row.authorId==2).declaration,first.declaration);
   });
 }

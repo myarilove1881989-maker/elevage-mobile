@@ -2,11 +2,33 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'offline_grant.dart';
 import 'outbox.dart';
+import 'sync_coordinator.dart';
 
-mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore {
+mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncStateStore {
   int get outboxFarmId;
   DateTime Function() get outboxClock;
   Future<void> applyProjectionReceipt(Map<String,dynamic> receipt) async {}
+
+  Future<void> createSyncState() async {
+    await customStatement('CREATE TABLE IF NOT EXISTS tablet_sync_state '
+      '(singleton INTEGER PRIMARY KEY CHECK(singleton=1),last_success INTEGER)');
+    await customStatement('INSERT OR IGNORE INTO tablet_sync_state(singleton) VALUES(1)');
+  }
+
+  @override
+  Future<void> recordSyncSuccess(DateTime time)=>customStatement(
+    'UPDATE tablet_sync_state SET last_success=? WHERE singleton=1',[time.toUtc().millisecondsSinceEpoch]);
+
+  @override
+  Future<SyncSummary> syncSummary() async {
+    final row=await customSelect("SELECT COUNT(CASE WHEN transport_status!='SERVER_RECEIVED' THEN 1 END) AS pending,"
+      "COUNT(CASE WHEN business_status='NEEDS_RECONCILIATION' THEN 1 END) AS conflicts,"
+      "COUNT(CASE WHEN transport_status='TRANSPORT_BLOCKED' THEN 1 END) AS blocked FROM outbox").getSingle();
+    final state=await customSelect('SELECT last_success FROM tablet_sync_state WHERE singleton=1').getSingle();
+    final time=state.readNullable<int>('last_success');
+    return SyncSummary(pending:row.read<int>('pending'),conflicts:row.read<int>('conflicts'),
+      blocked:row.read<int>('blocked'),lastSuccess:time==null?null:DateTime.fromMillisecondsSinceEpoch(time,isUtc:true));
+  }
 
   Future<void> createOutboxSchema() async {
     await customStatement('CREATE TABLE local_sequence_counter (singleton INTEGER PRIMARY KEY CHECK(singleton=1),next_sequence INTEGER NOT NULL)');

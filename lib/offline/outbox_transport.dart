@@ -97,6 +97,7 @@ class OutboxTransport {
   final OutboxStore store;
   final DeviceOutboxApi api;
   Future<void>? _running;
+  bool lastRunContactedServer=false;
   Future<void> syncOnce() {
     if(_running!=null) return _running!;
     final task=_sync().whenComplete(()=>_running=null);
@@ -110,12 +111,14 @@ class OutboxTransport {
   }
 
   Future<void> _sync() async {
+    lastRunContactedServer=false;
     final waiting=await store.awaitingReceipts();
     if(waiting.isNotEmpty) {
       final ids=waiting.map((e)=>e.operationId).toList();
       final receipts=await api.status(ids);
       _validateIds(receipts,ids,complete:false);
       await store.acceptReceipts(receipts);
+      lastRunContactedServer=true;
     }
     final entries=await store.leasePending();
     if(entries.isEmpty) return;
@@ -124,6 +127,7 @@ class OutboxTransport {
       final receipts=await api.receive(entries);
       _validateIds(receipts,ids,complete:true);
       await store.acceptReceipts(receipts);
+      lastRunContactedServer=true;
     } on DeviceTransportException catch(error) {
       final expired=error.reasonCode=='DEVICE_CHALLENGE_EXPIRED_OR_USED';
       await store.transportFailure(ids,code:expired?'CHALLENGE_EXPIRED':'HTTP_${error.status}',

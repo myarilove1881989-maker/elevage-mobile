@@ -11,6 +11,8 @@ import 'package:app_elevage/offline/foundation_api.dart';
 import 'package:app_elevage/offline/local_operator_session.dart';
 import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/tablet_controller.dart';
+import 'package:app_elevage/offline/sync_coordinator.dart';
+import 'package:app_elevage/offline/outbox.dart';
 import 'package:app_elevage/screens/offline_tablet_screen.dart';
 import 'package:app_elevage/screens/supervision_screen.dart';
 import 'package:app_elevage/services/supervision_service.dart';
@@ -35,6 +37,7 @@ class DelayedGrantStore implements OperatorSecretStore {
 
 void main() {
   final binding=IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  String? terrainNamespace;
   void stage(String value) {binding.reportData={'journey_complete':false,'stage':value};}
   testWidgets('Android Keystore encrypted shared cache Jean Paul PIN and restart', (tester) async {
     Future<void> tapVisible(Finder target) async {
@@ -54,6 +57,7 @@ void main() {
     ])}\n-----END PUBLIC KEY-----';
     var user=1;
     final namespace='https://android-test-${DateTime.now().microsecondsSinceEpoch}.invalid/api';
+    terrainNamespace=namespace;
     final secrets=DelayedGrantStore();
     MockClient client()=>MockClient((request) async {
       Map<String,dynamic> response;
@@ -95,7 +99,7 @@ void main() {
       return http.Response(jsonEncode(response),200);
     });
     TabletController controller()=>TabletController(api:FoundationApi(baseUrl:namespace,
-      deviceIdentity:native,secrets:secrets,client:client()),secrets:secrets);
+      deviceIdentity:native,secrets:secrets,client:client()),secrets:secrets,automaticSyncEnabled:false);
     var tablet=controller();
     await tester.pumpWidget(const MaterialApp(home:Scaffold(body:Text('Test Android hors ligne'))));
     await tablet.signIn('owner','synthetic-password');
@@ -153,8 +157,7 @@ void main() {
     }
     expect(find.text('Profil ouvert : Jean'),findsOneWidget);
     expect(find.text('Stock confirmé : 10'),findsOneWidget);
-    await tester.tap(find.text('Enregistrer un client'));
-    await tester.pumpAndSettle();
+    await tapVisible(find.text('Enregistrer un client'));
     await tester.enterText(find.byType(TextFormField).first,'Client créé sans réseau');
     await tester.tap(find.text('Enregistrer sur la tablette'));
     await tester.pumpAndSettle();
@@ -340,5 +343,60 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     binding.reportData={...binding.reportData??{},'stage':'COMPLETE','owner_supervision_complete':true};
     debugPrint('NATIVE_OWNER_SUPERVISION_COMPLETE original_author=2 decision_actor=1');
+  },timeout:const Timeout(Duration(minutes:5)));
+
+  testWidgets('Android startup sync transmits Jean and Paul while PIN and JWT sessions remain closed',(tester) async {
+    expect(binding.reportData?['owner_supervision_complete'],isTrue);
+    binding.reportData={...binding.reportData??{},'stage':'SHARED_SYNC_START','shared_sync_complete':false};
+    final namespace=terrainNamespace!;
+    const secrets=AndroidOperatorSecretStore();
+    final native=AndroidDeviceIdentity();
+    final network=StreamController<bool?>.broadcast(sync:true);
+    final server=<String,Map<String,dynamic>>{};int posts=0;
+    MockClient transportClient()=>MockClient((request) async {
+      expect(request.headers.keys.map((key)=>key.toLowerCase()),isNot(contains('authorization')));
+      final data=jsonDecode(request.body) as Map;
+      if(request.url.path.endsWith('/transport-challenge/')) {
+        return http.Response(jsonEncode({'id':'00000000-0000-4000-8000-000000000099','device_id':7,
+          'exploitation_id':1,'device_generation':1,'purpose':data['purpose'],'method':'POST',
+          'path':data['purpose']=='RECEIVE'?'/api/offline/submissions/':'/api/offline/submissions/status/',
+          'signature_contract':'ELEVAGE-DEVICE-TRANSPORT-V1'}),201);
+      }
+      expect(request.headers['X-Elevage-Signature'],isNotEmpty);
+      if(data['operations'] is List) {
+        posts++;
+        for(final value in data['operations'] as List) {
+          final operation=Map<String,dynamic>.from(value as Map);
+          server.putIfAbsent(operation['client_operation_id'] as String,()=>operation);
+        }
+      }
+      final ids=data['operation_ids'] is List?List<String>.from(data['operation_ids'] as List):server.keys.toList();
+      return http.Response(jsonEncode({'receipts':[for(final id in ids) {
+        'client_operation_id':id,'transport_status':'SERVER_RECEIVED','business_status':'UNREVIEWED',
+        'author_user_id':server[id]!['author_user_id'],'received_at':DateTime.now().toUtc().toIso8601String(),
+        'applied_at':null,'server_entity_id':'','server_version':'',
+      }]}),200);
+    });
+    final tablet=TabletController(api:FoundationApi(baseUrl:namespace,deviceIdentity:native,secrets:secrets),
+      secrets:secrets,transportClient:transportClient,networkChanges:()=>network.stream);
+    await tablet.initialize();
+    network.add(true);
+    final manual=tablet.syncOutbox();
+    expect(tablet.api.personal,isNull);expect(tablet.operators!.session,isNull);
+    for(var i=0;i<300 && tablet.sync!.summary.pending>0;i++) {await tester.pump(const Duration(milliseconds:100));}
+    await manual;expect(server,hasLength(7));expect(posts,1);
+    expect(server.values.where((value)=>value['author_user_id']==2),hasLength(6));
+    expect(server.values.where((value)=>value['author_user_id']==3),hasLength(1));
+    expect(tablet.sync!.summary.pending,0);expect(tablet.sync!.summary.lastSuccess,isNotNull);
+    final originals=await (tablet.cache! as OutboxStore).listOutbox();
+    expect(originals.every((entry)=>entry.transportStatus=='SERVER_RECEIVED'),isTrue);
+    expect(tablet.operators!.session,isNull);expect(tablet.api.personal,isNull);
+    // Also exercise the real Android connectivity channel; no HTTP business call uses it here.
+    final nativeState=await androidNetworkChanges().first.timeout(const Duration(seconds:10));
+    expect(nativeState,isA<bool>());
+    tablet.dispose();tablet.api.close();await network.close();
+    await closeAndroidFarmDatabase(farmId:1,server:Uri.parse(namespace));
+    binding.reportData={...binding.reportData??{},'stage':'COMPLETE','shared_sync_complete':true};
+    debugPrint('NATIVE_SHARED_SYNC_COMPLETE jean=6 paul=1 personal_session=closed');
   },timeout:const Timeout(Duration(minutes:5)));
 }
