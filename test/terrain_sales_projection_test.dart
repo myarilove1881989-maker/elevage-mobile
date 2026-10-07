@@ -68,6 +68,14 @@ void main() {
     expect((await db.listOutbox()).single.declaration['payload'],containsPair('montant_recu','50000.00'));
   });
 
+  test('composed egg sale keeps tray and extra quantity with exact total price',() async {
+    await db.replaceConfirmedCache('lots',[lot(20,eggs:100)]);
+    await enqueue('VENTE_OEUFS',{'lot_ref':{'server_id':7},'client_ref':{'server_id':9},
+      'conditionnement':'COMPOSE','nombre_alveoles':2,'oeufs_supplementaires':5,'prix_total':'50.01'});
+    expect((await db.projectedPage('lots')).single['data'],containsPair('projected_egg_stock',35));
+    expect((await db.projectedPage('sales')).single['data'],containsPair('montant_total','50.01'));
+  });
+
   test('cash contradiction secret field and duplicate payment identity roll back the whole receipt',() async {
     final cash=await enqueue('ENCAISSEMENT',{'client_ref':{'server_id':9},'montant_recu':'50000.00','mode':'ESPECES'});
     await expectLater(db.acceptReceipts([receipt(cash,status:'NEEDS_RECONCILIATION')..['cash_recognition']=recognition(remaining:'20000.01')]),throwsStateError);

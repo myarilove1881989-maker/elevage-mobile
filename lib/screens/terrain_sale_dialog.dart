@@ -15,6 +15,7 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
   final lotSearch=TextEditingController(),clientSearch=TextEditingController();
   String kind='VENTE_ANIMAUX',pack='UNITE',mode='ESPECES';
   final size=TextEditingController(text:'30');
+  final extraEggs=TextEditingController(text:'0');
   Map<String,dynamic>? lot,client,sale;
   late List<Map<String,dynamic>> lots=widget.lots,clients=widget.clients;
   List<Map<String,dynamic>> sales=[];
@@ -22,7 +23,17 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
   String? error;
   DateTime occurred=DateTime.now();
   @override
-  void dispose() {for(final controller in [quantity,price,amount,note,size,lotSearch,clientSearch]) {controller.dispose();}super.dispose();}
+  void initState() {super.initState();quantity.addListener(changed);size.addListener(changed);extraEggs.addListener(changed);}
+  void changed() {if(mounted) {setState((){});}}
+  int get saleQuantity {
+    final count=int.tryParse(quantity.text.trim())??0;
+    if(kind=='VENTE_OEUFS' && pack=='COMPOSE') {return count*30+(int.tryParse(extraEggs.text.trim())??0);}
+    final multiplier=kind=='VENTE_OEUFS'?{'UNITE':1,'DOUZAINE':12,'PLATEAU':30}[pack]??int.tryParse(size.text.trim())??0:1;
+    return count*multiplier;
+  }
+  bool get shortage=>kind!='ENCAISSEMENT' && lot!=null && saleQuantity>((lot!['data'] as Map)[kind=='VENTE_OEUFS'?'projected_egg_stock':'projected_stock'] as int? ??0);
+  @override
+  void dispose() {for(final controller in [quantity,price,amount,note,size,extraEggs,lotSearch,clientSearch]) {controller.dispose();}super.dispose();}
   Map<String,dynamic> reference(Map<String,dynamic> row,{bool saleReference=false}) {
     final id=(row['data'] as Map)[saleReference?'reference_id':'id'];
     return id is int?{'server_id':id}:{'local_uuid':row['local_uuid']??id};
@@ -72,11 +83,14 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
       payload['lot_ref']=reference(lot!);
       if(lot!['dependency'] is String) {dependencies.add(lot!['dependency'] as String);}
       final count=int.parse(quantity.text.trim());
+      if(saleQuantity<1 || saleQuantity>2147483647) {setState(()=>error='Vérifiez la quantité totale de cette déclaration.');return;}
       final unitPrice=_fixedDecimal(price.text,2)!;
-      if(_scaledInteger(unitPrice)*BigInt.from(count)>BigInt.parse('999999999999')) {setState(()=>error='Le montant de la vente dépasse la limite.');return;}
+      if(_scaledInteger(unitPrice)*BigInt.from(kind=='VENTE_OEUFS' && pack=='COMPOSE'?1:count)>BigInt.parse('999999999999')) {setState(()=>error='Le montant de la vente dépasse la limite.');return;}
       if(kind=='VENTE_ANIMAUX') {payload.addAll({'quantite':count,'prix_unitaire':unitPrice});}
+      else if(pack=='COMPOSE') {payload.addAll({'conditionnement':pack,'nombre_alveoles':count,'oeufs_supplementaires':int.parse(extraEggs.text.trim()),'prix_total':unitPrice});}
       else {payload.addAll({'conditionnement':pack,'nombre_conditionnements':count,'prix_unitaire_conditionnement':unitPrice,
         if(pack=='CARTON')'oeufs_par_conditionnement':int.parse(size.text.trim())});}
+      if(note.text.trim().isNotEmpty) {payload['note']=note.text.trim();}
     }
     Navigator.pop(context,<String,dynamic>{'entity_type':kind,'payload':payload,'dependencies':dependencies.toList(),'occurred':occurred.toUtc()});
   }
@@ -99,11 +113,20 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
           decoration:const InputDecoration(labelText:'Lot'),items:[for(final row in lots.where((row)=>kind!='VENTE_OEUFS' || (row['data'] as Map)['type_production']=='OEUFS'))DropdownMenuItem(value:row,child:Text((row['data'] as Map)['nom'].toString()))],
           validator:(value)=>value==null?'Choisissez le lot.':null,onChanged:(value)=>setState(()=>lot=value)),
         if(kind=='VENTE_OEUFS') DropdownButtonFormField<String>(initialValue:pack,decoration:const InputDecoration(labelText:'Conditionnement'),
-          items:const [DropdownMenuItem(value:'UNITE',child:Text('Unité')),DropdownMenuItem(value:'DOUZAINE',child:Text('Douzaine')),DropdownMenuItem(value:'PLATEAU',child:Text('Plateau de 30')),DropdownMenuItem(value:'CARTON',child:Text('Carton'))],
+          items:const [DropdownMenuItem(value:'UNITE',child:Text('Unité')),DropdownMenuItem(value:'DOUZAINE',child:Text('Douzaine')),DropdownMenuItem(value:'PLATEAU',child:Text('Plateau de 30')),DropdownMenuItem(value:'CARTON',child:Text('Carton')),DropdownMenuItem(value:'COMPOSE',child:Text('Alvéoles et œufs supplémentaires'))],
           onChanged:(value) {if(value!=null) {setState(()=>pack=value);}}),
         if(kind=='VENTE_OEUFS' && pack=='CARTON') TextFormField(controller:size,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Œufs par carton'),validator:integer),
-        TextFormField(key:const ValueKey('sale-quantity'),controller:quantity,keyboardType:TextInputType.number,decoration:InputDecoration(labelText:kind=='VENTE_OEUFS'?'Nombre de conditionnements':'Animaux vendus'),validator:integer),
-        TextFormField(key:const ValueKey('sale-price'),controller:price,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'Prix unitaire du conditionnement / animal'),validator:decimal),
+        TextFormField(key:const ValueKey('sale-quantity'),controller:quantity,keyboardType:TextInputType.number,
+          decoration:InputDecoration(labelText:kind=='VENTE_OEUFS'?pack=='COMPOSE'?'Alvéoles de 30':'Nombre de conditionnements':'Animaux vendus'),
+          validator:(value)=>kind=='VENTE_OEUFS' && pack=='COMPOSE'?RegExp(r'^[0-9]{1,9}$').hasMatch(value??'')?null:'Nombre d’alvéoles positif ou nul requis.':integer(value)),
+        if(kind=='VENTE_OEUFS' && pack=='COMPOSE') TextFormField(controller:extraEggs,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Œufs supplémentaires (0 à 29)'),
+          validator:(value)=>RegExp(r'^[0-9]{1,2}$').hasMatch(value??'') && (int.tryParse(value??'')??30)<=29?null:'Indiquez de 0 à 29 œufs.'),
+        TextFormField(key:const ValueKey('sale-price'),controller:price,keyboardType:const TextInputType.numberWithOptions(decimal:true),
+          decoration:InputDecoration(labelText:kind=='VENTE_OEUFS' && pack=='COMPOSE'?'Prix total de la vente':'Prix unitaire du conditionnement / animal'),validator:decimal),
+        if(lot!=null) Text('Dernier stock confirmé : ${(lot!['data'] as Map)[kind=='VENTE_OEUFS'?'stock_oeufs':'stock']} • stock projeté : ${(lot!['data'] as Map)[kind=='VENTE_OEUFS'?'projected_egg_stock':'projected_stock']}'),
+        if(shortage) const Text('Alerte : cette vente dépasse le stock projeté. Indiquez le motif ; le serveur devra rapprocher ce constat.',style:TextStyle(color:Colors.red,fontWeight:FontWeight.bold)),
+        TextFormField(key:const ValueKey('sale-note'),controller:note,maxLength:10000,decoration:const InputDecoration(labelText:'Motif / constat'),
+          validator:(value)=>shortage && (value??'').trim().isEmpty?'Indiquez le motif de la survente.':null),
         const Text('Vente enregistrée sur la tablette — confirmation serveur en attente. Une survente restera à rapprocher.'),
       ] else ...[
         DropdownButtonFormField<Map<String,dynamic>>(key:ValueKey('cash-sale-$version'),initialValue:sale,decoration:const InputDecoration(labelText:'Vente visée (facultative)'),

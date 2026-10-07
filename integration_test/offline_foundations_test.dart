@@ -31,8 +31,10 @@ class DelayedGrantStore implements OperatorSecretStore {
 }
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  final binding=IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  void stage(String value) {binding.reportData={'journey_complete':false,'stage':value};}
   testWidgets('Android Keystore encrypted shared cache Jean Paul PIN and restart', (tester) async {
+    stage('START');
     final native=AndroidDeviceIdentity();
     final installation=await native.publicIdentity();
     expect(installation['private_key_exportable'],isFalse);
@@ -110,6 +112,7 @@ void main() {
     await tablet.initialize();
     expect(tablet.operators!.session,isNull);
     expect(tablet.profiles.map((p)=>p['display_name']),containsAll(['Jean','Paul']));
+    stage('ENCRYPTED_QUEUE_REOPENED');
     await tablet.unlockProfile(2,'Jean','123456');
     expect(tablet.outboxRows.single.authorId,2);
     expect(tablet.outboxRows.single.transportStatus,'LOCAL_PENDING');
@@ -152,6 +155,7 @@ void main() {
     expect(tablet.outboxRows,hasLength(2));
     expect(tablet.outboxRows.every((row)=>row.authorId==2),isTrue);
     expect((await tablet.readPage('clients')).map((row)=>(row['data'] as Map)['nom']),contains('Client créé sans réseau'));
+    stage('NATIVE_CLIENT_SAVED');
     await tester.ensureVisible(find.text('Enregistrer une opération terrain'));
     await tester.tap(find.text('Enregistrer une opération terrain'));
     await tester.pumpAndSettle();
@@ -175,8 +179,9 @@ void main() {
     final nativePurchase=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='ACHAT');
     expect(nativePurchase.declaration['payload'],containsPair('prix_total','39.03'));
     expect((await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'],containsPair('projected_stock',3));
+    stage('NATIVE_PURCHASE_SAVED');
     await Scrollable.ensureVisible(tester.element(find.text('Enregistrer une vente ou un encaissement')),
-      alignment:0.5,duration:const Duration(milliseconds:200));
+      alignment:0.5);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
     for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {
@@ -198,8 +203,9 @@ void main() {
     final nativeSale=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='VENTE_ANIMAUX');
     expect(nativeSale.declaration['dependencies'],contains(nativePurchase.operationId));
     expect((await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'],containsPair('projected_stock',2));
+    stage('NATIVE_SALE_SAVED');
     await Scrollable.ensureVisible(tester.element(find.text('Enregistrer une vente ou un encaissement')),
-      alignment:0.5,duration:const Duration(milliseconds:200));
+      alignment:0.5);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
     for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {await tester.pump(const Duration(milliseconds:100));}
@@ -220,11 +226,41 @@ void main() {
     expect(nativeCash.declaration['payload'],containsPair('montant_recu','50.00'));
     expect(nativeCash.declaration['dependencies'],contains(nativeSale.operationId));
     expect(tablet.outboxRows.every((entry)=>entry.authorId==2),isTrue);
+    stage('NATIVE_CASH_SAVED');
+    await Scrollable.ensureVisible(tester.element(find.text('Enregistrer une vente ou un encaissement')),
+      alignment:0.5);
+    await tester.pumpAndSettle();await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {await tester.pump(const Duration(milliseconds:100));}
+    expect(find.text('Vente ou encaissement terrain'),findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tester.pumpAndSettle();await tester.tap(find.text('Client créé sans réseau').last);await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tester.pumpAndSettle();await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
+    await tester.pumpAndSettle();await tester.tap(find.text('Achat natif test').last);await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('sale-quantity')));
+    await tester.enterText(find.byKey(const ValueKey('sale-quantity')),'3');await tester.pumpAndSettle();
+    expect(find.textContaining('Alerte : cette vente dépasse le stock projeté'),findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('sale-price')));
+    await tester.enterText(find.byKey(const ValueKey('sale-price')),'13,01');await tester.pumpAndSettle();
+    await tester.tap(find.text('Conserver sur la tablette'));await tester.pumpAndSettle();
+    expect(find.text('Indiquez le motif de la survente.'),findsOneWidget);expect(tablet.outboxRows,hasLength(5));
+    await tester.ensureVisible(find.byKey(const ValueKey('sale-note')));
+    await tester.enterText(find.byKey(const ValueKey('sale-note')),'Vente effectuée, inventaire à rapprocher.');await tester.pumpAndSettle();
+    await tester.tap(find.text('Conserver sur la tablette'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.outboxRows.length<6;attempt++) {await tester.pump(const Duration(milliseconds:100));}
+    expect(tablet.outboxRows,hasLength(6));
+    expect(tablet.outboxRows.singleWhere((entry)=>(entry.declaration['payload'] as Map)['note']=='Vente effectuée, inventaire à rapprocher.').authorId,2);
+    final oversold=(await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'] as Map;
+    expect(oversold['stock'],0);expect(oversold['projected_stock'],-1);
+    stage('NATIVE_OVERSALE_WITH_REASON_SAVED');
     await tester.tap(find.byTooltip('Verrouiller / changer d’opérateur'));
     await tester.pumpAndSettle();
     expect(find.text('Profil ouvert : Jean'),findsNothing);
     expect(find.text('Jean'),findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await closeAndroidFarmDatabase(farmId:1,server:Uri.parse(namespace));
+    binding.reportData={'journey_complete':true,'stage':'COMPLETE','own_pending_operations':6,
+      'original_author_user_id':2,'oversale_note_preserved':true};
+    debugPrint('NATIVE_JOURNEY_COMPLETE own_operations=6 author=2');
   },timeout:const Timeout(Duration(minutes:5)));
 }

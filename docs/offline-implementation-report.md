@@ -274,3 +274,28 @@ immédiatement d'un clic alors que le bouton venait sous l'AppBar. Le test
 centre le bouton, attend le défilement, puis vérifie l'ouverture du dialogue
 avant de continuer. Les assertions métier et les avertissements de clic
 manqué restent actifs. Relance CI intégrale requise.
+
+### Critères de survente et conditionnements 2F
+
+La relecture du paragraphe 19 a ajouté l'alerte forte et le motif requis
+lorsque la quantité dépasse le stock projeté. Le fait réel reste saisissable ;
+le stock confirmé ne devient pas négatif. Le motif est conservé dans la
+déclaration originale et les mouvements applicables. Le parcours natif
+vérifie la demande du motif puis la conservation de la survente.
+Conditionnement composé existant préservé : alvéoles de 30, supplément
+0–29 et prix total exact. Les dépassements de quantité SQL et de montant
+sont classés à rapprocher avant toute écriture métier, sans boucle de retry.
+18 tests ciblés serveur passent sous SQLite avec 3 skips PG ; nouvelle
+régression complète et CI mobile requises pour ce dernier complément.
+
+La seconde CI `37645579781` passe 167 tests Flutter, analyse et builds,
+mais son job natif nominalement vert est REJETÉ : logs réels "Test timed
+out" et "Some tests failed" malgré la phrase du driver "All tests passed".
+L'animation ensureVisible était attendue avant de pomper les frames du test.
+Le centrage est immédiat, puis pumpAndSettle attend la disposition stable.
+Le délai de cinq minutes n'est pas augmenté. Le driver exige désormais un
+rapport de parcours complet avec six opérations et l'auteur Jean ; le
+script vérifie aussi les logs du PID de l'application isolée et un marqueur
+de fin émis après les assertions et la fermeture du cache. Trois tests
+Python vérifient l'acceptation réelle, le refus du faux succès et le refus
+de preuve manquante. Ce résultat natif ne valide aucune porte 2F.
