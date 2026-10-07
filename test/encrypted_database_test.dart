@@ -26,7 +26,10 @@ void main() {
     expect((await db.cachedPage('clients')).single['data'],{'id':1,'name':'Jean client'});
     await db.close();
     db=open(farm:2);
-    await expectLater(db.cachedPage('clients'),throwsStateError);
+    await expectLater(db.cachedPage('clients'),throwsA(predicate<Object>(
+      (error)=>error.toString().contains('Cette base appartient à une autre exploitation.'),
+      'explicit tenant isolation rejection, including Drift isolate transport',
+    )));
     await db.close();
     db=open(encryptionKey:'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
     await expectLater(db.cachedPage('clients'),throwsA(anything));
