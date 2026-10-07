@@ -107,6 +107,10 @@ void main() {
   });
 
   testWidgets('narrow owner screen requires motive and keeps Jean as original author', (tester) async {
+    Future<void> tapVisible(Finder target) async {
+      await Scrollable.ensureVisible(tester.element(target),alignment:0.5);
+      await tester.pumpAndSettle();await tester.tap(target);await tester.pumpAndSettle();
+    }
     tester.view.physicalSize=const Size(320,568);tester.view.devicePixelRatio=1;
     addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
     bool cancelled=false;Map<String,dynamic>? saved;
@@ -129,10 +133,11 @@ void main() {
     expect(find.text('Auteur original : Jean'),findsOneWidget);
     await tester.ensureVisible(find.text('Prendre une décision avec motif'));
     await tester.tap(find.text('Prendre une décision avec motif'));await tester.pumpAndSettle();
-    await tester.tap(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)));
+    await tapVisible(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)));
     await tester.pumpAndSettle();await tester.tap(find.text('Annuler sans supprimer').last);await tester.pumpAndSettle();
     await tester.tap(find.text('Enregistrer la décision'));await tester.pumpAndSettle();
     expect(find.text('Indiquez le motif de votre décision.'),findsOneWidget);expect(saved,isNull);
+    await tester.ensureVisible(find.byKey(const ValueKey('decision-reason')));
     await tester.enterText(find.byKey(const ValueKey('decision-reason')),'Doublon reçu vérifié avec Jean.');
     await tester.tap(find.text('Enregistrer la décision'));await tester.pumpAndSettle();
     expect(saved!['action'],'CANCEL');expect(saved!['reason'],'Doublon reçu vérifié avec Jean.');
