@@ -175,11 +175,14 @@ void main() {
     final nativePurchase=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='ACHAT');
     expect(nativePurchase.declaration['payload'],containsPair('prix_total','39.03'));
     expect((await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'],containsPair('projected_stock',3));
-    await tester.ensureVisible(find.text('Enregistrer une vente ou un encaissement'));
+    await Scrollable.ensureVisible(tester.element(find.text('Enregistrer une vente ou un encaissement')),
+      alignment:0.5,duration:const Duration(milliseconds:200));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
     for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {
       await tester.pump(const Duration(milliseconds:100));
     }
+    expect(find.text('Vente ou encaissement terrain'),findsOneWidget);
     await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
     await tester.pumpAndSettle();await tester.tap(find.text('Client créé sans réseau').last);await tester.pumpAndSettle();
     await tester.ensureVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).last);
@@ -195,9 +198,12 @@ void main() {
     final nativeSale=tablet.outboxRows.singleWhere((entry)=>entry.declaration['entity_type']=='VENTE_ANIMAUX');
     expect(nativeSale.declaration['dependencies'],contains(nativePurchase.operationId));
     expect((await tablet.readPage('lots')).singleWhere((row)=>(row['data'] as Map)['nom']=='Achat natif test')['data'],containsPair('projected_stock',2));
-    await tester.ensureVisible(find.text('Enregistrer une vente ou un encaissement'));
+    await Scrollable.ensureVisible(tester.element(find.text('Enregistrer une vente ou un encaissement')),
+      alignment:0.5,duration:const Duration(milliseconds:200));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Enregistrer une vente ou un encaissement'));await tester.pumpAndSettle();
     for(var attempt=0;attempt<300 && find.text('Vente ou encaissement terrain').evaluate().isEmpty;attempt++) {await tester.pump(const Duration(milliseconds:100));}
+    expect(find.text('Vente ou encaissement terrain'),findsOneWidget);
     await tester.tap(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)).first);
     await tester.pumpAndSettle();await tester.tap(find.text('Encaissement reçu').last);await tester.pumpAndSettle();
     await tester.tap(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);

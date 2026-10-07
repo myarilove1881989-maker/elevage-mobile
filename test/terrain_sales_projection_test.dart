@@ -32,7 +32,8 @@ void main() {
       'vente_ref':{'local_uuid':sale.declaration['local_entity_id']},'montant_recu':'39.03','mode':'ESPECES'},dependencies:[client.operationId,sale.operationId]);
     await db.close();db=open();
     final entries=await db.listOutbox();expect(entries,hasLength(3));expect(entries.every((entry)=>entry.authorId==2),isTrue);
-    expect(entries.last.operationId,cash.operationId);expect(entries.last.declaration['dependencies'],containsAll([client.operationId,sale.operationId]));
+    final restoredCash=entries.singleWhere((entry)=>entry.operationId==cash.operationId);
+    expect(restoredCash.declaration['dependencies'],containsAll([client.operationId,sale.operationId]));
     expect((await db.projectedPage('sales',search:client.declaration['local_entity_id'] as String)).single['data'],containsPair('montant_total','39.03'));
     expect((await db.projectedPage('lots')).single['data'],containsPair('projected_stock',17));
   });
