@@ -184,7 +184,7 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
         _facts(row!['original_payload'] as Map),
         if(recognized!=null) ...[const Divider(),_facts(recognized)],
         if((receipt['reason_text']?.toString()??'').isNotEmpty) Text('Dernier motif : ${receipt['reason_text']}'),
-        if(!loading && receipt?['business_status']!='SUPERSEDED' && receipt?['business_status']!='NOT_APPLIED' &&
+        if(!loading && receipt['business_status']!='SUPERSEDED' && receipt['business_status']!='NOT_APPLIED' &&
           (!applied || recognized!=null || {'VENTE_ANIMAUX','VENTE_OEUFS','MORTALITE','DON','VOL'}.contains(row!['entity_type'])))
           FilledButton(onPressed:decide,child:const Text('Prendre une décision avec motif')),
         const Divider(),const Text('Historique de cette opération',style:TextStyle(fontWeight:FontWeight.bold)),
