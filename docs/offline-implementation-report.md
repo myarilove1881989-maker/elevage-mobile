@@ -30,6 +30,21 @@ strict, l'analyse, la suite Flutter, la preuve de fichier illisible avec
 SQLite Python standard, le Web release et les APK debug/ARM64 release.
 L'exécution Android API 24 est encore en cours, donc 2C reste non validée.
 
+Le checkpoint `00f4e9de5b5fe6d00cce2dd05c5b4a0baf5c5214` passe 126 tests,
+le lockfile strict, l'analyse (56 infos antérieures, aucune erreur ni
+warning), le Web et les APK. La relance précédente a installé et exécuté
+la fixture native API 24, puis révélé un contrôleur de champ PIN libéré
+avant la fin de la transition de fermeture. Le contrôleur appartient
+désormais à l'état du dialogue et est libéré à son démontage. La suite
+native complète est relancée ; cet échec reste conservé dans les preuves.
+
+Le parcours Flutter Android API 24 passe après cette correction. L'étape
+JUnit suivante révèle un conflit de résolution cohérente : le graphe
+debug reçoit runner 1.3.0 via le plugin Flutter tandis que le test demande
+1.7.0. Les dépendances de test maintenues sont maintenant déclarées aussi
+dans le graphe debug pour aligner les deux configurations, sans modifier
+le graphe release ni désactiver les contrôles de résolution.
+
 Le premier job API 24 a atteint 45 minutes : la compilation de l'APK
 avait réussi en 275,8 secondes, puis son installation est restée bloquée.
 Les assertions Android n'ont donc pas été exécutées. Le même APK s'est

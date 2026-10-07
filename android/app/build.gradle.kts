@@ -45,6 +45,9 @@ android {
 // 🔥 AJOUT OBLIGATOIRE
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Android test runtime must match the debug app's consistently resolved graph.
+    debugImplementation("androidx.test.ext:junit:1.3.0")
+    debugImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
 }
