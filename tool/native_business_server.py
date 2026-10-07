@@ -11,6 +11,7 @@ from pathlib import Path
 import ssl
 import subprocess
 import sys
+import threading
 from datetime import datetime,timedelta,timezone as dt_timezone
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIServer,WSGIRequestHandler,make_server
@@ -41,6 +42,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view,permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 from core.models import (User,Espece,Lot,Task,CollecteOeufs,Client,Achat,Vente,VenteOeufs,
     Payment,Lettrage,EncaissementTerrain,AffectationMouvementOeufs,
     TerrainSubmission,TerrainDecision,AuditEvent,DeviceRegistration)
@@ -62,6 +64,64 @@ def owner_only(request):
 def fixture_state(request):
     owner_only(request)
     return Response({key:value for key,value in STATE.items() if key!='collections'})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def expired_tokens(request):
+    owner_only(request)
+    refresh=RefreshToken.for_user(User.objects.get(pk=STATE['jean']))
+    past=timezone.now()-timedelta(days=14)
+    access=refresh.access_token
+    refresh.set_iat(at_time=past);access.set_iat(at_time=past)
+    refresh.set_exp(from_time=past,lifetime=timedelta(seconds=1))
+    access.set_exp(from_time=past,lifetime=timedelta(seconds=1))
+    return Response({'access':str(access),'refresh':str(refresh)})
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_recovery(request):
+    owner_only(request)
+    disabled=TerrainSubmission.objects.get(client_operation_id=request.data['disabled_id'])
+    recovered=TerrainSubmission.objects.get(client_operation_id=request.data['recovered_id'])
+    assert disabled.author_user_id==STATE['jean'] and disabled.outcome.business_status=='CONFIRMED'
+    member=User.objects.get(pk=STATE['jean']).memberships.get(exploitation_id=STATE['farm'])
+    assert not member.is_active
+    assert Client.objects.get(nom='Client Jean désactivé').created_by_id==STATE['jean']
+    decision=TerrainDecision.objects.get(submission=disabled)
+    assert decision.decision_actor_id==STATE['owner']
+    assert recovered.author_user_id==STATE['paul'] and recovered.outcome.business_status=='NEEDS_RECONCILIATION'
+    assert not Client.objects.filter(nom='Client Paul récupéré').exists()
+    device=DeviceRegistration.objects.get(pk=recovered.device_id)
+    assert device.status=='REVOKED' and not device.is_primary_writer
+    event=AuditEvent.objects.get(action='TERRAIN_RECOVERED',operation_id=recovered.client_operation_id)
+    assert event.actor_user_id==STATE['paul'] and event.decision_actor_id==STATE['owner'] and event.source=='RECOVERY'
+    assert TerrainSubmission.objects.count()==9 and not BEARER_ON_DEVICE
+    result={'verified':True,'disabled_author':STATE['jean'],'decision_actor':STATE['owner'],
+      'recovered_author':STATE['paul'],'revoked':True,'reactivated':False,'recovered_applied':False}
+    (EVIDENCE/'server-recovery-verification.json').write_text(json.dumps(result,indent=2)+'\n')
+    print('REAL_SERVER_RECOVERY_VERIFIED disabled_author=Jean decision=Owner recovered_author=Paul revoked=true',flush=True)
+    return Response(result)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def verify_resilience(request):
+    owner_only(request)
+    assert settings.NATIVE_RESILIENCE
+    ids=request.data['operation_ids']
+    assert len(ids)==2 and len(set(ids))==2
+    rows=list(TerrainSubmission.objects.filter(client_operation_id__in=ids))
+    assert len(rows)==2 and TerrainSubmission.objects.count()==2
+    assert all(r.author_user_id==STATE['jean'] and r.outcome.business_status=='CONFIRMED' for r in rows)
+    assert Client.objects.count()==2
+    assert not Client.objects.filter(nom='Client écriture interrompue').exists()
+    for action in ['TERRAIN_RECEIVED','TERRAIN_APPLIED']:
+        assert AuditEvent.objects.filter(action=action,operation_id__in=ids).count()==2
+    assert not BEARER_ON_DEVICE
+    result={'verified':True,'originals':2,'effects':2,'author':STATE['jean'],
+      'interrupted_write_applied':False,'duplicate_effects':False,'device_bearer':False}
+    (EVIDENCE/'server-resilience-verification.json').write_text(json.dumps(result,indent=2)+'\n')
+    print('REAL_SERVER_RESILIENCE_VERIFIED originals=2 effects=2 duplicate=false',flush=True)
+    return Response(result)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -97,19 +157,23 @@ def verify(request):
     return Response(result)
 
 urlpatterns=[path('api/test-fixture/state/',fixture_state),
+    path('api/test-fixture/expired-tokens/',expired_tokens),
+    path('api/test-fixture/verify-recovery/',verify_recovery),
+    path('api/test-fixture/verify-resilience/',verify_resilience),
     path('api/test-fixture/verify/',verify),path('api/',include('core.urls'))]
 
 def assert_database():
     conf=connection.settings_dict
     assert connection.vendor=='postgresql' and conf['HOST']=='127.0.0.1' and str(conf['PORT'])=='55438'
-    assert conf['NAME']=='elevage_native_i_test' and conf['USER']=='native_i_test'
+    expected='elevage_native_i_resilience_test' if settings.NATIVE_RESILIENCE else 'elevage_native_i_test'
+    assert conf['NAME']==expected and conf['USER']=='native_i_test'
     with connection.cursor() as cursor:
         cursor.execute('SELECT current_database(),inet_server_port(),version()')
         name,port,version=cursor.fetchone()
-        assert name=='elevage_native_i_test' and port==5432 and version.startswith('PostgreSQL 17.')
+        assert name==expected and port==5432 and version.startswith('PostgreSQL 17.')
         cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'")
         assert cursor.fetchone()[0]==0,'Fresh database required; never reset an existing database'
-    print('TEST_DATABASE PostgreSQL17 host=127.0.0.1:55438 database=elevage_native_i_test production=false',flush=True)
+    print(f'TEST_DATABASE PostgreSQL17 host=127.0.0.1:55438 database={expected} production=false',flush=True)
 
 def seed():
     password='SyntheticNativeI-2026-only'
@@ -128,6 +192,7 @@ def seed():
         sync_collection_stock_movement(row);collections.append(row.pk)
     task=Task.objects.create(exploitation=farm,title='Visite native réelle',date=timezone.localdate(),assigned_to=jean,status='IN_PROGRESS')
     STATE.update(owner=owner.pk,farm=farm.pk,jean=jean.pk,paul=paul.pk,species=species.pk,
+      jean_membership=jean.memberships.get(exploitation=farm).pk,
       egg_lot=egglot.pk,egg_sale_at=at.isoformat(),task=task.pk,collections=collections)
     key=ed25519.Ed25519PrivateKey.generate()
     settings.OFFLINE_SIGNING_PRIVATE_KEY=key.private_bytes(serialization.Encoding.PEM,
@@ -170,12 +235,25 @@ def main():
         global BEARER_ON_DEVICE
         if environ['PATH_INFO'] in ['/api/offline/transport-challenge/','/api/offline/submissions/','/api/offline/submissions/status/']:
             BEARER_ON_DEVICE|=bool(environ.get('HTTP_AUTHORIZATION'))
+        if settings.NATIVE_RESILIENCE and environ['PATH_INFO']=='/api/offline/submissions/' and not STATE.get('held_once'):
+            captured=[]
+            response=app(environ,lambda status,headers,exc_info=None:captured.append((status,headers,exc_info)))
+            chunks=list(response)
+            try:
+                assert captured[0][0].startswith('200')
+                assert TerrainSubmission.objects.count()==2
+                STATE['held_once']=True
+                print('REAL_SYNC_CRASH_SERVER_PERSISTED originals=2',flush=True)
+                threading.Event().wait(90)
+                start_response(*captured[0]);return chunks
+            finally:response.close()
         return app(environ,start_response)
-    server=make_server('127.0.0.1',9443,inspected,server_class=ThreadedServer,handler_class=QuietHandler)
+    port=9444 if settings.NATIVE_RESILIENCE else 9443
+    server=make_server('127.0.0.1',port,inspected,server_class=ThreadedServer,handler_class=QuietHandler)
     context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(private/'server.pem',private/'key.pem')
     server.socket=context.wrap_socket(server.socket,server_side=True)
     (private/'ready').write_text('READY\n')
-    print('REAL_NATIVE_TEST_SERVER_READY https://10.0.2.2:9443/api production=false',flush=True)
+    print(f'REAL_NATIVE_TEST_SERVER_READY https://10.0.2.2:{port}/api production=false',flush=True)
     server.serve_forever()
 
 if __name__=='__main__':main()

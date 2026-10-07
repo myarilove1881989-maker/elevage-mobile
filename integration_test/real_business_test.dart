@@ -10,6 +10,7 @@ import 'package:app_elevage/offline/local_operator_session.dart';
 import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/outbox.dart';
 import 'package:app_elevage/offline/tablet_controller.dart';
+import 'grant_diagnostic_client.dart';
 
 void main() {
   final binding=IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -24,9 +25,18 @@ void main() {
     }
     const secrets=AndroidOperatorSecretStore();
     final native=AndroidDeviceIdentity();
-    TabletController controller()=>TabletController(api:FoundationApi(baseUrl:base,
-      deviceIdentity:native,secrets:secrets,client:client()),secrets:secrets,
-      transportClient:client,automaticSyncEnabled:false);
+    TabletController controller() {
+      late FoundationApi api;
+      api=FoundationApi(baseUrl:base,deviceIdentity:native,secrets:secrets,
+        client:GrantDiagnosticClient(client(),expected:() {
+          final person=api.personal!;
+          return {'sub':'${person.userId}','exploitation_id':person.farmId,
+            'device_id':(person.capabilities['primary_device'] as Map)['id'],
+            'write_generation':person.capabilities['write_generation'],
+            'rights_version':(person.capabilities['membership'] as Map)['version']};
+        }));
+      return TabletController(api:api,secrets:secrets,transportClient:client,automaticSyncEnabled:false);
+    }
     void stage(String value) {binding.reportData={'real_business_complete':false,'stage':value};}
     stage('REAL_LOGIN');
     await tester.pumpWidget(const MaterialApp(home:Scaffold(body:Text('Validation métier isolée'))));
@@ -81,6 +91,14 @@ void main() {
     for(final original in originals) {
       expect((await queue.listOutbox()).singleWhere((e)=>e.operationId==original.operationId).declaration,original.declaration);
     }
+    stage('REAL_EXPIRED_PERSONAL_TOKENS');
+    await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
+    final expired=await tablet.api.request('POST','/test-fixture/expired-tokens/');
+    tablet.api.personal=OnlineOperatorIdentity(userId:fixture['jean'] as int,farmId:fixture['farm'] as int,
+      role:'OPERATEUR',capabilities:{},access:expired['access'] as String,refresh:expired['refresh'] as String);
+    await expectLater(tablet.api.request('GET','/cache-page/?collection=clients'),
+      throwsA(isA<FoundationApiException>().having((e)=>e.status,'HTTP status',401)));
+    expect(tablet.api.personal,isNull);expect(await queue.listOutbox(),hasLength(7));
     stage('REAL_DEVICE_SYNC');
     await Future.wait([tablet.syncOutbox(),tablet.syncOutbox()]);
     final rows=await queue.listOutbox();
@@ -97,8 +115,39 @@ void main() {
     expect(verified['fifo'],[2,2]);expect(verified['stock'],17);
     expect(verified['cash_received'],'50000.00');expect(verified['cash_allocated'],'30000.00');
     expect(verified['cash_review'],'20000.00');
+    stage('REAL_DISABLED_ORIGINAL_AUTHOR');
+    await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
+    final disabled=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
+      payload:{'nom':'Client Jean désactivé'},businessOccurredAt:DateTime.now().toUtc());
+    tablet.lock();
+    await tablet.api.request('PATCH','/memberships/${fixture['jean_membership']}/',data:{'is_active':false});
+    await tablet.syncOutbox();
+    final retained=(await queue.listOutbox()).singleWhere((e)=>e.operationId==disabled.operationId);
+    expect(retained.businessStatus,'NEEDS_RECONCILIATION');expect(retained.authorId,fixture['jean']);
+    expect(retained.declaration,disabled.declaration);
+    final decision=await tablet.api.request('POST','/offline/reconciliation/${disabled.operationId}/',data:{
+      'decision_uuid':newOperationUuid(),'expected_decision_version':0,'action':'APPLY_ORIGINAL',
+      'reason':'Vérification explicite des faits originaux de Jean','payload':<String,dynamic>{}});
+    expect((decision['receipt'] as Map)['business_status'],'CONFIRMED');
+    expect((decision['receipt'] as Map)['decision_actor_id'],fixture['owner']);
+    stage('REAL_REVOKED_DEVICE_RECOVERY');
+    await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
+    final recover=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
+      payload:{'nom':'Client Paul récupéré'},businessOccurredAt:DateTime.now().toUtc());
+    tablet.lock();
+    await tablet.api.request('POST','/devices/${tablet.deviceId}/revoke/',data:{'reason':'Révocation explicite pendant validation isolée'});
+    await tablet.syncOutbox();
+    final blocked=(await queue.listOutbox()).singleWhere((e)=>e.operationId==recover.operationId);
+    expect(blocked.transportStatus,isNot('SERVER_RECEIVED'));expect(blocked.declaration,recover.declaration);
+    expect(await tablet.recoverPending('Récupération explicite après révocation'),1);
+    expect(tablet.knownDeviceRevoked,isTrue);
+    await expectLater(tablet.syncOutbox(),throwsStateError);
+    final recovery=await tablet.api.request('POST','/test-fixture/verify-recovery/',
+      data:{'disabled_id':disabled.operationId,'recovered_id':recover.operationId});
+    expect(recovery['verified'],isTrue);expect(recovery['reactivated'],isFalse);expect(recovery['recovered_applied'],isFalse);
     binding.reportData={'real_business_complete':true,'stage':'COMPLETE','originals':7,
-      'jean':6,'paul':1,'server_verified':true,'fifo_verified':true,'cash_verified':true};
+      'jean':6,'paul':1,'server_verified':true,'fifo_verified':true,'cash_verified':true,
+      'expired_tokens_verified':true,'disabled_author_verified':true,'revoked_recovery_verified':true};
     debugPrint('REAL_NATIVE_BUSINESS_COMPLETE originals=7 jean=6 paul=1 server_verified=true');
     tablet.api.close();tablet.dispose();
     await closeAndroidFarmDatabase(farmId:fixture['farm'] as int,server:Uri.parse(base));
