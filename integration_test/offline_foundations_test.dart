@@ -156,10 +156,12 @@ void main() {
       await tester.pump(const Duration(milliseconds:100));
     }
     expect(find.text('Profil ouvert : Jean'),findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Stock confirmé : 10'),200,maxScrolls:20);
+    await tester.scrollUntilVisible(find.text('Stock confirmé : 10'),200,maxScrolls:20,
+      scrollable:find.byType(Scrollable).first);
     await tester.pumpAndSettle();
     expect(find.text('Stock confirmé : 10'),findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Enregistrer un client'),-200,maxScrolls:20);
+    await tester.scrollUntilVisible(find.text('Enregistrer un client'),-200,maxScrolls:20,
+      scrollable:find.byType(Scrollable).first);
     await tapVisible(find.text('Enregistrer un client'));
     await tester.enterText(find.byType(TextFormField).first,'Client créé sans réseau');
     await tester.tap(find.text('Enregistrer sur la tablette'));
@@ -271,7 +273,8 @@ void main() {
     await tester.tap(find.byTooltip('Verrouiller / changer d’opérateur'));
     await tester.pumpAndSettle();
     expect(find.text('Profil ouvert : Jean'),findsNothing);
-    await tester.scrollUntilVisible(find.text('Jean'),-200,maxScrolls:20);
+    await tester.scrollUntilVisible(find.text('Jean'),-200,maxScrolls:20,
+      scrollable:find.byType(Scrollable).first);
     expect(find.text('Jean'),findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
     await closeAndroidFarmDatabase(farmId:1,server:Uri.parse(namespace));
