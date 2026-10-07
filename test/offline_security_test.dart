@@ -78,7 +78,7 @@ void main() {
   test('Jean and Paul retain separate PINs across restart and switching locks', () async {
     final secrets = MemorySecrets();
     final jean = await grantFor(1), paul = await grantFor(2);
-    var sessions = LocalOperatorSessions(store:secrets,namespace:'test',clock:()=>now);
+    var sessions = LocalOperatorSessions(store:secrets,namespace:'test',farmId:1,deviceId:7,generation:2,clock:()=>now);
     await sessions.enroll(jean,'123456');
     await sessions.enroll(paul,'654321');
     expect(secrets.values.values.any((v)=>v.contains('123456') || v.contains('654321')),isFalse);
@@ -86,7 +86,7 @@ void main() {
     expect(sessions.session!.userId,1);
     expect(await sessions.unlock(paul,'123456'),isFalse);
     expect(sessions.session,isNull);
-    sessions = LocalOperatorSessions(store:secrets,namespace:'test',clock:()=>now);
+    sessions = LocalOperatorSessions(store:secrets,namespace:'test',farmId:1,deviceId:7,generation:2,clock:()=>now);
     expect(sessions.session,isNull);
     expect(await sessions.unlock(paul,'654321'),isTrue);
     expect(sessions.session!.userId,2);
@@ -100,15 +100,25 @@ void main() {
     final secrets = MemorySecrets();
     final jean = await grantFor(1);
     var time = now;
-    var sessions = LocalOperatorSessions(store:secrets,namespace:'test',clock:()=>time);
+    var sessions = LocalOperatorSessions(store:secrets,namespace:'test',farmId:1,deviceId:7,generation:2,clock:()=>time);
     await sessions.enroll(jean,'123456');
     for (var i=0;i<5;i++) { expect(await sessions.unlock(jean,'000000'),isFalse); }
-    sessions = LocalOperatorSessions(store:secrets,namespace:'test',clock:()=>time);
+    sessions = LocalOperatorSessions(store:secrets,namespace:'test',farmId:1,deviceId:7,generation:2,clock:()=>time);
     expect(await sessions.unlock(jean,'123456'),isFalse);
     time = now.add(const Duration(seconds:31));
     expect(await sessions.unlock(jean,'123456'),isTrue);
     time = now.add(const Duration(seconds:1));
     expect(await sessions.unlock(jean,'123456'),isFalse);
     expect(sessions.session,isNull);
+  });
+
+  test('valid signed grant cannot open another device or farm local session',() async {
+    final grant=await grantFor(1);
+    for(final context in [(2,7,2),(1,8,2),(1,7,3)]) {
+      final sessions=LocalOperatorSessions(store:MemorySecrets(),namespace:'test',
+        farmId:context.$1,deviceId:context.$2,generation:context.$3,clock:()=>now);
+      await expectLater(sessions.enroll(grant,'123456'),throwsStateError);
+      expect(sessions.session,isNull);
+    }
   });
 }

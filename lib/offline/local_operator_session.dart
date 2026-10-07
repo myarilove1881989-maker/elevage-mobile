@@ -40,19 +40,25 @@ class LocalOperatorSession {
 /// Shared business DB; personal secrets and local lock never replace an HTTP JWT.
 class LocalOperatorSessions {
   LocalOperatorSessions({required this.store, required this.namespace,
+    required this.farmId, required this.deviceId, required this.generation,
     DateTime Function()? clock}) : clock = clock ?? DateTime.now;
   final OperatorSecretStore store;
   final String namespace;
+  final int farmId,deviceId,generation;
   final DateTime Function() clock;
   LocalOperatorSession? _session;
-  LocalOperatorSession? get session => _session;
+  LocalOperatorSession? get session {
+    if(_session!=null && !clock().toUtc().isBefore(_session!.grant.expiresAt)) lock();
+    return _session;
+  }
+  int _lockEpoch=0;
   bool _busy = false;
   static final _kdf = Pbkdf2(macAlgorithm: Hmac.sha256(), iterations: 210000, bits: 256);
 
   String _key(VerifiedOfflineGrant grant) =>
       'operator_pin_${namespace}_${grant.farmId}_${grant.deviceId}_${grant.userId}';
 
-  void lock() { _session = null; }
+  void lock() { _session = null; _lockEpoch++; }
 
   Future<void> enroll(VerifiedOfflineGrant grant, String pin) async {
     if (_busy) throw StateError('Une opération de sécurité est déjà en cours.');
@@ -88,6 +94,7 @@ class LocalOperatorSessions {
   }
 
   Future<bool> _unlock(VerifiedOfflineGrant grant, String pin) async {
+    final epoch=_lockEpoch;
     _validateGrant(grant);
     _validatePin(pin);
     final encoded = await store.read(_key(grant));
@@ -112,6 +119,8 @@ class LocalOperatorSessions {
     record['failures'] = 0;
     record['blocked_until'] = 0;
     await store.write(_key(grant), jsonEncode(record));
+    _validateGrant(grant);
+    if(epoch!=_lockEpoch) return false;
     _session = LocalOperatorSession(grant: grant, openedAt: clock().toUtc());
     return true;
   }
@@ -133,6 +142,9 @@ class LocalOperatorSessions {
       (await _kdf.deriveKey(secretKey: SecretKey(utf8.encode(pin)), nonce: salt)).extractBytes();
 
   void _validateGrant(VerifiedOfflineGrant grant) {
+    if(grant.farmId!=farmId || grant.deviceId!=deviceId || grant.generation!=generation) {
+      throw StateError('Ce profil ne correspond pas à cette tablette et exploitation.');
+    }
     if (!clock().toUtc().isBefore(grant.expiresAt) ||
         clock().toUtc().millisecondsSinceEpoch < (grant.claims['iat'] as int) * 1000) {
       throw StateError('Autorisation expirée : connexion requise.');

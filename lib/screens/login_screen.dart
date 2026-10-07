@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'offline_tablet_screen.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/screens/dashboard_screen.dart';
 import 'package:app_elevage/screens/register_screen.dart';
@@ -102,6 +104,11 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android)
+                    OutlinedButton.icon(icon:const Icon(Icons.tablet_android),
+                      label:const Text('Ouvrir mon profil sur cette tablette'),
+                      onPressed:isLoading?null:()=>Navigator.push(context,
+                        MaterialPageRoute(builder:(_)=>const OfflineTabletScreen()))),
                   Image.asset('assets/images/elevage_logo.png', height: 180),
                   const SizedBox(height: 40),
                   TextField(

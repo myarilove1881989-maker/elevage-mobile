@@ -38,3 +38,43 @@ jobs:
           name: pilote-test-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
+  android-foundations:
+    needs: flutter
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: Enable runner KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 24
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: |
+            flutter test integration_test/offline_foundations_test.dart -d emulator-5554
+            cd android && ./gradlew connectedDebugAndroidTest
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: android-foundations-test-evidence
+          path: |
+            build/app/outputs/androidTest-results/
+            build/app/reports/androidTests/
+            build/app/outputs/apk/debug/
+            build/app/outputs/apk/androidTest/debug/
+          retention-days: 7
