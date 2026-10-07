@@ -45,6 +45,12 @@ debug reçoit runner 1.3.0 via le plugin Flutter tandis que le test demande
 dans le graphe debug pour aligner les deux configurations, sans modifier
 le graphe release ni désactiver les contrôles de résolution.
 
+La compilation instrumentation a ensuite lancé les tâches de tous les
+plugins, dont une suite tierce déclarant minSdk 16. La commande cible
+désormais explicitement les APK et tests de `:app`, avec toutes leurs
+dépendances, pour exécuter notre test Keystore sur API 24. Aucun manifeste
+n'est forcé avec overrideLibrary et aucune assertion n'est supprimée.
+
 Le premier job API 24 a atteint 45 minutes : la compilation de l'APK
 avait réussi en 275,8 secondes, puis son installation est restée bloquée.
 Les assertions Android n'ont donc pas été exécutées. Le même APK s'est
