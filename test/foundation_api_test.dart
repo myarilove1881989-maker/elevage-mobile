@@ -79,4 +79,21 @@ void main() {
     expect(secrets.values.values.single,isNot(contains('synthetic-password')));
     api.close();
   });
+
+  test('expired access and refresh clear only the personal session',() async {
+    final secrets=TestSecretStore();var refreshes=0;
+    final api=FoundationApi(baseUrl:'https://test.invalid/api',deviceIdentity:TestIdentity(),secrets:secrets,
+      client:MockClient((request) async {
+        if(request.url.path.endsWith('/token/')) return http.Response('{"access":"expired-access","refresh":"expired-refresh"}',200);
+        if(request.url.path.endsWith('/capabilities/')) return http.Response('{"user":2,"exploitation":1,"role":"OPERATEUR"}',200);
+        if(request.url.path.endsWith('/refresh/')) refreshes++;
+        return http.Response('{}',401);
+      }));
+    await api.logIn('Jean','synthetic-password');
+    await secrets.write('retained-offline-grant','original-test-grant');
+    await expectLater(api.request('GET','/cache-page/?collection=clients'),throwsA(isA<FoundationApiException>()));
+    expect(refreshes,1);expect(api.personal,isNull);
+    expect(await secrets.read('retained-offline-grant'),'original-test-grant');
+    api.close();
+  });
 }

@@ -61,6 +61,23 @@ void main() {
     await expectLater(enqueue(id:id,payload:{'nom':'Changed'}),throwsStateError);
   });
 
+  for(final elapsed in [const Duration(hours:6),const Duration(hours:24),const Duration(days:4),const Duration(days:7)]) {
+    test('controlled clock offline ${elapsed.inHours}h retains original after encrypted restart',() async {
+      final original=await enqueue();await enqueue(grant:paul);
+      clock=clock.add(elapsed);await db.close();db=open();
+      final rows=await db.listOutbox();expect(rows,hasLength(2));
+      expect(rows.singleWhere((e)=>e.operationId==original.operationId).declaration,original.declaration);
+      expect(rows.map((e)=>e.authorId),containsAll([2,3]));
+      if(elapsed>=const Duration(days:3)) {
+        await expectLater(enqueue(),throwsStateError);
+        expect(await db.listOutbox(),hasLength(2));
+      }
+      final batch=await db.leasePending();expect(batch,hasLength(2));
+      expect(batch.first.declaration,original.declaration);
+      expect((await db.syncSummary()).pending,2);
+    });
+  }
+
   test('outbox and projection rollback together, including sequence, on crash or lock',() async {
     await db.customStatement('CREATE TABLE synthetic_projection(id INTEGER PRIMARY KEY)');
     await expectLater(enqueue(project:() async {

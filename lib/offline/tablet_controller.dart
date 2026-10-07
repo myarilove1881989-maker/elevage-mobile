@@ -86,7 +86,7 @@ class TabletController extends ChangeNotifier {
       }
     }
     operators=LocalOperatorSessions(store:secrets,namespace:Uri.encodeComponent(api.baseUrl),
-      farmId:farm,deviceId:device,generation:writeGeneration);
+      farmId:farm,deviceId:device,generation:writeGeneration,clock:clock);
     profiles=await cache!.operatorProfiles();
     _notify();
   }
