@@ -8,7 +8,7 @@
 - Branche de travail : `feature/offline-phase-2c`.
 - Aucun merge, déploiement ou accès PostgreSQL production.
 
-## Préparation 2C — EN COURS, non validée
+## Phase 2C — VALIDÉE, socle Android
 
 La validation doit utiliser Flutter 3.47.6 / Dart 3.13.5. Le SDK Windows
 installé est 3.41.6 / 3.11.4. Dart ne peut pas canonicaliser les chemins
@@ -80,6 +80,26 @@ Références :
 - https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec
 
 ## Portes de progression
+
+Clôture du socle 2C, 7 octobre 2026 : checkpoint code
+`9e5937846340e09e51c3c287b5de576e0bb02867`, workflow `37613201556`,
+jobs Flutter et Android tous deux réussis. Flutter 3.47.6 / Dart 3.13.5 :
+126 tests, lockfile strict, aucune erreur ni warning d'analyse (56 infos
+initiales conservées), Web release, APK debug et ARM64 release réussis.
+API 24 x86_64 : vrai parcours Jean/Paul, PIN et coffre Android, cache
+chiffré partagé, puis test Keystore réussi dans deux processus.
+Le fichier Android extrait refuse une lecture SQLite Python standard,
+également vérifiée après téléchargement de l'artefact. SHA256 ZIP :
+`1e4412926219d0cd9f04988e9f0c6ab5e6a526cd44272e13092fad39e3d23f40`.
+Le script trouve désormais le cache par son nom synthétique dans l'espace
+de l'application isolée au lieu de supposer un dossier particulier.
+La preuve publique native a aussi activé un appareil de test via Django
+sur PostgreSQL local ; corps altéré et rejeu refusés, régression backend
+183 tests réussie avec deux skips propres à SQLite.
+
+Cette clôture valide le socle 2C, sans valider les phases 2D–2I.
+Le redémarrage complet du parcours terrain avec commandes en attente,
+les conflits métier et le déploiement restent des portes ultérieures.
 
 La première CI a réellement installé Flutter 3.47.6 et résolu le lockfile.
 L'analyse du code initial retourne 56 diagnostics de niveau `info`, sans
