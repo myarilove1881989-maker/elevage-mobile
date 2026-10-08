@@ -10,13 +10,20 @@ val releaseSecrets = listOf("ELEVAGE_KEYSTORE_PATH", "ELEVAGE_KEYSTORE_PASSWORD"
 val releaseRequested = gradle.startParameter.taskNames.any {
     it.contains("release", ignoreCase = true)
 }
-if (releaseRequested) {
+val validateReleaseSigning = {
     require(releaseSecrets.values.all { !it.isNullOrBlank() }) {
         "Release signing requires the four ELEVAGE signing environment variables."
     }
     val keyFile = file(releaseSecrets.getValue("ELEVAGE_KEYSTORE_PATH")!!).canonicalFile
     require(keyFile.isFile && !keyFile.toPath().startsWith(rootProject.projectDir.parentFile.canonicalFile.toPath())) {
         "Release keystore must exist outside the repository."
+    }
+}
+if (releaseRequested) validateReleaseSigning()
+// Also guard aggregate tasks such as "build", whose graph includes release tasks.
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.name.contains("release", ignoreCase = true) }) {
+        validateReleaseSigning()
     }
 }
 
