@@ -18,7 +18,7 @@ from datetime import datetime,timedelta,timezone as dt_timezone
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIServer,WSGIRequestHandler,make_server
 
-PINNED_BACKEND='644fdfd89e9344122626863e54f5dff898196f31'
+PINNED_BACKEND='fd4b7b838b1392c666947aaace0e53c6296409e8'
 ROOT=Path(__file__).resolve().parent.parent
 BACKEND=ROOT/'build'/'native-business-backend'
 EVIDENCE=ROOT/'build'/'native-business-proof'
@@ -280,10 +280,10 @@ def assert_database():
     with connection.cursor() as cursor:
         cursor.execute('SELECT current_database(),inet_server_port(),version()')
         name,port,version=cursor.fetchone()
-        assert name==expected and port==5432 and version.startswith('PostgreSQL 17.')
+        assert name==expected and port==5432 and version.startswith('PostgreSQL 18.4 ')
         cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'")
         assert cursor.fetchone()[0]==0,'Fresh database required; never reset an existing database'
-    print(f'TEST_DATABASE PostgreSQL17 host=127.0.0.1:55438 database={expected} production=false',flush=True)
+    print(f'TEST_DATABASE PostgreSQL18.4 host=127.0.0.1:55438 database={expected} production=false',flush=True)
 
 def seed():
     password='SyntheticNativeI-2026-only'

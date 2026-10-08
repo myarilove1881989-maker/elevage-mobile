@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           repository: myarilove1881989-maker/backend-elevage
-          ref: 644fdfd89e9344122626863e54f5dff898196f31
+          ref: fd4b7b838b1392c666947aaace0e53c6296409e8
           path: build/native-business-backend
           persist-credentials: false
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -100,7 +100,7 @@ jobs:
       - run: flutter test
       - run: dart run tool/encryption_proof.dart
       - run: python3 tool/check_encryption.py
-      - run: flutter build web --release
+      - run: flutter build web --release --dart-define=API_URL=https://phase2k.synthetic.invalid/api
       - run: flutter build apk --debug
       - name: Release must refuse missing permanent signing credentials
         shell: bash
