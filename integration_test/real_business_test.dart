@@ -48,12 +48,20 @@ void main() {
     var tablet=controller();
     await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
     final fixture=await tablet.api.request('GET','/test-fixture/state/');
+    final ownerAgenda=await tablet.api.request('GET','/cache-page/?collection=tasks');
+    expect((ownerAgenda['results'] as List).map((e)=>(e as Map)['id']).toSet(),{fixture['task'],fixture['paul_task']});
+    final ownerLots=await tablet.api.request('GET','/cache-page/?collection=lots');
+    expect((ownerLots['results'] as List).any((e)=>(e as Map)['id']==fixture['foreign_lot']),isFalse);
     await tablet.preparePrimaryTablet();
     expect(tablet.farmId,fixture['farm']);
     await tablet.signIn('native-jean','SyntheticNativeI-2026-only');
     await tablet.prepareOperator('123456');await tablet.refreshCache();
+    final jeanAgenda=await tablet.api.request('GET','/cache-page/?collection=tasks');
+    expect((jeanAgenda['results'] as List).map((e)=>(e as Map)['id']).toList(),[fixture['task']]);
     await tablet.signIn('native-paul','SyntheticNativeI-2026-only');
-    await tablet.prepareOperator('654321');
+    await tablet.prepareOperator('654321');await tablet.refreshCache();
+    final paulAgenda=await tablet.api.request('GET','/cache-page/?collection=tasks');
+    expect((paulAgenda['results'] as List).map((e)=>(e as Map)['id']).toList(),[fixture['paul_task']]);
     tablet.api.personal=null;
     stage('REAL_NETWORK_DISCONNECT');
     debugPrint('REAL_NETWORK_DISCONNECT_READY');
@@ -67,6 +75,7 @@ void main() {
     stage('REAL_OFFLINE_JEAN');
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
     expect(tablet.api.personal,isNull);
+    expect((await tablet.readPage('tasks')).map((e)=>(e['data'] as Map)['id']).toList(),[fixture['task']]);
     final clientJean=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
       payload:{'nom':'Client réel Jean'},businessOccurredAt:controlledNow());
     final purchase=await tablet.declare(entityType:'ACHAT',operationType:'CREATE',
@@ -89,8 +98,11 @@ void main() {
     final task=await tablet.declare(entityType:'TASK',operationType:'UPDATE',
       payload:{'task_id':fixture['task'],'status':'DONE','report':'Compte rendu réel Jean'},
       expectedServerVersion:'1',businessOccurredAt:controlledNow());
+    final projected=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['nom']=='Lot natif acheté')['data'] as Map;
+    expect(projected['stock'],0);expect(projected['projected_stock'],17);
     tablet.lock();
     await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
+    expect((await tablet.readPage('tasks')).map((e)=>(e['data'] as Map)['id']).toList(),[fixture['paul_task']]);
     final clientPaul=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
       payload:{'nom':'Client réel Paul'},businessOccurredAt:controlledNow());
     final originals=[clientJean,purchase,sale,cash,eggs,task,clientPaul];
@@ -166,7 +178,11 @@ void main() {
       payload:{'lot_ref':lotRef,'quantite':1},dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
     final theft=await tablet.declare(entityType:'VOL',operationType:'CREATE',
       payload:{'lot_ref':lotRef,'quantite':1},dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
-    final fieldOperations=[expense,feed,weighing,collection,mortality,birth,donation,theft];
+    final outside=await tablet.declare(entityType:'VOL',operationType:'CREATE',
+      payload:{'lot_ref':{'server_id':fixture['foreign_lot']},'quantite':1},businessOccurredAt:controlledNow());
+    final before=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['nom']=='Lot natif acheté')['data'] as Map;
+    expect(before['stock'],17);expect(before['projected_stock'],13);
+    final fieldOperations=[expense,feed,weighing,collection,mortality,birth,donation,theft,outside];
     tablet.lock();expect(tablet.api.personal,isNull);
     tablet.api.close();tablet.dispose();
     await closeAndroidFarmDatabase(farmId:fixture['farm'] as int,server:Uri.parse(base));
@@ -177,14 +193,19 @@ void main() {
     }
     await tablet.syncOutbox();await tablet.syncOutbox();
     final fieldRows=await fieldQueue.listOutbox();
-    expect(fieldRows,hasLength(15));
+    expect(fieldRows,hasLength(16));
     for(final original in fieldOperations) {
-      expect(fieldRows.singleWhere((e)=>e.operationId==original.operationId).businessStatus,'CONFIRMED');
+      expect(fieldRows.singleWhere((e)=>e.operationId==original.operationId).businessStatus,
+        original.operationId==outside.operationId?'NEEDS_RECONCILIATION':'CONFIRMED');
     }
+    await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
+    final after=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['nom']=='Lot natif acheté')['data'] as Map;
+    expect(after['stock'],13);expect(after['projected_stock'],13);tablet.lock();
     await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
     final fullJourney=await tablet.api.request('POST','/test-fixture/verify-full-journey/',
       data:{'operation_ids':fieldOperations.map((e)=>e.operationId).toList()});
     expect(fullJourney['verified'],isTrue);expect(fullJourney['parent_stock'],13);expect(fullJourney['newborn_stock'],3);
+    expect(fullJourney['foreign_stock'],9);expect(fullJourney['foreign_reference_applied'],isFalse);
     stage('REAL_CONTROLLED_GRANT_EXPIRY');
     tablet.api.personal=null;
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
@@ -262,6 +283,7 @@ void main() {
       'full_field_journey_verified':true,
       'controlled_grant_expiry_verified':true,
       'real_network_disconnect_verified':true,
+      'projected_stock_verified':true,'agenda_scopes_verified':true,'farm_isolation_verified':true,
       'expired_tokens_verified':true,'disabled_author_verified':true,'revoked_recovery_verified':true};
     debugPrint('REAL_NATIVE_BUSINESS_COMPLETE originals=7 jean=6 paul=1 server_verified=true');
     tablet.api.close();tablet.dispose();

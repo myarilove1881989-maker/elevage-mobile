@@ -13,6 +13,7 @@ Future<void> main()=>integrationDriver(timeout:const Duration(minutes:5),writeRe
       data?['write_crash_rollback']!=true || data?['apk_update_preserved']!=true ||
       data?['native_identity_preserved']!=true || data?['backend_unavailable_preserved']!=true ||
       data?['sync_crash_recovered']!=true || data?['lost_response_idempotent']!=true ||
+      data?['mid_sync_network_interrupted']!=true ||
       data?['originals']!=2 || data?['effects']!=2) {
       throw StateError('Native resilience incomplete: ${data?['stage']}');
     }

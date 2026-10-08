@@ -103,9 +103,20 @@ void main() {
       await Future<void>.delayed(const Duration(seconds:12));
       state['phase']='SYNC_INTERRUPTED';await save();
       debugPrint('REAL_SYNC_CRASH_READY pending=2');
-      await tablet.syncOutbox();
+      final transmission=tablet.syncOutbox();
+      // The host waits for the actual server commit, then blocks this test destination.
+      await Future<void>.delayed(const Duration(seconds:5));
+      final probe=client();
+      try {
+        await expectLater(probe.get(Uri.parse('$base/test-fixture/state/')).timeout(const Duration(seconds:3)),
+          throwsA(isA<TimeoutException>()));
+      } finally {probe.close();}
+      state['mid_sync_network_interrupted']=true;await save();
+      debugPrint('REAL_MID_SYNC_PACKET_INTERRUPTION_CONFIRMED originals=2');
+      await transmission;
       throw StateError('Host did not interrupt after actual server persistence');
     } else if(state['phase']=='SYNC_INTERRUPTED') {
+      expect(state['mid_sync_network_interrupted'],isTrue);
       expect(rows,hasLength(2));
       expect(rows.every((e)=>e.transportStatus=='RETRY_WAIT' && e.lastError=='INTERRUPTED_REQUEST'),isTrue);
       expect(await digest(rows.singleWhere((e)=>e.operationId==state['second_id'])),state['second_digest']);
@@ -120,6 +131,7 @@ void main() {
       binding.reportData={'stage':'COMPLETE','resilience_complete':true,'write_crash_rollback':true,
         'apk_update_preserved':true,'native_identity_preserved':true,'backend_unavailable_preserved':true,
         'sync_crash_recovered':true,'lost_response_idempotent':true,'originals':2,'effects':2};
+      binding.reportData!['mid_sync_network_interrupted']=true;
       debugPrint('REAL_NATIVE_RESILIENCE_COMPLETE originals=2 effects=2 crash_write=true update=true crash_sync=true');
     } else {throw StateError('Unexpected resilience phase');}
     api.close();tablet.dispose();

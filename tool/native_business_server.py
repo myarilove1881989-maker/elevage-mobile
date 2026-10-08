@@ -132,7 +132,7 @@ def verify_recovery(request):
     assert device.status=='REVOKED' and not device.is_primary_writer
     event=AuditEvent.objects.get(action='TERRAIN_RECOVERED',operation_id=recovered.client_operation_id)
     assert event.actor_user_id==STATE['paul'] and event.decision_actor_id==STATE['owner'] and event.source=='RECOVERY'
-    assert TerrainSubmission.objects.count()==19 and not BEARER_ON_DEVICE
+    assert TerrainSubmission.objects.count()==20 and not BEARER_ON_DEVICE
     result={'verified':True,'disabled_author':STATE['jean'],'decision_actor':STATE['owner'],
       'recovered_author':STATE['paul'],'revoked':True,'reactivated':False,'recovered_applied':False}
     (EVIDENCE/'server-recovery-verification.json').write_text(json.dumps(result,indent=2)+'\n')
@@ -167,11 +167,14 @@ def verify_resilience(request):
 def verify_full_journey(request):
     owner_only(request)
     ids=request.data['operation_ids']
-    assert len(ids)==8 and len(set(ids))==8
+    assert len(ids)==9 and len(set(ids))==9
     rows=list(TerrainSubmission.objects.filter(client_operation_id__in=ids).order_by('local_sequence'))
-    assert len(rows)==8 and TerrainSubmission.objects.count()==15
-    assert [row.author_user_id for row in rows]==[STATE['jean']]*4+[STATE['paul']]*4
-    assert all(row.outcome.business_status=='CONFIRMED' for row in rows)
+    assert len(rows)==9 and TerrainSubmission.objects.count()==16
+    assert [row.author_user_id for row in rows]==[STATE['jean']]*4+[STATE['paul']]*5
+    assert all(row.outcome.business_status=='CONFIRMED' for row in rows[:8])
+    assert rows[8].outcome.business_status=='NEEDS_RECONCILIATION'
+    assert rows[8].outcome.reason_code=='REFERENCE_OUTSIDE_FARM'
+    assert Lot.objects.get(pk=STATE['foreign_lot']).stock==9
     expense=Depense.objects.get()
     feed=ConsommationAliment.objects.get()
     weighing=PeseeProduction.objects.get()
@@ -187,13 +190,13 @@ def verify_full_journey(request):
     for kind,quantity in [('MORTALITE',2),('DON',1),('VOL',1)]:
         movement=Mouvement.objects.get(type_mouvement=kind)
         assert movement.lot_id==parent.pk and movement.quantite==quantity and movement.created_by_id==STATE['paul']
-    for action in ['TERRAIN_RECEIVED','TERRAIN_APPLIED']:
-        assert AuditEvent.objects.filter(action=action,operation_id__in=ids).count()==8
+    assert AuditEvent.objects.filter(action='TERRAIN_RECEIVED',operation_id__in=ids).count()==9
+    assert AuditEvent.objects.filter(action='TERRAIN_APPLIED',operation_id__in=ids).count()==8
     assert not BEARER_ON_DEVICE
-    result={'verified':True,'operations':8,'parent_stock':13,'newborn_stock':3,'collection_available':8,
-      'jean':4,'paul':4,'duplicates':False}
+    result={'verified':True,'operations':9,'parent_stock':13,'newborn_stock':3,'collection_available':8,
+      'jean':4,'paul':5,'duplicates':False,'foreign_stock':9,'foreign_reference_applied':False}
     (EVIDENCE/'server-full-journey-verification.json').write_text(json.dumps(result,indent=2)+'\n')
-    print('REAL_SERVER_FULL_JOURNEY_VERIFIED operations=8 parent_stock=13 newborn_stock=3 authors=Jean+Paul',flush=True)
+    print('REAL_SERVER_FULL_JOURNEY_VERIFIED operations=9 parent_stock=13 newborn_stock=3 isolation=true authors=Jean+Paul',flush=True)
     return Response(result)
 
 @api_view(['POST'])
@@ -205,7 +208,7 @@ def verify_expired_grants(request):
     ids=request.data['operation_ids']
     assert len(ids)==2 and len(set(ids))==2
     rows=list(TerrainSubmission.objects.filter(client_operation_id__in=ids).order_by('local_sequence'))
-    assert len(rows)==2 and TerrainSubmission.objects.count()==17
+    assert len(rows)==2 and TerrainSubmission.objects.count()==18
     assert [row.author_user_id for row in rows]==[STATE['jean'],STATE['paul']]
     for row in rows:
         assert row.outcome.business_status=='CONFIRMED'
@@ -297,9 +300,16 @@ def seed():
           collecte_at=at+timedelta(minutes=offset),nombre_collecte=count,created_by=jean)
         sync_collection_stock_movement(row);collections.append(row.pk)
     task=Task.objects.create(exploitation=farm,title='Visite native réelle',date=timezone.localdate(),assigned_to=jean,status='IN_PROGRESS')
+    paul_task=Task.objects.create(exploitation=farm,title='Visite personnelle Paul',date=timezone.localdate(),assigned_to=paul)
+    foreign_owner=User.objects.create_user(username='native-foreign-owner',password=password)
+    foreign_species=Espece.objects.create(exploitation=foreign_owner.exploitation,nom='Espèce hors exploitation')
+    foreign_lot=Lot.objects.create(exploitation=foreign_owner.exploitation,espece=foreign_species,
+      nom='Lot hors exploitation',date_debut=timezone.localdate())
+    Mouvement.objects.create(exploitation=foreign_owner.exploitation,lot=foreign_lot,type_mouvement='ACHAT',quantite=9)
     STATE.update(owner=owner.pk,farm=farm.pk,jean=jean.pk,paul=paul.pk,species=species.pk,
       jean_membership=jean.memberships.get(exploitation=farm).pk,category=category.pk,
-      egg_lot=egglot.pk,egg_sale_at=at.isoformat(),task=task.pk,collections=collections)
+      egg_lot=egglot.pk,egg_sale_at=at.isoformat(),task=task.pk,paul_task=paul_task.pk,
+      foreign_lot=foreign_lot.pk,collections=collections)
     key=ed25519.Ed25519PrivateKey.generate()
     settings.OFFLINE_SIGNING_PRIVATE_KEY=key.private_bytes(serialization.Encoding.PEM,
       serialization.PrivateFormat.PKCS8,serialization.NoEncryption()).decode()

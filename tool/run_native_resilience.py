@@ -56,9 +56,9 @@ def signer(apk):
     candidates=sorted((Path(os.environ['ANDROID_HOME'])/'build-tools').glob('*/apksigner'))
     assert candidates,'Android SDK signer verifier missing'
     output=run([str(candidates[-1]),'verify','--print-certs',str(apk)])
-    # Recent build-tools include SDK ranges in the Signer prefix.
+    # Build-tools report either SDK-range Signer entries or scheme-specific V2/V3 Signer entries.
     digests={value.lower() for value in re.findall(
-      r'^Signer[^\n]*certificate SHA-256 digest: ([0-9a-fA-F]{64})\s*$',output,re.MULTILINE)}
+      r'^(?:Signer[^\n]*|V[1-4](?:\.[0-9]+)? Signer: )certificate SHA-256 digest: ([0-9a-fA-F]{64})\s*$',output,re.MULTILINE)}
     if len(digests)!=1:
         public_lines=[line for line in output.splitlines() if 'certificate SHA-256 digest:' in line]
         print('APK_PUBLIC_SIGNER_DIAGNOSTIC '+json.dumps(public_lines),flush=True)
@@ -73,12 +73,18 @@ def installed_version():
 def main():
     assert os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('NATIVE_RESILIENCE')=='1'
     assert run(ADB+['shell','getprop','ro.build.version.sdk']).strip()=='24'
+    run(ADB+['root']);run(ADB+['wait-for-device'],timeout=30)
+    assert run(ADB+['shell','id','-u']).strip()=='0','Disposable emulator root required for packet interruption'
+    packet_rule=['OUTPUT','-d','10.0.2.2/32','-p','tcp','--dport','9444','-j','DROP']
+    def firewall(action):return run(ADB+['shell','iptables','-w',action,*packet_rule],timeout=30)
+    assert subprocess.run(ADB+['shell','iptables','-w','-C',*packet_rule],capture_output=True,timeout=30).returncode==1
     assert not (PRIVATE/'ready').exists(),'Fresh CI fixture required'
     PROOF.mkdir(parents=True,exist_ok=True)
     with (PROOF/'server.log').open('w',encoding='utf-8') as server_log:
         server=subprocess.Popen([sys.executable,'tool/native_business_server.py'],cwd=ROOT,
           stdout=server_log,stderr=subprocess.STDOUT)
         current_port=None
+        network_blocked=False
         try:
             deadline=time.monotonic()+90
             while not (PRIVATE/'ready').exists():
@@ -118,8 +124,14 @@ def main():
                 no_failure(application_logs(pid))
                 assert time.monotonic()<deadline,'Server never persisted both original UUIDs'
                 time.sleep(0.5)
+            firewall('-I');network_blocked=True
+            wait_marker(pid,'REAL_MID_SYNC_PACKET_INTERRUPTION_CONFIRMED originals=2',timeout=20)
             (PROOF/'sync-crash-before-stop.log').write_text(application_logs(pid),encoding='utf-8')
             stop(current_port);current_port=None
+            firewall('-D');network_blocked=False
+            (PROOF/'mid-sync-network-interruption.json').write_text(json.dumps({'destination':'10.0.2.2:9444',
+              'committed_originals':2,'client_request_in_flight':True,'independent_probe_timeout':True,
+              'own_process_stopped_after_packet_cut':True,'exact_rule_removed':True,'production':False},indent=2)+'\n')
             pid,current_port,endpoint=launch();drive(endpoint)
             log=wait_marker(pid,'REAL_NATIVE_RESILIENCE_COMPLETE originals=2 effects=2 crash_write=true update=true crash_sync=true')
             (PROOF/'resilience-complete.log').write_text(log,encoding='utf-8')
@@ -127,6 +139,7 @@ def main():
             print('REAL_NATIVE_RESILIENCE_GATE_PASSED',flush=True)
         finally:
             try:
+                if network_blocked:firewall('-D')
                 if current_port:stop(current_port)
             finally:
                 if server.poll() is None:
