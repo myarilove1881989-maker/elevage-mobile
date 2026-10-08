@@ -1,3 +1,5 @@
+import java.security.KeyStore
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -17,6 +19,16 @@ val validateReleaseSigning = {
     val keyFile = file(releaseSecrets.getValue("ELEVAGE_KEYSTORE_PATH")!!).canonicalFile
     require(keyFile.isFile && !keyFile.toPath().startsWith(rootProject.projectDir.parentFile.canonicalFile.toPath())) {
         "Release keystore must exist outside the repository."
+    }
+    try {
+        val store = KeyStore.getInstance(keyFile, releaseSecrets.getValue("ELEVAGE_KEYSTORE_PASSWORD")!!.toCharArray())
+        val alias = releaseSecrets.getValue("ELEVAGE_KEY_ALIAS")!!
+        require(store.isKeyEntry(alias))
+        require(store.getKey(alias, releaseSecrets.getValue("ELEVAGE_KEY_PASSWORD")!!.toCharArray()) is java.security.PrivateKey)
+        (store.getCertificate(alias) as java.security.cert.X509Certificate).checkValidity()
+    } catch (error: Exception) {
+        // Never include provider exception text, which can contain secret inputs.
+        throw GradleException("Release signing credentials are invalid or the certificate has expired.")
     }
 }
 if (releaseRequested) validateReleaseSigning()
