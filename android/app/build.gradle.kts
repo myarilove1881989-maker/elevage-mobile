@@ -1,11 +1,46 @@
+import java.security.KeyStore
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Provisioned by the custodian outside the repository; never fall back to debug.
+val releaseSecrets = listOf("ELEVAGE_KEYSTORE_PATH", "ELEVAGE_KEYSTORE_PASSWORD",
+    "ELEVAGE_KEY_ALIAS", "ELEVAGE_KEY_PASSWORD").associateWith { System.getenv(it) }
+val releaseRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+val validateReleaseSigning = {
+    require(releaseSecrets.values.all { !it.isNullOrBlank() }) {
+        "Release signing requires the four ELEVAGE signing environment variables."
+    }
+    val keyFile = file(releaseSecrets.getValue("ELEVAGE_KEYSTORE_PATH")!!).canonicalFile
+    require(keyFile.isFile && !keyFile.toPath().startsWith(rootProject.projectDir.parentFile.canonicalFile.toPath())) {
+        "Release keystore must exist outside the repository."
+    }
+    try {
+        val store = KeyStore.getInstance(keyFile, releaseSecrets.getValue("ELEVAGE_KEYSTORE_PASSWORD")!!.toCharArray())
+        val alias = releaseSecrets.getValue("ELEVAGE_KEY_ALIAS")!!
+        require(store.isKeyEntry(alias))
+        require(store.getKey(alias, releaseSecrets.getValue("ELEVAGE_KEY_PASSWORD")!!.toCharArray()) is java.security.PrivateKey)
+        (store.getCertificate(alias) as java.security.cert.X509Certificate).checkValidity()
+    } catch (error: Exception) {
+        // Never include provider exception text, which can contain secret inputs.
+        throw GradleException("Release signing credentials are invalid or the certificate has expired.")
+    }
+}
+if (releaseRequested) validateReleaseSigning()
+// Also guard aggregate tasks such as "build", whose graph includes release tasks.
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.name.contains("release", ignoreCase = true) }) {
+        validateReleaseSigning()
+    }
+}
+
 android {
-    namespace = "com.example.elevage_mobile"
+    namespace = "com.elevage.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,16 +57,31 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.elevage_mobile"
-        minSdk = flutter.minSdkVersion
+        applicationId = "com.elevage.app"
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseSecrets.values.all { !it.isNullOrBlank() }) {
+            create("permanentRelease") {
+                storeFile = file(releaseSecrets.getValue("ELEVAGE_KEYSTORE_PATH")!!)
+                storePassword = releaseSecrets.getValue("ELEVAGE_KEYSTORE_PASSWORD")
+                keyAlias = releaseSecrets.getValue("ELEVAGE_KEY_ALIAS")
+                keyPassword = releaseSecrets.getValue("ELEVAGE_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
+        debug {
+            // Isolated installation for emulator validation, separate from customer app data.
+            applicationIdSuffix = ".offlinevalidation"
+        }
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("permanentRelease")
         }
     }
 }
@@ -39,6 +89,11 @@ android {
 // 🔥 AJOUT OBLIGATOIRE
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Android test runtime must match the debug app's consistently resolved graph.
+    debugImplementation("androidx.test.ext:junit:1.3.0")
+    debugImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
 }
 
 flutter {

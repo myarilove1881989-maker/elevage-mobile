@@ -7,10 +7,7 @@ import '../theme/terre_et_or_theme.dart';
 class AddDepenseScreen extends StatefulWidget {
   final ApiService apiService;
 
-  const AddDepenseScreen({
-    super.key,
-    required this.apiService,
-  });
+  const AddDepenseScreen({super.key, required this.apiService});
 
   @override
   State<AddDepenseScreen> createState() => _AddDepenseScreenState();
@@ -39,10 +36,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
 
   // ================= INIT =================
   Future<void> initData() async {
-    await Future.wait([
-      fetchLots(),
-      fetchCategories(),
-    ]);
+    await Future.wait([fetchLots(), fetchCategories()]);
 
     if (!mounted) return;
 
@@ -56,8 +50,9 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     try {
       final result = await widget.apiService.getLots();
       lots = result;
-    } catch (e) {
-      debugPrint("❌ Erreur chargement lots");
+    } catch (_) {
+      if (!mounted) return;
+      showMessage(context.tr('server_unreachable'));
     }
   }
 
@@ -66,16 +61,15 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     try {
       final result = await widget.apiService.getCategoriesDepense();
       categories = result;
-    } catch (e) {
-      debugPrint("❌ ERREUR CATEGORIES: $e");
+    } catch (_) {
+      if (!mounted) return;
+      showMessage(context.tr('server_unreachable'));
     }
   }
 
   // ================= MESSAGE =================
   void showMessage(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   // ================= DATE =================
@@ -148,17 +142,13 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
   @override
   Widget build(BuildContext context) {
     if (isInitLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Theme(
       data: terreEtOrTheme(context),
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(context.tr('add_expense')),
-        ),
+        appBar: AppBar(title: Text(context.tr('add_expense'))),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: SingleChildScrollView(
@@ -176,6 +166,9 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                     children: [
                       // ================= LOT =================
                       DropdownButtonFormField<int>(
+
+                        isExpanded: true,
+
                         value: selectedLotId,
                         hint: Text(context.tr('choose_batch')),
                         items: lots.map<DropdownMenuItem<int>>((lot) {
@@ -197,6 +190,9 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
 
                       // ================= CATEGORIE =================
                       DropdownButtonFormField<int>(
+
+                        isExpanded: true,
+
                         value: selectedCategorieId,
                         hint: Text(context.tr('choose_category')),
                         items: categories.map<DropdownMenuItem<int>>((c) {

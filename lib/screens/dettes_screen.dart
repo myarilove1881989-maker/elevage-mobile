@@ -38,24 +38,28 @@ class _DettesScreenState extends State<DettesScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Erreur de chargement des soldes clients')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur de chargement des soldes clients'),
+        ),
+      );
     }
   }
 
   List<DetteClient> get filtered => clients.where((c) {
-        final status = selectedFilter == 'ALL' || c.statut == selectedFilter;
-        final q = searchQuery.toLowerCase();
-        final match = q.isEmpty ||
-            c.nom.toLowerCase().contains(q) ||
-            (c.telephone ?? '').toLowerCase().contains(q);
-        return status && match;
-      }).toList();
+    final status = selectedFilter == 'ALL' || c.statut == selectedFilter;
+    final q = searchQuery.toLowerCase();
+    final match =
+        q.isEmpty ||
+        c.nom.toLowerCase().contains(q) ||
+        (c.telephone ?? '').toLowerCase().contains(q);
+    return status && match;
+  }).toList();
   Color color(String status) => status == 'PAYE'
       ? TerreEtOrColors.green
       : status == 'PARTIEL'
-          ? TerreEtOrColors.gold
-          : const Color(0xFFD85B4B);
+      ? TerreEtOrColors.gold
+      : const Color(0xFFD85B4B);
   String money(double value) =>
       AppSettings.instance.formatMoney(value, decimals: 0);
   String label(String filter) {
@@ -72,78 +76,87 @@ class _DettesScreenState extends State<DettesScreen> {
     final paid = clients.fold<double>(0, (s, c) => s + c.totalPaye);
     final due = clients.fold<double>(0, (s, c) => s + c.reste);
     return Scaffold(
-        appBar: AppBar(title: Text(context.tr('customer_debts'))),
-        body: isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: loadData,
-                child: LayoutBuilder(
-                    builder: (context, constraints) => ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.all(16),
-                            children: [
-                              GridView.count(
-                                  crossAxisCount: constraints.maxWidth >= 760
-                                      ? 3
-                                      : constraints.maxWidth >= 480
-                                          ? 3
-                                          : 1,
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  mainAxisSpacing: 10,
-                                  crossAxisSpacing: 10,
-                                  childAspectRatio:
-                                      constraints.maxWidth < 480 ? 3.0 : 1.45,
-                                  children: [
-                                    DetailMetricCard(
-                                        label: 'Total facturé',
-                                        value: money(billed),
-                                        icon: Icons.receipt_long_outlined,
-                                        color: const Color(0xFF3D7FA1)),
-                                    DetailMetricCard(
-                                        label: 'Total payé',
-                                        value: money(paid),
-                                        icon: Icons.check_circle_outline,
-                                        color: TerreEtOrColors.green),
-                                    DetailMetricCard(
-                                        label: 'Solde à recevoir',
-                                        value: money(due),
-                                        icon: Icons
-                                            .account_balance_wallet_outlined,
-                                        color: due > 0
-                                            ? const Color(0xFFD85B4B)
-                                            : TerreEtOrColors.green),
-                                  ]),
-                              const SizedBox(height: 14),
-                              TextField(
-                                  decoration: InputDecoration(
-                                      hintText: context.tr('search_name_phone'),
-                                      prefixIcon: const Icon(Icons.search)),
-                                  onChanged: (v) =>
-                                      setState(() => searchQuery = v)),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: ['ALL', 'PAYE', 'PARTIEL', 'IMPAYE']
-                                      .map((f) => ChoiceChip(
-                                          label: Text(label(f)),
-                                          selected: selectedFilter == f,
-                                          selectedColor:
-                                              TerreEtOrColors.paleGold,
-                                          onSelected: (_) => setState(
-                                              () => selectedFilter = f)))
-                                      .toList()),
-                              const SizedBox(height: 14),
-                              if (list.isEmpty)
-                                const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 70),
-                                    child: Center(
-                                        child:
-                                            Text('Aucun solde client trouvé')))
-                              else
-                                ...list.map((c) => _clientCard(c)),
-                            ]))));
+      appBar: AppBar(title: Text(context.tr('customer_debts'))),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: loadData,
+              child: LayoutBuilder(
+                builder: (context, constraints) => ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    GridView.count(
+                      crossAxisCount: constraints.maxWidth >= 760
+                          ? 3
+                          : constraints.maxWidth >= 480
+                          ? 3
+                          : 1,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: constraints.maxWidth < 480 ? 3.0 : 1.45,
+                      children: [
+                        DetailMetricCard(
+                          label: 'Total facturé',
+                          value: money(billed),
+                          icon: Icons.receipt_long_outlined,
+                          color: const Color(0xFF3D7FA1),
+                        ),
+                        DetailMetricCard(
+                          label: 'Total payé',
+                          value: money(paid),
+                          icon: Icons.check_circle_outline,
+                          color: TerreEtOrColors.green,
+                        ),
+                        DetailMetricCard(
+                          label: 'Solde à recevoir',
+                          value: money(due),
+                          icon: Icons.account_balance_wallet_outlined,
+                          color: due > 0
+                              ? const Color(0xFFD85B4B)
+                              : TerreEtOrColors.green,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: context.tr('search_name_phone'),
+                        prefixIcon: const Icon(Icons.search),
+                      ),
+                      onChanged: (v) => setState(() => searchQuery = v),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: ['ALL', 'PAYE', 'PARTIEL', 'IMPAYE']
+                          .map(
+                            (f) => ChoiceChip(
+                              label: Text(label(f)),
+                              selected: selectedFilter == f,
+                              selectedColor: TerreEtOrColors.paleGold,
+                              onSelected: (_) =>
+                                  setState(() => selectedFilter = f),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    if (list.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 70),
+                        child: Center(child: Text('Aucun solde client trouvé')),
+                      )
+                    else
+                      ...list.map((c) => _clientCard(c)),
+                  ],
+                ),
+              ),
+            ),
+    );
   }
 
   Widget _clientCard(DetteClient client) {
@@ -158,6 +171,7 @@ class _DettesScreenState extends State<DettesScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => ClientDetailScreen(
+              apiService: widget.apiService,
               clientId: client.id,
               nom: client.nom,
               telephone: client.telephone ?? '',
@@ -216,9 +230,7 @@ class _DettesScreenState extends State<DettesScreen> {
                       TerreEtOrColors.green,
                     ),
                   ),
-                  Expanded(
-                    child: _amount('Reste', client.reste, statusColor),
-                  ),
+                  Expanded(child: _amount('Reste', client.reste, statusColor)),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 9,
@@ -259,15 +271,22 @@ class _DettesScreenState extends State<DettesScreen> {
     );
   }
 
-  Widget _amount(String label, double value, Color color) =>
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
-            style: const TextStyle(color: TerreEtOrColors.muted, fontSize: 11)),
-        const SizedBox(height: 3),
-        FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(money(value),
-                style: TextStyle(color: color, fontWeight: FontWeight.bold)))
-      ]);
+  Widget _amount(String label, double value, Color color) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(color: TerreEtOrColors.muted, fontSize: 11),
+      ),
+      const SizedBox(height: 3),
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(
+          money(value),
+          style: TextStyle(color: color, fontWeight: FontWeight.bold),
+        ),
+      ),
+    ],
+  );
 }

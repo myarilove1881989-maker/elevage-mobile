@@ -11,12 +11,10 @@ import 'package:app_elevage/screens/production_tracking_screen.dart';
 
 import '../main.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tzdata;
 
 import 'package:app_elevage/screens/stock_detail_screen.dart';
 import 'package:app_elevage/screens/ca_detail_screen.dart';
 import 'package:app_elevage/screens/depense_detail_screen.dart';
-import 'package:app_elevage/screens/marge_detail_screen.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
@@ -30,10 +28,7 @@ import 'package:url_launcher/url_launcher.dart';
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
 
-  const DashboardScreen({
-    super.key,
-    required this.apiService,
-  });
+  const DashboardScreen({super.key, required this.apiService});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -93,18 +88,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove("token");
-    await prefs.remove("username");
-    ApiService.token = null;
-    globalToken = null;
+    await apiService.logout();
 
     if (!mounted) return;
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(apiService: apiService),
-      ),
+      MaterialPageRoute(builder: (_) => LoginScreen(apiService: apiService)),
       (route) => false,
     );
   }
@@ -112,20 +101,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    print("?? INITSTATE CALLED");
     apiService = widget.apiService;
     loadUsername();
     initData();
-  }
-
-  Future<void> testApi() async {
-    try {
-      final res = await apiService.getDashboard();
-      print("? API OK");
-      print(res);
-    } catch (e) {
-      print("? API ERROR: $e");
-    }
   }
 
   Future<void> loadTasks() async {
@@ -140,7 +118,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       temp.putIfAbsent(date, () => []);
       temp[date]!.add(task); // ?? garde tout (id + title)
     }
-    print(temp);
 
     setState(() {
       events = temp;
@@ -149,7 +126,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> initData() async {
     try {
-      print("?? INIT START");
 
       final results = await Future.wait([
         widget.apiService.getDashboard(),
@@ -181,7 +157,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         isLoading = false;
       });
     } catch (e) {
-      print("? ERREUR INIT: $e");
 
       if (!mounted) return;
 
@@ -189,9 +164,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Erreur: $e")));
     }
   }
 
@@ -205,11 +180,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         data = result;
       });
     } catch (e) {
-      print("? dashboard error: $e");
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur dashboard")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Erreur dashboard")));
     }
   }
 
@@ -248,13 +222,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         lots = result;
       });
     } catch (e) {
-      print("? lots error: $e");
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Erreur chargement lots")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Erreur chargement lots")));
     }
   }
 
@@ -269,13 +242,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         if (selectedEspeceId != null &&
             !especes.any(
-                (species) => _intValue(species['id']) == selectedEspeceId)) {
+              (species) => _intValue(species['id']) == selectedEspeceId,
+            )) {
           selectedEspeceId = null;
           selectedLotId = null;
         }
       });
     } catch (e) {
-      print("? especes error: $e");
 
       if (!mounted) return;
 
@@ -298,15 +271,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         isLoading = false;
       });
     } catch (e) {
-      print("? lot detail error: $e");
 
       if (!mounted) return;
 
       setState(() => isLoading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Erreur chargement lot")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Erreur chargement lot")));
     }
   }
 
@@ -329,7 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           priority: Priority.high,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.dateAndTime,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
@@ -359,10 +331,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: const Color(0xFFE4E8EC),
-              width: 1,
-            ),
+            border: Border.all(color: const Color(0xFFE4E8EC), width: 1),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x10000000),
@@ -389,11 +358,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: color.withOpacity(0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        icon,
-                        size: 34,
-                        color: color,
-                      ),
+                      child: Icon(icon, size: 34, color: color),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -411,12 +376,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       isMoney
                           ? AppSettings.instance
-                              .formatMoney(value)
-                              .replaceAll(
-                                AppSettings.instance.currency.symbol,
-                                '',
-                              )
-                              .trim()
+                                .formatMoney(value)
+                                .replaceAll(
+                                  AppSettings.instance.currency.symbol,
+                                  '',
+                                )
+                                .trim()
                           : value.toString(),
                       textAlign: TextAlign.center,
                       maxLines: 1,
@@ -520,36 +485,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 children: tasks
-                    .map((t) => ListTile(
-                          leading: const Icon(Icons.check_circle,
-                              color: Colors.green),
-                          title: Text(t["title"]),
+                    .map(
+                      (t) => ListTile(
+                        leading: const Icon(
+                          Icons.check_circle,
+                          color: Colors.green,
+                        ),
+                        title: Text(t["title"]),
 
-                          // ?? BOUTON SUPPRIMER
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () async {
-                              await apiService.deleteTask(t["id"]);
-                              await loadTasks();
+                        // ?? BOUTON SUPPRIMER
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () async {
+                            await apiService.deleteTask(t["id"]);
+                            await loadTasks();
 
-                              if (mounted && Navigator.canPop(context)) {
-                                Navigator.pop(context);
-                              } // ferme popup
+                            if (mounted && Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            } // ferme popup
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(context.tr('task_deleted'))),
-                              );
-                            },
-                          ),
-                        ))
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(context.tr('task_deleted')),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(context.tr('close')),
-          )
+          ),
         ],
       ),
     );
@@ -562,9 +532,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(context.tr('new_task')),
-        content: TextField(
-          onChanged: (value) => newTask = value,
-        ),
+        content: TextField(onChanged: (value) => newTask = value),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -578,8 +546,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               try {
                 await scheduleNotification(newTask, day);
-              } catch (e) {
-                print(e);
+              } catch (_) {
+                // Un rappel facultatif ne doit pas bloquer la tâche enregistrée.
               }
 
               Navigator.pop(context);
@@ -599,9 +567,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await loadTasks();
     if (!mounted) return;
     setState(() => isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.tr('data_updated'))),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.tr('data_updated'))));
   }
 
   Future<void> _openLots() async {
@@ -616,7 +584,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => AddDepenseScreen(apiService: apiService)),
+        builder: (_) => AddDepenseScreen(apiService: apiService),
+      ),
     );
     if (result == true) await refreshDashboard();
   }
@@ -634,7 +603,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => AddMouvementScreen(apiService: apiService)),
+        builder: (_) => AddMouvementScreen(apiService: apiService),
+      ),
     );
     if (result == true) await refreshDashboard();
   }
@@ -651,7 +621,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-          builder: (_) => ClientListScreen(apiService: apiService)),
+        builder: (_) => ClientListScreen(apiService: apiService),
+      ),
     );
   }
 
@@ -699,9 +670,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Text(
                   context.tr('choose_tutorial_language'),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: const Color(0xFF063B63),
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: const Color(0xFF063B63),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               ListTile(
@@ -774,10 +745,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: _brandTitle(),
             ),
-            item(context.tr('purchases'), Icons.shopping_bag_outlined,
-                () => _openAchat()),
-            item(context.tr('expenses'), Icons.shopping_cart_outlined,
-                () => _openDepense()),
+            item(
+              context.tr('purchases'),
+              Icons.shopping_bag_outlined,
+              () => _openAchat(),
+            ),
+            item(
+              context.tr('expenses'),
+              Icons.shopping_cart_outlined,
+              () => _openDepense(),
+            ),
             item(
               context.tr('production_tracking'),
               Icons.monitor_heart_outlined,
@@ -788,11 +765,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Icons.swap_horiz,
               () => _openMouvement(),
             ),
-            item(context.tr('billing'), Icons.receipt_long_outlined,
-                _openClients),
+            item(
+              context.tr('billing'),
+              Icons.receipt_long_outlined,
+              _openClients,
+            ),
             item(context.tr('history'), Icons.history, () => _openLots()),
             item(
-                context.tr('settings'), Icons.settings_outlined, _openSettings),
+              context.tr('settings'),
+              Icons.settings_outlined,
+              _openSettings,
+            ),
             item(
               context.tr('tutorial'),
               Icons.menu_book_outlined,
@@ -882,9 +865,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -896,324 +877,347 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       drawer: _navigationDrawer(),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: const Color(0xFF063B63),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        toolbarHeight: 76,
-        title: Row(
-          children: [
-            // =========================
-            // LOGO ELEV'AGE
-            // =========================
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Builder(
-                  builder: (menuContext) => IconButton(
-                    tooltip: context.tr('open_menu'),
-                    icon: const Icon(Icons.menu, size: 30),
-                    onPressed: () => Scaffold.of(menuContext).openDrawer(),
-                  ),
+      appBar: screenWidth < 700
+          ? AppBar(
+              backgroundColor: const Color(0xFF063B63),
+              foregroundColor: Colors.white,
+              toolbarHeight: 64,
+              leading: Builder(
+                builder: (menuContext) => IconButton(
+                  tooltip: context.tr('open_menu'),
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => Scaffold.of(menuContext).openDrawer(),
                 ),
-                const SizedBox(width: 6),
-                RichText(
-                  text: const TextSpan(
+              ),
+              title: const Text('Élev’Age'),
+              actions: [
+                IconButton(
+                  tooltip: context.tr('refresh'),
+                  onPressed: _refreshAll,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            )
+          : AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: const Color(0xFF063B63),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              toolbarHeight: 76,
+              title: Row(
+                children: [
+                  // =========================
+                  // LOGO ELEV'AGE
+                  // =========================
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextSpan(
-                        text: "Elev'",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                      Builder(
+                        builder: (menuContext) => IconButton(
+                          tooltip: context.tr('open_menu'),
+                          icon: const Icon(Icons.menu, size: 30),
+                          onPressed: () =>
+                              Scaffold.of(menuContext).openDrawer(),
                         ),
                       ),
-                      TextSpan(
-                        text: "Age",
-                        style: TextStyle(
-                          color: Color(0xFF4CAF50),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                      const SizedBox(width: 6),
+                      RichText(
+                        text: const TextSpan(
+                          children: [
+                            TextSpan(
+                              text: "Elev'",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 24,
+                              ),
+                            ),
+                            TextSpan(
+                              text: "Age",
+                              style: TextStyle(
+                                color: Color(0xFF4CAF50),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 24,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
 
-            // Espace entre le logo et les boutons
-            const SizedBox(width: 8),
+                  // Espace entre le logo et les boutons
+                  const SizedBox(width: 8),
 
-            // =========================
-            // NAVIGATION
-            // =========================
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // ACTUALISER
-                  InkWell(
-                    onTap: _refreshAll,
-                    child: SizedBox(
-                      width: screenWidth < 700 ? 44 : 76,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.refresh,
-                            color: Colors.white,
-                            size: 27,
-                          ),
-                          if (screenWidth >= 700) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              context.tr('refresh'),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                              ),
-                              textAlign: TextAlign.center,
+                  // =========================
+                  // NAVIGATION
+                  // =========================
+                  Expanded(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // ACTUALISER
+                        InkWell(
+                          onTap: _refreshAll,
+                          child: SizedBox(
+                            width: screenWidth < 700 ? 44 : 76,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.refresh,
+                                  color: Colors.white,
+                                  size: 27,
+                                ),
+                                if (screenWidth >= 700) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    context.tr('refresh'),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ],
                             ),
-                          ],
+                          ),
+                        ),
+
+                        if (showNavActions) ...[
+                          const SizedBox(width: 8),
+
+                          // ACHATS
+                          InkWell(
+                            onTap: _openAchat,
+                            child: SizedBox(
+                              width: 80,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.shopping_bag_outlined,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    context.tr('purchases'),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(width: navSpacing),
+
+                          // DÉPENSES
+                          InkWell(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      AddDepenseScreen(apiService: apiService),
+                                ),
+                              );
+
+                              if (result == true) {
+                                await refreshDashboard();
+                              }
+                            },
+                            child: SizedBox(
+                              width: 90,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.shopping_cart_outlined,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    context.tr('expenses'),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(width: navSpacing),
+
+                          // SUIVI DE PRODUCTION
+                          InkWell(
+                            key: const Key('topProductionTrackingButton'),
+                            onTap: _openProductionTracking,
+                            child: SizedBox(
+                              width: 140,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.monitor_heart_outlined,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    context.tr('production_tracking'),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(width: navSpacing),
+
+                          // MOUVEMENTS
+                          InkWell(
+                            onTap: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AddMouvementScreen(
+                                    apiService: apiService,
+                                  ),
+                                ),
+                              );
+
+                              if (result == true) {
+                                await refreshDashboard();
+                              }
+                            },
+                            child: SizedBox(
+                              width: 105,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.swap_horiz,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    context.tr('movements'),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(width: navSpacing),
+
+                          // FACTURATION
+                          InkWell(
+                            onTap: _openClients,
+                            child: SizedBox(
+                              width: 92,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.receipt_long_outlined,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    context.tr('billing'),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(width: navSpacing),
+
+                          // HISTORIQUE
+                          InkWell(
+                            onTap: _openLots,
+                            child: SizedBox(
+                              width: 80,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.history,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    context.tr('history'),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
-                      ),
-                    ),
-                  ),
 
-                  if (showNavActions) ...[
-                    const SizedBox(width: 8),
+                        const SizedBox(width: 4),
 
-                    // ACHATS
-                    InkWell(
-                      onTap: _openAchat,
-                      child: SizedBox(
-                        width: 80,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.shopping_bag_outlined,
-                              color: Colors.white,
-                              size: 30,
+                        // DÉCONNEXION
+                        InkWell(
+                          onTap: _logout,
+                          child: SizedBox(
+                            width: screenWidth < 700 ? 44 : 64,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.logout,
+                                  color: Colors.white70,
+                                  size: 25,
+                                ),
+                                if (screenWidth >= 700) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    context.tr('logout'),
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
-                            SizedBox(height: 3),
-                            Text(
-                              context.tr('purchases'),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(width: navSpacing),
-
-                    // DÉPENSES
-                    InkWell(
-                      onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                AddDepenseScreen(apiService: apiService),
                           ),
-                        );
-
-                        if (result == true) {
-                          await refreshDashboard();
-                        }
-                      },
-                      child: SizedBox(
-                        width: 90,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.shopping_cart_outlined,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              context.tr('expenses'),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
                         ),
-                      ),
-                    ),
-
-                    SizedBox(width: navSpacing),
-
-                    // SUIVI DE PRODUCTION
-                    InkWell(
-                      key: const Key('topProductionTrackingButton'),
-                      onTap: _openProductionTracking,
-                      child: SizedBox(
-                        width: 140,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.monitor_heart_outlined,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              context.tr('production_tracking'),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(width: navSpacing),
-
-                    // MOUVEMENTS
-                    InkWell(
-                      onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                AddMouvementScreen(apiService: apiService),
-                          ),
-                        );
-
-                        if (result == true) {
-                          await refreshDashboard();
-                        }
-                      },
-                      child: SizedBox(
-                        width: 105,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.swap_horiz,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              context.tr('movements'),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(width: navSpacing),
-
-                    // FACTURATION
-                    InkWell(
-                      onTap: _openClients,
-                      child: SizedBox(
-                        width: 92,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.receipt_long_outlined,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              context.tr('billing'),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    SizedBox(width: navSpacing),
-
-                    // HISTORIQUE
-                    InkWell(
-                      onTap: _openLots,
-                      child: SizedBox(
-                        width: 80,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.history,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              context.tr('history'),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(width: 4),
-
-                  // DÉCONNEXION
-                  InkWell(
-                    onTap: _logout,
-                    child: SizedBox(
-                      width: screenWidth < 700 ? 44 : 64,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.logout,
-                            color: Colors.white70,
-                            size: 25,
-                          ),
-                          if (screenWidth >= 700) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              context.tr('logout'),
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(8),
@@ -1221,10 +1225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               /// ?? TITRE SECTION (remplace AppBar subtitle)
               Padding(
-                padding: const EdgeInsets.only(
-                  top: 28,
-                  bottom: 22,
-                ),
+                padding: const EdgeInsets.only(top: 28, bottom: 22),
                 child: Column(
                   children: [
                     RichText(
@@ -1270,13 +1271,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   Widget especeFilter() {
                     return DropdownButtonFormField<int>(
+
+                      isExpanded: true,
+
                       value: selectedEspeceId ?? 0,
                       decoration: InputDecoration(
                         labelText: context.tr('species'),
-                        prefixIcon: const Icon(
-                          Icons.pets,
-                          color: Colors.green,
-                        ),
+                        prefixIcon: const Icon(Icons.pets, color: Colors.green),
                         filled: true,
                         fillColor: Colors.white,
                         contentPadding: const EdgeInsets.symmetric(
@@ -1319,16 +1320,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           selectedLotId = null;
                         });
 
-                        fetchDashboardByEspece(
-                          value == 0 ? null : value,
-                        );
+                        fetchDashboardByEspece(value == 0 ? null : value);
                       },
                     );
                   }
 
                   Widget lotFilter() {
                     return DropdownButtonFormField<int?>(
+
+
                       isExpanded: true,
+
+
                       value: selectedLotId,
                       decoration: InputDecoration(
                         labelText: context.tr('batch'),
@@ -1390,15 +1393,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(
-                          width: 430,
-                          child: especeFilter(),
-                        ),
+                        SizedBox(width: 430, child: especeFilter()),
                         const SizedBox(width: 32),
-                        SizedBox(
-                          width: 430,
-                          child: lotFilter(),
-                        ),
+                        SizedBox(width: 430, child: lotFilter()),
                       ],
                     );
                   }
@@ -1528,9 +1525,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => PerformanceScreen(
-                                apiService: apiService,
-                              ),
+                              builder: (_) =>
+                                  PerformanceScreen(apiService: apiService),
                             ),
                           );
                         },
@@ -1545,9 +1541,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => DettesScreen(
-                                apiService: apiService,
-                              ),
+                              builder: (_) =>
+                                  DettesScreen(apiService: apiService),
                             ),
                           );
                         },
@@ -1753,16 +1748,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(width: 8),
 
-                            Text(
-                              context.tr('today_tasks'),
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0B4F7C),
+                            Expanded(
+                              child: Text(
+                                context.tr('today_tasks'),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0B4F7C),
+                                ),
                               ),
                             ),
-
-                            const Spacer(),
 
                             // ================= NAVIGATION TÂCHES =================
                             if (tasksForDay.length > 3) ...[
@@ -1781,7 +1778,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   final target = (current - 180).clamp(
                                     0.0,
                                     _tasksScrollController
-                                        .position.maxScrollExtent,
+                                        .position
+                                        .maxScrollExtent,
                                   );
 
                                   _tasksScrollController.animateTo(
@@ -1806,7 +1804,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   final target = (current + 180).clamp(
                                     0.0,
                                     _tasksScrollController
-                                        .position.maxScrollExtent,
+                                        .position
+                                        .maxScrollExtent,
                                   );
 
                                   _tasksScrollController.animateTo(
@@ -1895,8 +1894,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                                       if (!mounted) return;
 
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
                                           content: Text("Tâche supprimée"),
                                         ),
@@ -1945,17 +1945,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             size: 21,
                                           ),
                                           onPressed: () async {
-                                            await apiService
-                                                .deleteTask(task["id"]);
+                                            await apiService.deleteTask(
+                                              task["id"],
+                                            );
                                             await loadTasks();
 
                                             if (!mounted) return;
 
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               const SnackBar(
-                                                content:
-                                                    Text("Tâche supprimée"),
+                                                content: Text(
+                                                  "Tâche supprimée",
+                                                ),
                                               ),
                                             );
                                           },
@@ -1978,13 +1981,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Expanded(
-                            child: calendarCard,
-                          ),
+                          Expanded(child: calendarCard),
                           const SizedBox(width: 16),
-                          Expanded(
-                            child: tasksCard,
-                          ),
+                          Expanded(child: tasksCard),
                         ],
                       ),
                     );
@@ -1995,10 +1994,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       calendarCard,
                       const SizedBox(height: 12),
-                      SizedBox(
-                        height: 310,
-                        child: tasksCard,
-                      ),
+                      SizedBox(height: 310, child: tasksCard),
                     ],
                   );
                 },
