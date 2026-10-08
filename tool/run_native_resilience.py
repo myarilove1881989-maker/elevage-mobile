@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 from urllib.parse import urlsplit,urlunsplit
-from run_real_business import ROOT,PROOF,PRIVATE,PACKAGE,ADB,run
+from run_real_business import ROOT,PROOF,PRIVATE,PACKAGE,ADB,run,prepare_emulator_clock
 
 def application_logs(pid):
     return run(ADB+['logcat','--pid='+pid,'-d','-v','brief'])
@@ -75,6 +75,7 @@ def main():
     assert run(ADB+['shell','getprop','ro.build.version.sdk']).strip()=='24'
     run(ADB+['root']);run(ADB+['wait-for-device'],timeout=30)
     assert run(ADB+['shell','id','-u']).strip()=='0','Disposable emulator root required for packet interruption'
+    prepare_emulator_clock()
     packet_rule=['OUTPUT','-d','10.0.2.2/32','-p','tcp','--dport','9444','-j','DROP']
     def firewall(action):return run(ADB+['shell','iptables','-w',action,*packet_rule],timeout=30)
     assert subprocess.run(ADB+['shell','iptables','-w','-C',*packet_rule],capture_output=True,timeout=30).returncode==1

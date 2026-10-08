@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime,timezone
 from urllib.parse import urlsplit,urlunsplit
 
 ROOT=Path(__file__).resolve().parent.parent
@@ -18,6 +19,25 @@ ADB=['adb','-s','emulator-5554']
 def run(args,timeout=180):
     return subprocess.run(args,check=True,capture_output=True,text=True,timeout=timeout).stdout
 
+def prepare_emulator_clock():
+    """Fresh CI emulator only, before any PIN/grant/DB is created; no app time leeway."""
+    assert os.environ.get('GITHUB_ACTIONS')=='true'
+    assert run(ADB+['shell','getprop','ro.build.version.sdk']).strip()=='24'
+    assert run(ADB+['shell','id','-u']).strip()=='0'
+    help_text=run(ADB+['shell','date','--help'])
+    assert 'MMDDhhmm' in help_text,'Supported POSIX date input required'
+    before=int(run(ADB+['shell','date','+%s']).strip())-time.time()
+    # POSIX date input has second resolution. A bounded forward offset avoids
+    # integer iat appearing future due to emulator initialization/truncation.
+    target=datetime.fromtimestamp(time.time()+2,timezone.utc).strftime('%m%d%H%M%Y.%S')
+    run(ADB+['shell','date','-u',target])
+    after=int(run(ADB+['shell','date','+%s']).strip())-time.time()
+    assert 0<=after<=3,'Ephemeral emulator clock must be within three seconds ahead of runner UTC'
+    PROOF.mkdir(parents=True,exist_ok=True)
+    (PROOF/'emulator-clock.json').write_text(json.dumps({'sdk':24,'before_delta_seconds':round(before,3),
+      'after_delta_seconds':round(after,3),'before_profiles':True,'production':False,
+      'grant_validation_leeway_changed':False},indent=2)+'\n')
+
 def require_completed(log):
     assert 'REAL_NATIVE_BUSINESS_COMPLETE originals=7 jean=6 paul=1 server_verified=true' in log
     assert not re.search(r'(TestFailure|Unhandled Exception|EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK|test timed out|\[E\]|FAILURE|Some tests failed)',log,re.I)
@@ -28,6 +48,7 @@ def main():
     # Disposable CI emulator only; one synthetic destination, no global flush.
     run(ADB+['root']);run(ADB+['wait-for-device'],timeout=30)
     assert run(ADB+['shell','id','-u']).strip()=='0','Isolated emulator root required for packet interruption'
+    prepare_emulator_clock()
     rule=['OUTPUT','-d','10.0.2.2/32','-p','tcp','--dport','9443','-j','DROP']
     def firewall(action):return run(ADB+['shell','iptables','-w',action,*rule],timeout=30)
     existing=subprocess.run(ADB+['shell','iptables','-w','-C',*rule],capture_output=True,text=True,timeout=30)

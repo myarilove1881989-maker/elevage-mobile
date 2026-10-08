@@ -11,6 +11,7 @@ import 'package:app_elevage/offline/local_operator_session.dart';
 import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/outbox.dart';
 import 'package:app_elevage/offline/tablet_controller.dart';
+import 'package:app_elevage/screens/offline_tablet_screen.dart';
 import 'grant_diagnostic_client.dart';
 
 void main() {
@@ -73,14 +74,59 @@ void main() {
     } finally {offlineProbe.close();}
     debugPrint('REAL_NETWORK_DISCONNECTED_CONFIRMED');
     stage('REAL_OFFLINE_JEAN');
-    await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
+    Future<void> tapVisible(Finder target) async {
+      await Scrollable.ensureVisible(tester.element(target),alignment:0.5);
+      await tester.pumpAndSettle();await tester.tap(target);await tester.pumpAndSettle();
+    }
+    final jeanName=tablet.profiles.singleWhere((e)=>e['user_id']==fixture['jean'])['display_name'] as String;
+    await tester.pumpWidget(MaterialApp(home:OfflineTabletScreen(controller:tablet)));
+    await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && find.text(jeanName).evaluate().isEmpty;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(find.text(jeanName),findsOneWidget);await tapVisible(find.text(jeanName));
+    await tester.enterText(find.byType(TextField).last,'123456');
+    await tester.tap(find.text('Valider'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.operators!.session==null;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(tablet.operators!.session!.userId,fixture['jean']);
     expect(tablet.api.personal,isNull);
     expect((await tablet.readPage('tasks')).map((e)=>(e['data'] as Map)['id']).toList(),[fixture['task']]);
-    final clientJean=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
-      payload:{'nom':'Client réel Jean'},businessOccurredAt:controlledNow());
-    final purchase=await tablet.declare(entityType:'ACHAT',operationType:'CREATE',
-      payload:{'nom_lot':'Lot natif acheté','espece':fixture['species'],'quantite':20,
-        'prix_total':'20000.00','prix_unitaire':'1000.00'},businessOccurredAt:controlledNow());
+    await tapVisible(find.text('Enregistrer un client'));
+    await tester.enterText(find.byType(TextFormField).first,'Client réel Jean');
+    await tester.tap(find.text('Enregistrer sur la tablette'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.outboxRows.isEmpty;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    final clientJean=tablet.outboxRows.single;
+    expect(clientJean.authorId,fixture['jean']);expect(clientJean.declaration['entity_type'],'CLIENT');
+    await tapVisible(find.text('Enregistrer une opération terrain'));
+    for(var attempt=0;attempt<300 && find.text('Opération réalisée sur le terrain').evaluate().isEmpty;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    await tapVisible(find.descendant(of:find.byType(AlertDialog),matching:find.byType(DropdownButtonFormField<String>)).first);
+    await tester.tap(find.text('Achat').last);await tester.pumpAndSettle();
+    await tapVisible(find.byType(DropdownButtonFormField<Map<String,dynamic>>).first);
+    await tester.tap(find.text('Espèce synthétique native').last);await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('ACHAT-nom_lot')),'Lot natif acheté');
+    await tester.ensureVisible(find.byKey(const ValueKey('ACHAT-quantite')));
+    await tester.enterText(find.byKey(const ValueKey('ACHAT-quantite')),'20');
+    await tester.ensureVisible(find.byKey(const ValueKey('ACHAT-prix_unitaire')));
+    await tester.enterText(find.byKey(const ValueKey('ACHAT-prix_unitaire')),'1000,00');
+    await tester.tap(find.text('Conserver sur la tablette'));await tester.pumpAndSettle();
+    for(var attempt=0;attempt<300 && tablet.outboxRows.length<2;attempt++) {
+      await tester.pump(const Duration(milliseconds:100));
+    }
+    expect(tablet.outboxRows,hasLength(2));
+    final purchase=tablet.outboxRows.singleWhere((e)=>e.declaration['entity_type']=='ACHAT');
+    expect(purchase.authorId,fixture['jean']);expect((purchase.declaration['payload'] as Map)['prix_total'],'20000.00');
+    debugPrint('REAL_NATIVE_UI_OFFLINE_SAVED client=1 purchase=1 author=Jean network_blocked=true');
+    // The actual screen owns its controller; replace it before opening a fresh controller.
+    await tester.pumpWidget(const MaterialApp(home:Scaffold(body:Text('Reprise du parcours métier'))));
+    await closeAndroidFarmDatabase(farmId:fixture['farm'] as int,server:Uri.parse(base));
+    tablet=controller();await tablet.initialize();
+    await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
     final sale=await tablet.declare(entityType:'VENTE_ANIMAUX',operationType:'CREATE',
       payload:{'lot_ref':{'local_uuid':purchase.declaration['local_entity_id']},
         'client_ref':{'local_uuid':clientJean.declaration['local_entity_id']},
@@ -284,6 +330,7 @@ void main() {
       'controlled_grant_expiry_verified':true,
       'real_network_disconnect_verified':true,
       'projected_stock_verified':true,'agenda_scopes_verified':true,'farm_isolation_verified':true,
+      'real_native_ui_verified':true,
       'expired_tokens_verified':true,'disabled_author_verified':true,'revoked_recovery_verified':true};
     debugPrint('REAL_NATIVE_BUSINESS_COMPLETE originals=7 jean=6 paul=1 server_verified=true');
     tablet.api.close();tablet.dispose();
