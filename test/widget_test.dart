@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:app_elevage/main.dart';
-
 void main() {
   testWidgets('App loads correctly', (WidgetTester tester) async {
     // Build the app

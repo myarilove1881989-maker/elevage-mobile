@@ -1,0 +1,156 @@
+name: Offline feature validation
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: ['feature/offline-*']
+permissions:
+  contents: read
+concurrency:
+  group: offline-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android-real-business:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [business, resilience]
+    services:
+      postgres-native-test:
+        image: postgres:17.11
+        env:
+          POSTGRES_DB: ${{ matrix.scenario == 'resilience' && 'elevage_native_i_resilience_test' || 'elevage_native_i_test' }}
+          POSTGRES_USER: native_i_test
+          POSTGRES_PASSWORD: synthetic-native-i-password
+        ports: ['55438:5432']
+        options: >-
+          --health-cmd "pg_isready -U native_i_test -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: ''
+      NATIVE_RESILIENCE: ${{ matrix.scenario == 'resilience' && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: myarilove1881989-maker/backend-elevage
+          ref: 3c2d1fdcb530827c0d0a46b2ff0ec109e11d40e1
+          path: build/native-business-backend
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        if: matrix.scenario == 'resilience'
+        with:
+          repository: myarilove1881989-maker/elevage-mobile
+          ref: 43ce0ee484c0af08d9de59e1bd38b9e1bca71243
+          path: build/native-baseline-mobile
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: python3 --version
+      - run: python3 -m pip install -r build/native-business-backend/requirements.txt
+      - run: flutter pub get --enforce-lockfile
+      - name: Enable runner KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 24
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: ${{ matrix.scenario == 'resilience' && 'python3 tool/run_native_resilience.py' || 'python3 tool/run_real_business.py' }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: android-real-${{ matrix.scenario }}-evidence
+          path: build/native-business-proof/
+          retention-days: 7
+  flutter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+      - run: dart run tool/encryption_proof.dart
+      - run: python3 tool/check_encryption.py
+      - run: flutter build web --release
+      - run: flutter build apk --debug
+      - run: flutter build apk --release --target-platform android-arm64
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pilote-test-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+  android-foundations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: Enable runner KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808
+        with:
+          api-level: 24
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: |
+            python3 tool/run_android_foundations.py
+            (cd android && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest)
+            adb install --no-streaming -r -t build/app/outputs/apk/debug/app-debug.apk
+            adb install --no-streaming -r -t build/app/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            python3 tool/native_android_tests.py
+            python3 tool/android_encryption_proof.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: android-foundations-test-evidence
+          path: |
+            build/app/outputs/androidTest-results/
+            build/app/reports/androidTests/
+            build/app/outputs/apk/debug/
+            build/app/outputs/apk/androidTest/debug/
+            build/android-foundations-proof/
+          retention-days: 7
