@@ -71,6 +71,8 @@ for number in (103,104):
     assert "package: name='com.elevage.app'" in badging
     assert f"versionCode='{number}'" in badging and "versionName='1.0.0'" in badging
     assert "sdkVersion:'24'" in badging
+    assert 'application-debuggable' not in badging
+    assert "'arm64-v8a'" in badging and "'x86_64'" in badging
     target=int(re.search(r"targetSdkVersion:'(\d+)'",badging).group(1))
     assert target>=35
     run(ADB+['install','--no-streaming','-r',str(apk)])
@@ -81,7 +83,8 @@ for number in (103,104):
         run(ADB+['shell','sh','-c',"'printf phase2k-synthetic-preserved > "+sentinel+"'"])
     assert run(ADB+['shell','cat',sentinel]).stdout=='phase2k-synthetic-preserved'
     proof['builds'].append({'version_code':number,'version_name':'1.0.0','package':'com.elevage.app',
-        'minimum_sdk':24,'target_sdk':target,'certificate_sha256':fingerprint,
+        'minimum_sdk':24,'target_sdk':target,'debuggable':False,
+        'abis':['arm64-v8a','x86_64'],'certificate_sha256':fingerprint,
         'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'private_sentinel_preserved':True})
 (PROOF/'signing-and-update.json').write_text(json.dumps(proof,indent=2)+'\n')
 print('PHASE2K_TEST_CERT_RELEASE_UPDATE_PASSED')

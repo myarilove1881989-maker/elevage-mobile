@@ -18,7 +18,7 @@ from datetime import datetime,timedelta,timezone as dt_timezone
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIServer,WSGIRequestHandler,make_server
 
-PINNED_BACKEND='fd4b7b838b1392c666947aaace0e53c6296409e8'
+PINNED_BACKEND='b815c45b08cceb2827ded119cf0c07ea1119dc46'
 ROOT=Path(__file__).resolve().parent.parent
 BACKEND=ROOT/'build'/'native-business-backend'
 EVIDENCE=ROOT/'build'/'native-business-proof'

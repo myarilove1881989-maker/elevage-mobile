@@ -14,6 +14,11 @@ $before = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 $epoch = Read-Adb @('shell','date','+%s')
 $after = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 if ($epoch -notmatch '^\d+$') { throw 'Invalid device clock response.' }
+$apkPaths = & adb -s $Serial shell pm path com.elevage.app 2>&1
+# pm path exits 1 with empty output when the package is not installed.
+if ($LASTEXITCODE -ne 0 -and -not ($LASTEXITCODE -eq 1 -and -not $apkPaths)) {
+    throw 'Cannot read installed package paths; no installation attempted.'
+}
 $proof = [ordered]@{
     read_only = $true
     manufacturer = Read-Adb @('shell','getprop','ro.product.manufacturer')
@@ -27,7 +32,7 @@ $proof = [ordered]@{
     device_utc_epoch_seconds = [long]$epoch
     clock_delta_seconds = [math]::Round(([long]$epoch - (($before+$after)/2000)),3)
     round_trip_seconds = ($after-$before)/1000
-    apk_paths = Read-Adb @('shell','pm','path','com.elevage.app')
+    apk_paths = ($apkPaths -join "`n").Trim()
     measured_utc = [DateTimeOffset]::UtcNow.ToString('o')
     keystore_pin_offline_validated = $false
 }

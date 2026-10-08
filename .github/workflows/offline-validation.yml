@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           repository: myarilove1881989-maker/backend-elevage
-          ref: fd4b7b838b1392c666947aaace0e53c6296409e8
+          ref: b815c45b08cceb2827ded119cf0c07ea1119dc46
           path: build/native-business-backend
           persist-credentials: false
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
