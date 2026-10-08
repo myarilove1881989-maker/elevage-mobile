@@ -56,9 +56,14 @@ def signer(apk):
     candidates=sorted((Path(os.environ['ANDROID_HOME'])/'build-tools').glob('*/apksigner'))
     assert candidates,'Android SDK signer verifier missing'
     output=run([str(candidates[-1]),'verify','--print-certs',str(apk)])
-    digests=re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-f]+)',output)
-    assert len(digests)==1
-    return digests[0]
+    # Recent build-tools include SDK ranges in the Signer prefix.
+    digests={value.lower() for value in re.findall(
+      r'^Signer[^\n]*certificate SHA-256 digest: ([0-9a-fA-F]{64})\s*$',output,re.MULTILINE)}
+    if len(digests)!=1:
+        public_lines=[line for line in output.splitlines() if 'certificate SHA-256 digest:' in line]
+        print('APK_PUBLIC_SIGNER_DIAGNOSTIC '+json.dumps(public_lines),flush=True)
+    assert len(digests)==1,'One verified signing certificate SHA-256 required'
+    return next(iter(digests))
 
 def installed_version():
     output=run(ADB+['shell','dumpsys','package',PACKAGE])

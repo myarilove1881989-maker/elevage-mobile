@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -54,6 +55,15 @@ void main() {
     await tablet.signIn('native-paul','SyntheticNativeI-2026-only');
     await tablet.prepareOperator('654321');
     tablet.api.personal=null;
+    stage('REAL_NETWORK_DISCONNECT');
+    debugPrint('REAL_NETWORK_DISCONNECT_READY');
+    await Future<void>.delayed(const Duration(seconds:2));
+    final offlineProbe=client();
+    try {
+      await expectLater(offlineProbe.get(Uri.parse('$base/test-fixture/state/')).timeout(const Duration(seconds:3)),
+        throwsA(isA<TimeoutException>()));
+    } finally {offlineProbe.close();}
+    debugPrint('REAL_NETWORK_DISCONNECTED_CONFIRMED');
     stage('REAL_OFFLINE_JEAN');
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
     expect(tablet.api.personal,isNull);
@@ -95,6 +105,14 @@ void main() {
     for(final original in originals) {
       expect((await queue.listOutbox()).singleWhere((e)=>e.operationId==original.operationId).declaration,original.declaration);
     }
+    debugPrint('REAL_NETWORK_RESTORE_READY');
+    await Future<void>.delayed(const Duration(seconds:2));
+    final onlineProbe=client();
+    try {
+      final reached=await onlineProbe.get(Uri.parse('$base/test-fixture/state/')).timeout(const Duration(seconds:5));
+      expect(reached.statusCode,401);
+    } finally {onlineProbe.close();}
+    debugPrint('REAL_NETWORK_RESTORED_CONFIRMED');
     stage('REAL_EXPIRED_PERSONAL_TOKENS');
     await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
     final expired=await tablet.api.request('POST','/test-fixture/expired-tokens/');
@@ -192,7 +210,7 @@ void main() {
       if(seconds<345600) {
         await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');tablet.lock();
       } else {
-        await expectLater(tablet.unlockProfile(fixture['jean'] as int,'Jean','123456'),throwsA(isA<Exception>()));
+        await expectLater(tablet.unlockProfile(fixture['jean'] as int,'Jean','123456'),throwsStateError);
         await expectLater(tablet.declare(entityType:'CLIENT',operationType:'CREATE',
           payload:{'nom':'Écriture expirée interdite'},businessOccurredAt:controlledNow()),throwsStateError);
       }
@@ -243,6 +261,7 @@ void main() {
       'jean':6,'paul':1,'server_verified':true,'fifo_verified':true,'cash_verified':true,
       'full_field_journey_verified':true,
       'controlled_grant_expiry_verified':true,
+      'real_network_disconnect_verified':true,
       'expired_tokens_verified':true,'disabled_author_verified':true,'revoked_recovery_verified':true};
     debugPrint('REAL_NATIVE_BUSINESS_COMPLETE originals=7 jean=6 paul=1 server_verified=true');
     tablet.api.close();tablet.dispose();

@@ -8,6 +8,7 @@ import 'package:http/io_client.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:app_elevage/offline/device_identity.dart';
 import 'package:app_elevage/offline/foundation_api.dart';
+import 'package:app_elevage/offline/farm_database.dart';
 import 'package:app_elevage/offline/local_operator_session.dart';
 import 'package:app_elevage/offline/offline_database.dart';
 import 'package:app_elevage/offline/outbox.dart';
