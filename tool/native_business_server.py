@@ -12,6 +12,8 @@ import ssl
 import subprocess
 import sys
 import threading
+import traceback
+from functools import wraps
 from datetime import datetime,timedelta,timezone as dt_timezone
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIServer,WSGIRequestHandler,make_server
@@ -55,6 +57,19 @@ from cryptography.hazmat.primitives.asymmetric import rsa,ed25519
 STATE={}
 BEARER_ON_DEVICE=False
 
+def traced_verification(function):
+    """Identify failed fixture assertions without logging requests or secrets."""
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except Exception as error:
+            frames=traceback.extract_tb(error.__traceback__)
+            locations=[f'{Path(frame.filename).name}:{frame.lineno}:{frame.name}' for frame in frames]
+            print('REAL_FIXTURE_FAILED type='+type(error).__name__+' locations='+','.join(locations),flush=True)
+            raise
+    return wrapped
+
 def owner_only(request):
     if request.user.pk!=STATE.get('owner'):
         raise PermissionError('Synthetic fixture owner required')
@@ -79,6 +94,7 @@ def expired_tokens(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@traced_verification
 def verify_recovery(request):
     owner_only(request)
     disabled=TerrainSubmission.objects.get(client_operation_id=request.data['disabled_id'])
@@ -104,6 +120,7 @@ def verify_recovery(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@traced_verification
 def verify_resilience(request):
     owner_only(request)
     assert settings.NATIVE_RESILIENCE
@@ -125,6 +142,7 @@ def verify_resilience(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@traced_verification
 def verify(request):
     owner_only(request)
     ids=request.data.get('operation_ids')
