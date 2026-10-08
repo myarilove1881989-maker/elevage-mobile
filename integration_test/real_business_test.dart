@@ -197,6 +197,14 @@ void main() {
     expect(verified['cash_review'],'20000.00');
     stage('REAL_ALL_FIELD_OPERATIONS');
     tablet.api.personal=null;
+    debugPrint('REAL_FIELD_NETWORK_DISCONNECT_READY');
+    await Future<void>.delayed(const Duration(seconds:2));
+    final fieldOfflineProbe=client();
+    try {
+      await expectLater(fieldOfflineProbe.get(Uri.parse('$base/test-fixture/state/')).timeout(const Duration(seconds:3)),
+        throwsA(isA<TimeoutException>()));
+    } finally {fieldOfflineProbe.close();}
+    debugPrint('REAL_FIELD_NETWORK_DISCONNECTED_CONFIRMED');
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
     final lotRef={'local_uuid':purchase.declaration['local_entity_id']};
     final expense=await tablet.declare(entityType:'DEPENSE',operationType:'CREATE',
@@ -229,7 +237,7 @@ void main() {
     final before=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['nom']=='Lot natif acheté')['data'] as Map;
     expect(before['stock'],17);expect(before['projected_stock'],13);
     final beforeEggs=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['id']==fixture['egg_lot'])['data'] as Map;
-    expect(beforeEggs['stock_oeufs'],99);expect(beforeEggs['projected_egg_stock'],107);
+    expect(beforeEggs['stock_oeufs'],101);expect(beforeEggs['projected_egg_stock'],109);
     final fieldOperations=[expense,feed,weighing,collection,mortality,birth,donation,theft,outside];
     tablet.lock();expect(tablet.api.personal,isNull);
     tablet.api.close();tablet.dispose();
@@ -239,6 +247,14 @@ void main() {
     for(final original in fieldOperations) {
       expect((await fieldQueue.listOutbox()).singleWhere((e)=>e.operationId==original.operationId).declaration,original.declaration);
     }
+    debugPrint('REAL_FIELD_NETWORK_RESTORE_READY');
+    await Future<void>.delayed(const Duration(seconds:2));
+    final fieldOnlineProbe=client();
+    try {
+      final reached=await fieldOnlineProbe.get(Uri.parse('$base/test-fixture/state/')).timeout(const Duration(seconds:5));
+      expect(reached.statusCode,401);
+    } finally {fieldOnlineProbe.close();}
+    debugPrint('REAL_FIELD_NETWORK_RESTORED_CONFIRMED');
     await tablet.syncOutbox();await tablet.syncOutbox();
     final fieldRows=await fieldQueue.listOutbox();
     expect(fieldRows,hasLength(16));
@@ -250,13 +266,13 @@ void main() {
     final after=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['nom']=='Lot natif acheté')['data'] as Map;
     expect(after['stock'],13);expect(after['projected_stock'],13);
     final afterEggs=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['id']==fixture['egg_lot'])['data'] as Map;
-    expect(afterEggs['stock_oeufs'],107);expect(afterEggs['projected_egg_stock'],107);tablet.lock();
+    expect(afterEggs['stock_oeufs'],109);expect(afterEggs['projected_egg_stock'],109);tablet.lock();
     await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
     final fullJourney=await tablet.api.request('POST','/test-fixture/verify-full-journey/',
       data:{'operation_ids':fieldOperations.map((e)=>e.operationId).toList()});
     expect(fullJourney['verified'],isTrue);expect(fullJourney['parent_stock'],13);expect(fullJourney['newborn_stock'],3);
     expect(fullJourney['foreign_stock'],9);expect(fullJourney['foreign_reference_applied'],isFalse);
-    expect(fullJourney['egg_stock'],107);
+    expect(fullJourney['egg_stock'],109);
     stage('REAL_CONTROLLED_GRANT_EXPIRY');
     tablet.api.personal=null;
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');

@@ -112,14 +112,21 @@ def main():
               '--use-existing-app='+endpoint,'--keep-app-running'],cwd=ROOT)
             deadline=time.monotonic()+420
             disconnected=False;restored=False
+            field_disconnected=False;field_restored=False
             while driver.poll() is None:
                 assert time.monotonic()<deadline,'Native business driver timeout'
                 log=run(ADB+['logcat','--pid='+process,'-d','-v','brief'])
                 if not disconnected and 'REAL_NETWORK_DISCONNECT_READY' in log:
                     firewall('-I');blocked=True;disconnected=True
-                if blocked and 'REAL_NETWORK_RESTORE_READY' in log:
+                if blocked and not restored and 'REAL_NETWORK_RESTORE_READY' in log:
                     assert 'REAL_NETWORK_DISCONNECTED_CONFIRMED' in log
                     firewall('-D');blocked=False;restored=True
+                if not field_disconnected and 'REAL_FIELD_NETWORK_DISCONNECT_READY' in log:
+                    assert restored
+                    firewall('-I');blocked=True;field_disconnected=True
+                if blocked and field_disconnected and 'REAL_FIELD_NETWORK_RESTORE_READY' in log:
+                    assert 'REAL_FIELD_NETWORK_DISCONNECTED_CONFIRMED' in log
+                    firewall('-D');blocked=False;field_restored=True
                 time.sleep(0.25)
             application=run(ADB+['logcat','--pid='+process,'-d','-v','brief'])
             # Own test process only; no secret bodies or authentication tokens are printed.
@@ -127,9 +134,13 @@ def main():
             require_completed(application)
             assert driver.returncode==0,'Real native driver failed'
             assert disconnected and restored and 'REAL_NETWORK_RESTORED_CONFIRMED' in application
+            assert field_disconnected and field_restored and 'REAL_FIELD_NETWORK_RESTORED_CONFIRMED' in application
             (PROOF/'network-interruption.json').write_text(json.dumps({'ephemeral_emulator':True,
               'destination':'10.0.2.2:9443','packets_dropped':True,'request_timeout_verified':True,
-              'restored_request_status':401,'rule_removed':True,'production':False},indent=2)+'\n')
+              'restored_request_status':401,'rule_removed':True,'production':False,
+              'additional_field_operations_packets_dropped':True,
+              'additional_field_operations_timeout_verified':True,
+              'additional_field_operations_restored_status':401},indent=2)+'\n')
             for evidence in ['server-business-verification.json','server-full-journey-verification.json',
               'server-expired-grants-verification.json','server-recovery-verification.json']:
                 assert (PROOF/evidence).is_file(),'Missing server-side evidence: '+evidence

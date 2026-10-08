@@ -92,7 +92,18 @@ def main():
         assert not target.exists(),'Never overwrite baseline source files'
         target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/relative,target)
     subprocess.run(['flutter','pub','get','--enforce-lockfile'],cwd=BASELINE,check=True,timeout=180)
-    assert not subprocess.check_output(['git','-C',str(BASELINE),'diff','--name-only'],text=True).strip()
+    changed=subprocess.check_output(['git','-C',str(BASELINE),'diff','--name-only'],text=True).splitlines()
+    # Pub can replace the hand-written lockfile header with generated comments.
+    # Permit only comments/blank lines to differ, never the dependency graph.
+    if changed==['pubspec.lock']:
+        original=subprocess.check_output(['git','-C',str(BASELINE),'show','HEAD:pubspec.lock'])
+        resolved=(BASELINE/'pubspec.lock').read_bytes()
+        def lock_content(value):
+            return [line for line in value.decode().splitlines() if line.strip() and not line.lstrip().startswith('#')]
+        assert lock_content(original)==lock_content(resolved),'2H dependency graph must stay identical'
+        (BASELINE/'pubspec.lock').write_bytes(original)
+    remaining=subprocess.check_output(['git','-C',str(BASELINE),'diff','--name-only'],text=True).strip()
+    assert not remaining,'Unexpected 2H tracked changes: '+remaining
     PROOF.mkdir(parents=True,exist_ok=True)
     with (PROOF/'server.log').open('w',encoding='utf-8') as server_log:
         server=subprocess.Popen([sys.executable,'tool/native_business_server.py'],cwd=ROOT,
@@ -110,7 +121,7 @@ def main():
             def build(version):
                 source=BASELINE if version==101 else ROOT
                 subprocess.run(['flutter','build','apk','--debug','--target=integration_test/native_resilience_test.dart',
-                  '--target-platform=android-x64','--build-number='+str(version),'--dart-define=NATIVE_TEST_CA='+ca],
+                  '--no-pub','--target-platform=android-x64','--build-number='+str(version),'--dart-define=NATIVE_TEST_CA='+ca],
                   cwd=source,check=True,timeout=600)
                 if version==101:
                     assert not subprocess.check_output(['git','-C',str(BASELINE),'diff','--name-only'],text=True).strip()
