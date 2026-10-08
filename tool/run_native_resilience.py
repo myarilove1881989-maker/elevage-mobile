@@ -1,0 +1,133 @@
+"""Four launches of one isolated package; intentional crashes must have exact witnesses.
+
+An unavailable real server is suspended only by its own Popen PID. No customer
+package, emulator global clock/network, deployment URL or external DB is used.
+"""
+import base64
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import subprocess
+import sys
+import time
+from urllib.parse import urlsplit,urlunsplit
+from run_real_business import ROOT,PROOF,PRIVATE,PACKAGE,ADB,run
+
+def application_logs(pid):
+    return run(ADB+['logcat','--pid='+pid,'-d','-v','brief'])
+
+def no_failure(log):
+    assert not re.search(r'TestFailure|EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK|Test timed out|Some tests failed|Unhandled Exception',log,re.I)
+
+def wait_marker(pid,marker,timeout=120):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        log=application_logs(pid);no_failure(log)
+        if marker in log:return log
+        time.sleep(0.5)
+    raise AssertionError('Missing native checkpoint: '+marker)
+
+def launch():
+    run(ADB+['shell','am','force-stop',PACKAGE])
+    run(ADB+['shell','am','start','-n',PACKAGE+'/com.elevage.app.MainActivity'])
+    deadline=time.monotonic()+90
+    while time.monotonic()<deadline:
+        pid=subprocess.run(ADB+['shell','pidof',PACKAGE],capture_output=True,text=True,timeout=15).stdout.strip()
+        if pid:
+            assert pid.isdigit()
+            matches=re.findall(r'Dart VM service is listening on (http://127\.0\.0\.1:\d+/[^\s]+)',application_logs(pid))
+            if matches:
+                parts=urlsplit(matches[-1]);port=run(ADB+['forward','tcp:0','tcp:'+str(parts.port)]).strip()
+                assert port.isdigit()
+                return pid,port,urlunsplit(('http','127.0.0.1:'+port,parts.path,'',''))
+        time.sleep(0.5)
+    raise AssertionError('Own test process has no VM service')
+
+def stop(port):
+    run(ADB+['shell','am','force-stop',PACKAGE]);run(ADB+['forward','--remove','tcp:'+port])
+
+def drive(endpoint):
+    subprocess.run(['flutter','drive','--driver=test_driver/native_resilience_driver.dart',
+      '--use-existing-app='+endpoint,'--keep-app-running'],cwd=ROOT,check=True,timeout=420)
+
+def signer(apk):
+    candidates=sorted((Path(os.environ['ANDROID_HOME'])/'build-tools').glob('*/apksigner'))
+    assert candidates,'Android SDK signer verifier missing'
+    output=run([str(candidates[-1]),'verify','--print-certs',str(apk)])
+    digests=re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-f]+)',output)
+    assert len(digests)==1
+    return digests[0]
+
+def installed_version():
+    output=run(ADB+['shell','dumpsys','package',PACKAGE])
+    matches=re.findall(r'versionCode=(\d+)',output);assert len(matches)>=1
+    return int(matches[0])
+
+def main():
+    assert os.environ.get('GITHUB_ACTIONS')=='true' and os.environ.get('NATIVE_RESILIENCE')=='1'
+    assert run(ADB+['shell','getprop','ro.build.version.sdk']).strip()=='24'
+    assert not (PRIVATE/'ready').exists(),'Fresh CI fixture required'
+    PROOF.mkdir(parents=True,exist_ok=True)
+    with (PROOF/'server.log').open('w',encoding='utf-8') as server_log:
+        server=subprocess.Popen([sys.executable,'tool/native_business_server.py'],cwd=ROOT,
+          stdout=server_log,stderr=subprocess.STDOUT)
+        current_port=None
+        try:
+            deadline=time.monotonic()+90
+            while not (PRIVATE/'ready').exists():
+                assert server.poll() is None,'Fixture server startup failed'
+                assert time.monotonic()<deadline,'Fixture server startup timeout'
+                time.sleep(1)
+            ca=base64.b64encode((PRIVATE/'ca.pem').read_bytes()).decode()
+            def build(version):
+                subprocess.run(['flutter','build','apk','--debug','--target=integration_test/native_resilience_test.dart',
+                  '--target-platform=android-x64','--build-number='+str(version),'--dart-define=NATIVE_TEST_CA='+ca],
+                  cwd=ROOT,check=True,timeout=600)
+                return ROOT/'build'/'app'/'outputs'/'flutter-apk'/'app-debug.apk'
+            first=build(101);initial_signer=signer(first)
+            assert re.search(r'^Success\s*$',run(ADB+['install','--no-streaming','-r','-t',str(first)]),re.MULTILINE)
+            assert installed_version()==101
+            pid,current_port,endpoint=launch()
+            log=wait_marker(pid,'REAL_WRITE_CRASH_READY transaction_open=true')
+            (PROOF/'write-crash-before-stop.log').write_text(log,encoding='utf-8')
+            stop(current_port);current_port=None
+            pid,current_port,endpoint=launch();drive(endpoint)
+            log=wait_marker(pid,'REAL_UPDATE_PENDING_READY pending=2 write_rollback=true')
+            (PROOF/'write-crash-recovered.log').write_text(log,encoding='utf-8')
+            stop(current_port);current_port=None
+            updated=build(102);assert signer(updated)==initial_signer,'APK update changed signer'
+            assert re.search(r'^Success\s*$',run(ADB+['install','--no-streaming','-r','-t',str(updated)]),re.MULTILINE)
+            assert installed_version()==102
+            (PROOF/'apk-update.json').write_text(json.dumps({'from_version':101,'to_version':102,
+              'same_signer_sha256':initial_signer,'install_replace':True,'uninstalled':False},indent=2)+'\n')
+            pid,current_port,endpoint=launch()
+            wait_marker(pid,'REAL_BACKEND_DOWN_READY pending=2')
+            os.kill(server.pid,signal.SIGSTOP)
+            log=wait_marker(pid,'REAL_BACKEND_UNAVAILABLE_RETAINED pending=2',timeout=60)
+            os.kill(server.pid,signal.SIGCONT)
+            wait_marker(pid,'REAL_SYNC_CRASH_READY pending=2')
+            deadline=time.monotonic()+60
+            while 'REAL_SYNC_CRASH_SERVER_PERSISTED originals=2' not in (PROOF/'server.log').read_text(encoding='utf-8'):
+                no_failure(application_logs(pid))
+                assert time.monotonic()<deadline,'Server never persisted both original UUIDs'
+                time.sleep(0.5)
+            (PROOF/'sync-crash-before-stop.log').write_text(application_logs(pid),encoding='utf-8')
+            stop(current_port);current_port=None
+            pid,current_port,endpoint=launch();drive(endpoint)
+            log=wait_marker(pid,'REAL_NATIVE_RESILIENCE_COMPLETE originals=2 effects=2 crash_write=true update=true crash_sync=true')
+            (PROOF/'resilience-complete.log').write_text(log,encoding='utf-8')
+            assert (PROOF/'server-resilience-verification.json').is_file()
+            print('REAL_NATIVE_RESILIENCE_GATE_PASSED',flush=True)
+        finally:
+            try:
+                if current_port:stop(current_port)
+            finally:
+                if server.poll() is None:
+                    os.kill(server.pid,signal.SIGCONT)
+                    server.terminate()
+                    try:server.wait(timeout=15)
+                    except subprocess.TimeoutExpired:server.kill();server.wait(timeout=10)
+
+if __name__=='__main__':main()

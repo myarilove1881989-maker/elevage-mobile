@@ -5,6 +5,8 @@ Future<void> main()=>integrationDriver(timeout:const Duration(minutes:5),writeRe
     if(data?['real_business_complete']!=true || data?['stage']!='COMPLETE' ||
       data?['originals']!=7 || data?['jean']!=6 || data?['paul']!=1 ||
       data?['server_verified']!=true || data?['fifo_verified']!=true || data?['cash_verified']!=true ||
+      data?['full_field_journey_verified']!=true ||
+      data?['controlled_grant_expiry_verified']!=true ||
       data?['expired_tokens_verified']!=true || data?['disabled_author_verified']!=true || data?['revoked_recovery_verified']!=true) {
       throw StateError('Real native business journey incomplete: ${data?['stage']}');
     }

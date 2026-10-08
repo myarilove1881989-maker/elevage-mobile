@@ -70,13 +70,17 @@ def main():
             (PROOF/'android.log').write_text(application,encoding='utf-8')
             require_completed(application)
             assert result.returncode==0,'Real native driver failed'
-            assert (PROOF/'server-business-verification.json').is_file(),'No server-side business evidence'
+            for evidence in ['server-business-verification.json','server-full-journey-verification.json',
+              'server-expired-grants-verification.json','server-recovery-verification.json']:
+                assert (PROOF/evidence).is_file(),'Missing server-side evidence: '+evidence
             print('REAL_NATIVE_BUSINESS_GATE_PASSED',flush=True)
         finally:
-            run(ADB+['shell','am','force-stop',PACKAGE])
-            if port:run(ADB+['forward','--remove','tcp:'+port])
-            server.terminate()
-            try:server.wait(timeout=15)
-            except subprocess.TimeoutExpired:server.kill();server.wait(timeout=10)
+            try:
+                run(ADB+['shell','am','force-stop',PACKAGE])
+                if port:run(ADB+['forward','--remove','tcp:'+port])
+            finally:
+                server.terminate()
+                try:server.wait(timeout=15)
+                except subprocess.TimeoutExpired:server.kill();server.wait(timeout=10)
 
 if __name__=='__main__':main()

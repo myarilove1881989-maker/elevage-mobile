@@ -13,19 +13,24 @@ jobs:
   android-real-business:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [business, resilience]
     services:
       postgres-native-test:
         image: postgres:17.11
         env:
-          POSTGRES_DB: elevage_native_i_test
+          POSTGRES_DB: ${{ matrix.scenario == 'resilience' && 'elevage_native_i_resilience_test' || 'elevage_native_i_test' }}
           POSTGRES_USER: native_i_test
           POSTGRES_PASSWORD: synthetic-native-i-password
         ports: ['55438:5432']
         options: >-
-          --health-cmd "pg_isready -U native_i_test -d elevage_native_i_test"
+          --health-cmd "pg_isready -U native_i_test -d postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       DATABASE_URL: ''
+      NATIVE_RESILIENCE: ${{ matrix.scenario == 'resilience' && '1' || '0' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -57,11 +62,11 @@ jobs:
           arch: x86_64
           target: default
           disable-animations: true
-          script: python3 tool/run_real_business.py
+          script: ${{ matrix.scenario == 'resilience' && 'python3 tool/run_native_resilience.py' || 'python3 tool/run_real_business.py' }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: android-real-business-evidence
+          name: android-real-${{ matrix.scenario }}-evidence
           path: build/native-business-proof/
           retention-days: 7
   flutter:

@@ -9,10 +9,10 @@ export 'farm_database.dart';
 
 final _openDatabases = <String, Future<FarmDatabase>>{};
 
-Future<FarmDatabase> openAndroidFarmDatabase({required int farmId, required Uri server}) {
+Future<FarmDatabase> openAndroidFarmDatabase({required int farmId, required Uri server,DateTime Function()? clock}) {
   final identity = '${server.toString()}#$farmId';
   return _openDatabases.putIfAbsent(identity, () async {
-    try { return await _openAndroidFarmDatabase(farmId: farmId, server: server); }
+    try { return await _openAndroidFarmDatabase(farmId: farmId, server: server,clock:clock); }
     catch (_) { _openDatabases.remove(identity); rethrow; }
   });
 }
@@ -22,7 +22,7 @@ Future<void> closeAndroidFarmDatabase({required int farmId, required Uri server}
   if (pending != null) await (await pending).close();
 }
 
-Future<FarmDatabase> _openAndroidFarmDatabase({required int farmId, required Uri server}) async {
+Future<FarmDatabase> _openAndroidFarmDatabase({required int farmId, required Uri server,DateTime Function()? clock}) async {
   if (!Platform.isAndroid || farmId < 1 || server.scheme != 'https' || server.userInfo.isNotEmpty) {
     throw StateError('Une exploitation Android et un serveur HTTPS sont requis.');
   }
@@ -40,7 +40,7 @@ Future<FarmDatabase> _openAndroidFarmDatabase({required int farmId, required Uri
         .map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     await secrets.write(key: keyName, value: key);
   }
-  final database = FarmDatabase(encryptedExecutor(file, key), farmId: farmId, serverNamespace: namespace);
+  final database = FarmDatabase(encryptedExecutor(file, key), farmId: farmId, serverNamespace: namespace,clock:clock);
   try {
     await database.customSelect('SELECT singleton FROM farm_identity').getSingle();
     return database;

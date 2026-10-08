@@ -23,11 +23,13 @@ void main() {
         ..setTrustedCertificatesBytes(base64Decode(certificate));
       return IOClient(HttpClient(context:context));
     }
+    var controlledOffset=Duration.zero;
+    DateTime controlledNow()=>DateTime.now().toUtc().add(controlledOffset);
     const secrets=AndroidOperatorSecretStore();
     final native=AndroidDeviceIdentity();
     TabletController controller() {
       late FoundationApi api;
-      api=FoundationApi(baseUrl:base,deviceIdentity:native,secrets:secrets,
+      api=FoundationApi(baseUrl:base,deviceIdentity:native,secrets:secrets,clock:controlledNow,
         client:GrantDiagnosticClient(client(),expected:() {
           final person=api.personal!;
           return {'sub':'${person.userId}','exploitation_id':person.farmId,
@@ -35,7 +37,9 @@ void main() {
             'write_generation':person.capabilities['write_generation'],
             'rights_version':(person.capabilities['membership'] as Map)['version']};
         }));
-      return TabletController(api:api,secrets:secrets,transportClient:client,automaticSyncEnabled:false);
+      return TabletController(api:api,secrets:secrets,transportClient:client,automaticSyncEnabled:false,
+        clock:controlledNow,cacheOpener:({required int farmId,required Uri server})=>
+          openAndroidFarmDatabase(farmId:farmId,server:server,clock:controlledNow));
     }
     void stage(String value) {binding.reportData={'real_business_complete':false,'stage':value};}
     stage('REAL_LOGIN');
@@ -54,19 +58,19 @@ void main() {
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
     expect(tablet.api.personal,isNull);
     final clientJean=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
-      payload:{'nom':'Client réel Jean'},businessOccurredAt:DateTime.now().toUtc());
+      payload:{'nom':'Client réel Jean'},businessOccurredAt:controlledNow());
     final purchase=await tablet.declare(entityType:'ACHAT',operationType:'CREATE',
       payload:{'nom_lot':'Lot natif acheté','espece':fixture['species'],'quantite':20,
-        'prix_total':'20000.00','prix_unitaire':'1000.00'},businessOccurredAt:DateTime.now().toUtc());
+        'prix_total':'20000.00','prix_unitaire':'1000.00'},businessOccurredAt:controlledNow());
     final sale=await tablet.declare(entityType:'VENTE_ANIMAUX',operationType:'CREATE',
       payload:{'lot_ref':{'local_uuid':purchase.declaration['local_entity_id']},
         'client_ref':{'local_uuid':clientJean.declaration['local_entity_id']},
         'quantite':3,'prix_unitaire':'10000.00'},
-      dependencies:[purchase.operationId,clientJean.operationId],businessOccurredAt:DateTime.now().toUtc());
+      dependencies:[purchase.operationId,clientJean.operationId],businessOccurredAt:controlledNow());
     final cash=await tablet.declare(entityType:'ENCAISSEMENT',operationType:'CREATE',
       payload:{'client_ref':{'local_uuid':clientJean.declaration['local_entity_id']},
         'vente_ref':{'local_uuid':sale.declaration['local_entity_id']},'montant_recu':'50000.00','mode':'ESPECES'},
-      dependencies:[clientJean.operationId,sale.operationId],businessOccurredAt:DateTime.now().toUtc());
+      dependencies:[clientJean.operationId,sale.operationId],businessOccurredAt:controlledNow());
     final eggs=await tablet.declare(entityType:'VENTE_OEUFS',operationType:'CREATE',
       payload:{'lot_ref':{'server_id':fixture['egg_lot']},
         'client_ref':{'local_uuid':clientJean.declaration['local_entity_id']},
@@ -74,11 +78,11 @@ void main() {
       dependencies:[clientJean.operationId],businessOccurredAt:DateTime.parse(fixture['egg_sale_at'] as String));
     final task=await tablet.declare(entityType:'TASK',operationType:'UPDATE',
       payload:{'task_id':fixture['task'],'status':'DONE','report':'Compte rendu réel Jean'},
-      expectedServerVersion:'1',businessOccurredAt:DateTime.now().toUtc());
+      expectedServerVersion:'1',businessOccurredAt:controlledNow());
     tablet.lock();
     await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
     final clientPaul=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
-      payload:{'nom':'Client réel Paul'},businessOccurredAt:DateTime.now().toUtc());
+      payload:{'nom':'Client réel Paul'},businessOccurredAt:controlledNow());
     final originals=[clientJean,purchase,sale,cash,eggs,task,clientPaul];
     tablet.lock();
     stage('REAL_ENCRYPTED_RESTART');
@@ -115,14 +119,104 @@ void main() {
     expect(verified['fifo'],[2,2]);expect(verified['stock'],17);
     expect(verified['cash_received'],'50000.00');expect(verified['cash_allocated'],'30000.00');
     expect(verified['cash_review'],'20000.00');
+    stage('REAL_ALL_FIELD_OPERATIONS');
+    tablet.api.personal=null;
+    await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
+    final lotRef={'local_uuid':purchase.declaration['local_entity_id']};
+    final expense=await tablet.declare(entityType:'DEPENSE',operationType:'CREATE',
+      payload:{'lot_ref':lotRef,'categorie_id':fixture['category'],'montant':'123.45'},
+      dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
+    final feed=await tablet.declare(entityType:'ALIMENTATION',operationType:'CREATE',
+      payload:{'lot_ref':lotRef,'aliment':'Aliment natif','quantite_kg':'1.234','prix_kg':'10.00',
+        'depense_ref':{'local_uuid':expense.declaration['local_entity_id']}},
+      dependencies:[purchase.operationId,expense.operationId],businessOccurredAt:controlledNow());
+    final weighing=await tablet.declare(entityType:'PESEE',operationType:'CREATE',
+      payload:{'lot_ref':lotRef,'nombre_animaux_peses':2,'poids_total_kg':'1.234'},
+      dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
+    final collection=await tablet.declare(entityType:'COLLECTE_OEUFS',operationType:'CREATE',
+      payload:{'lot_ref':{'server_id':fixture['egg_lot']},'nombre_collecte':12,
+        'nombre_casses':2,'nombre_declasses':1,'nombre_consommes_donnes':1},
+      businessOccurredAt:controlledNow());
+    tablet.lock();
+    await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
+    final mortality=await tablet.declare(entityType:'MORTALITE',operationType:'CREATE',
+      payload:{'lot_ref':lotRef,'quantite':2},dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
+    final birth=await tablet.declare(entityType:'NAISSANCE',operationType:'CREATE',
+      payload:{'lot_ref':lotRef,'total_naissances':5,'mort_nes':2,'nom_nouveau_lot':'Naissances natives'},
+      dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
+    final donation=await tablet.declare(entityType:'DON',operationType:'CREATE',
+      payload:{'lot_ref':lotRef,'quantite':1},dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
+    final theft=await tablet.declare(entityType:'VOL',operationType:'CREATE',
+      payload:{'lot_ref':lotRef,'quantite':1},dependencies:[purchase.operationId],businessOccurredAt:controlledNow());
+    final fieldOperations=[expense,feed,weighing,collection,mortality,birth,donation,theft];
+    tablet.lock();expect(tablet.api.personal,isNull);
+    tablet.api.close();tablet.dispose();
+    await closeAndroidFarmDatabase(farmId:fixture['farm'] as int,server:Uri.parse(base));
+    tablet=controller();await tablet.initialize();
+    final fieldQueue=tablet.cache! as OutboxStore;
+    for(final original in fieldOperations) {
+      expect((await fieldQueue.listOutbox()).singleWhere((e)=>e.operationId==original.operationId).declaration,original.declaration);
+    }
+    await tablet.syncOutbox();await tablet.syncOutbox();
+    final fieldRows=await fieldQueue.listOutbox();
+    expect(fieldRows,hasLength(15));
+    for(final original in fieldOperations) {
+      expect(fieldRows.singleWhere((e)=>e.operationId==original.operationId).businessStatus,'CONFIRMED');
+    }
+    await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
+    final fullJourney=await tablet.api.request('POST','/test-fixture/verify-full-journey/',
+      data:{'operation_ids':fieldOperations.map((e)=>e.operationId).toList()});
+    expect(fullJourney['verified'],isTrue);expect(fullJourney['parent_stock'],13);expect(fullJourney['newborn_stock'],3);
+    stage('REAL_CONTROLLED_GRANT_EXPIRY');
+    tablet.api.personal=null;
+    await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
+    final oldJean=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
+      payload:{'nom':'Client ancien Jean'},businessOccurredAt:controlledNow());
+    tablet.lock();
+    await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
+    final oldPaul=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
+      payload:{'nom':'Client ancien Paul'},businessOccurredAt:controlledNow());
+    tablet.lock();
+    for(final seconds in [21600,86400,345600]) {
+      await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
+      final advanced=await tablet.api.request('POST','/test-fixture/advance-clock/',data:{'seconds':seconds});
+      expect(advanced['controlled_seconds'],seconds);
+      controlledOffset=Duration(seconds:seconds);tablet.api.personal=null;
+      tablet.api.close();tablet.dispose();
+      await closeAndroidFarmDatabase(farmId:fixture['farm'] as int,server:Uri.parse(base));
+      tablet=controller();await tablet.initialize();
+      final persisted=await (tablet.cache! as OutboxStore).listOutbox();
+      for(final original in [oldJean,oldPaul]) {
+        expect(persisted.singleWhere((e)=>e.operationId==original.operationId).declaration,original.declaration);
+      }
+      if(seconds<345600) {
+        await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');tablet.lock();
+      } else {
+        await expectLater(tablet.unlockProfile(fixture['jean'] as int,'Jean','123456'),throwsA(isA<Exception>()));
+        await expectLater(tablet.declare(entityType:'CLIENT',operationType:'CREATE',
+          payload:{'nom':'Écriture expirée interdite'},businessOccurredAt:controlledNow()),throwsStateError);
+      }
+    }
+    final expiryQueue=tablet.cache! as OutboxStore;
+    await tablet.syncOutbox();await tablet.syncOutbox();
+    for(final original in [oldJean,oldPaul]) {
+      expect((await expiryQueue.listOutbox()).singleWhere((e)=>e.operationId==original.operationId).businessStatus,'CONFIRMED');
+    }
+    await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
+    final late=await tablet.api.request('POST','/test-fixture/verify-expired-grants/',
+      data:{'operation_ids':[oldJean.operationId,oldPaul.operationId]});
+    expect(late['verified'],isTrue);expect(late['grants_expired_at_receipt'],isTrue);
+    await tablet.signIn('native-jean','SyntheticNativeI-2026-only');await tablet.prepareOperator('123456');
+    await tablet.signIn('native-paul','SyntheticNativeI-2026-only');await tablet.prepareOperator('654321');
+    await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
     stage('REAL_DISABLED_ORIGINAL_AUTHOR');
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');
     final disabled=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
-      payload:{'nom':'Client Jean désactivé'},businessOccurredAt:DateTime.now().toUtc());
+      payload:{'nom':'Client Jean désactivé'},businessOccurredAt:controlledNow());
     tablet.lock();
     await tablet.api.request('PATCH','/memberships/${fixture['jean_membership']}/',data:{'is_active':false});
     await tablet.syncOutbox();
-    final retained=(await queue.listOutbox()).singleWhere((e)=>e.operationId==disabled.operationId);
+    final retained=(await expiryQueue.listOutbox()).singleWhere((e)=>e.operationId==disabled.operationId);
     expect(retained.businessStatus,'NEEDS_RECONCILIATION');expect(retained.authorId,fixture['jean']);
     expect(retained.declaration,disabled.declaration);
     final decision=await tablet.api.request('POST','/offline/reconciliation/${disabled.operationId}/',data:{
@@ -133,11 +227,11 @@ void main() {
     stage('REAL_REVOKED_DEVICE_RECOVERY');
     await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
     final recover=await tablet.declare(entityType:'CLIENT',operationType:'CREATE',
-      payload:{'nom':'Client Paul récupéré'},businessOccurredAt:DateTime.now().toUtc());
+      payload:{'nom':'Client Paul récupéré'},businessOccurredAt:controlledNow());
     tablet.lock();
     await tablet.api.request('POST','/devices/${tablet.deviceId}/revoke/',data:{'reason':'Révocation explicite pendant validation isolée'});
     await tablet.syncOutbox();
-    final blocked=(await queue.listOutbox()).singleWhere((e)=>e.operationId==recover.operationId);
+    final blocked=(await expiryQueue.listOutbox()).singleWhere((e)=>e.operationId==recover.operationId);
     expect(blocked.transportStatus,isNot('SERVER_RECEIVED'));expect(blocked.declaration,recover.declaration);
     expect(await tablet.recoverPending('Récupération explicite après révocation'),1);
     expect(tablet.knownDeviceRevoked,isTrue);
@@ -147,6 +241,8 @@ void main() {
     expect(recovery['verified'],isTrue);expect(recovery['reactivated'],isFalse);expect(recovery['recovered_applied'],isFalse);
     binding.reportData={'real_business_complete':true,'stage':'COMPLETE','originals':7,
       'jean':6,'paul':1,'server_verified':true,'fifo_verified':true,'cash_verified':true,
+      'full_field_journey_verified':true,
+      'controlled_grant_expiry_verified':true,
       'expired_tokens_verified':true,'disabled_author_verified':true,'revoked_recovery_verified':true};
     debugPrint('REAL_NATIVE_BUSINESS_COMPLETE originals=7 jean=6 paul=1 server_verified=true');
     tablet.api.close();tablet.dispose();

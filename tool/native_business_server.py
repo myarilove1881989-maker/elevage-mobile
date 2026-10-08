@@ -46,6 +46,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.models import (User,Espece,Lot,Task,CollecteOeufs,Client,Achat,Vente,VenteOeufs,
+    CategorieDepense,Depense,ConsommationAliment,PeseeProduction,Mouvement,
     Payment,Lettrage,EncaissementTerrain,AffectationMouvementOeufs,
     TerrainSubmission,TerrainDecision,AuditEvent,DeviceRegistration)
 from core.egg_services import sync_collection_stock_movement
@@ -56,6 +57,26 @@ from cryptography.hazmat.primitives.asymmetric import rsa,ed25519
 
 STATE={}
 BEARER_ON_DEVICE=False
+CONTROLLED_OFFSET=0
+
+class ControlledDateTime(datetime):
+    @classmethod
+    def now(cls,tz=None):
+        return datetime.now(tz)+timedelta(seconds=CONTROLLED_OFFSET)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def advance_fixture_clock(request):
+    owner_only(request)
+    global CONTROLLED_OFFSET
+    seconds=request.data['seconds']
+    assert type(seconds) is int and seconds in [21600,86400,345600,604800]
+    assert seconds>=CONTROLLED_OFFSET
+    CONTROLLED_OFFSET=seconds
+    # Only the guarded ephemeral fixture changes Django's clock. OS/TLS clocks stay unchanged.
+    timezone.datetime=ControlledDateTime
+    assert abs((timezone.now()-datetime.now(dt_timezone.utc)).total_seconds()-seconds)<1
+    return Response({'controlled_seconds':seconds,'production':False})
 
 def traced_verification(function):
     """Identify failed fixture assertions without logging requests or secrets."""
@@ -111,7 +132,7 @@ def verify_recovery(request):
     assert device.status=='REVOKED' and not device.is_primary_writer
     event=AuditEvent.objects.get(action='TERRAIN_RECOVERED',operation_id=recovered.client_operation_id)
     assert event.actor_user_id==STATE['paul'] and event.decision_actor_id==STATE['owner'] and event.source=='RECOVERY'
-    assert TerrainSubmission.objects.count()==9 and not BEARER_ON_DEVICE
+    assert TerrainSubmission.objects.count()==19 and not BEARER_ON_DEVICE
     result={'verified':True,'disabled_author':STATE['jean'],'decision_actor':STATE['owner'],
       'recovered_author':STATE['paul'],'revoked':True,'reactivated':False,'recovered_applied':False}
     (EVIDENCE/'server-recovery-verification.json').write_text(json.dumps(result,indent=2)+'\n')
@@ -143,6 +164,66 @@ def verify_resilience(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @traced_verification
+def verify_full_journey(request):
+    owner_only(request)
+    ids=request.data['operation_ids']
+    assert len(ids)==8 and len(set(ids))==8
+    rows=list(TerrainSubmission.objects.filter(client_operation_id__in=ids).order_by('local_sequence'))
+    assert len(rows)==8 and TerrainSubmission.objects.count()==15
+    assert [row.author_user_id for row in rows]==[STATE['jean']]*4+[STATE['paul']]*4
+    assert all(row.outcome.business_status=='CONFIRMED' for row in rows)
+    expense=Depense.objects.get()
+    feed=ConsommationAliment.objects.get()
+    weighing=PeseeProduction.objects.get()
+    assert str(expense.montant)=='123.45' and expense.created_by_id==STATE['jean']
+    assert str(feed.quantite_kg)=='1.234' and feed.depense_id==expense.pk and feed.created_by_id==STATE['jean']
+    assert str(weighing.poids_total_kg)=='1.234' and weighing.created_by_id==STATE['jean']
+    collection=CollecteOeufs.objects.exclude(pk__in=STATE['collections']).get()
+    assert collection.nombre_commercialisable==8 and collection.created_by_id==STATE['jean']
+    parent=Achat.objects.get().lot
+    assert parent.stock==13
+    birth=Mouvement.objects.get(type_mouvement='NAISSANCE')
+    assert birth.lot_origine_id==parent.pk and birth.quantite==3 and birth.mort_nes==2 and birth.lot.stock==3
+    for kind,quantity in [('MORTALITE',2),('DON',1),('VOL',1)]:
+        movement=Mouvement.objects.get(type_mouvement=kind)
+        assert movement.lot_id==parent.pk and movement.quantite==quantity and movement.created_by_id==STATE['paul']
+    for action in ['TERRAIN_RECEIVED','TERRAIN_APPLIED']:
+        assert AuditEvent.objects.filter(action=action,operation_id__in=ids).count()==8
+    assert not BEARER_ON_DEVICE
+    result={'verified':True,'operations':8,'parent_stock':13,'newborn_stock':3,'collection_available':8,
+      'jean':4,'paul':4,'duplicates':False}
+    (EVIDENCE/'server-full-journey-verification.json').write_text(json.dumps(result,indent=2)+'\n')
+    print('REAL_SERVER_FULL_JOURNEY_VERIFIED operations=8 parent_stock=13 newborn_stock=3 authors=Jean+Paul',flush=True)
+    return Response(result)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@traced_verification
+def verify_expired_grants(request):
+    owner_only(request)
+    assert CONTROLLED_OFFSET==345600
+    ids=request.data['operation_ids']
+    assert len(ids)==2 and len(set(ids))==2
+    rows=list(TerrainSubmission.objects.filter(client_operation_id__in=ids).order_by('local_sequence'))
+    assert len(rows)==2 and TerrainSubmission.objects.count()==17
+    assert [row.author_user_id for row in rows]==[STATE['jean'],STATE['paul']]
+    for row in rows:
+        assert row.outcome.business_status=='CONFIRMED'
+        grant=row.offline_authorization
+        assert grant.expires_at<timezone.now()
+        assert grant.issued_at<=row.local_recorded_at<=grant.expires_at
+        assert row.received_at>grant.expires_at
+    assert Client.objects.filter(nom__in=['Client ancien Jean','Client ancien Paul']).count()==2
+    assert AuditEvent.objects.filter(action='TERRAIN_APPLIED',operation_id__in=ids).count()==2
+    result={'verified':True,'originals':2,'controlled_seconds':CONTROLLED_OFFSET,
+      'grants_expired_at_receipt':True,'recorded_in_original_window':True}
+    (EVIDENCE/'server-expired-grants-verification.json').write_text(json.dumps(result,indent=2)+'\n')
+    print('REAL_SERVER_EXPIRED_GRANTS_VERIFIED originals=2 controlled_days=4 original_windows=true',flush=True)
+    return Response(result)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@traced_verification
 def verify(request):
     owner_only(request)
     ids=request.data.get('operation_ids')
@@ -151,8 +232,11 @@ def verify(request):
     assert len(originals)==7
     assert [r.author_user_id for r in originals]==[STATE['jean']]*6+[STATE['paul']]
     assert all(r.exploitation_id==STATE['farm'] for r in originals)
-    assert Achat.objects.count()==1 and Vente.objects.count()==1 and VenteOeufs.objects.count()==1
-    sale=Vente.objects.get();assert str(sale.montant_total)=='30000.00'
+    assert Achat.objects.count()==1 and Vente.objects.count()==2 and VenteOeufs.objects.count()==1
+    egg_sale=VenteOeufs.objects.get()
+    assert str(egg_sale.montant_total)=='0.52' and egg_sale.created_by_id==STATE['jean']
+    assert egg_sale.vente.created_by_id==STATE['jean'] and str(egg_sale.vente.montant_total)=='0.52'
+    sale=Vente.objects.exclude(pk=egg_sale.vente_id).get();assert str(sale.montant_total)=='30000.00'
     assert sale.created_by_id==STATE['jean'] and sale.lot.stock==17
     cash=EncaissementTerrain.objects.get()
     assert str(cash.montant_recu)=='50000.00' and str(cash.montant_affecte)=='30000.00'
@@ -175,9 +259,12 @@ def verify(request):
     return Response(result)
 
 urlpatterns=[path('api/test-fixture/state/',fixture_state),
+    path('api/test-fixture/advance-clock/',advance_fixture_clock),
+    path('api/test-fixture/verify-expired-grants/',verify_expired_grants),
     path('api/test-fixture/expired-tokens/',expired_tokens),
     path('api/test-fixture/verify-recovery/',verify_recovery),
     path('api/test-fixture/verify-resilience/',verify_resilience),
+    path('api/test-fixture/verify-full-journey/',verify_full_journey),
     path('api/test-fixture/verify/',verify),path('api/',include('core.urls'))]
 
 def assert_database():
@@ -201,6 +288,7 @@ def seed():
     jean=User.objects.create_user(username='native-jean',password=password,exploitation=farm)
     paul=User.objects.create_user(username='native-paul',password=password,exploitation=farm)
     species=Espece.objects.create(exploitation=farm,nom='Espèce synthétique native')
+    category=CategorieDepense.objects.create(exploitation=farm,nom='Aliment synthétique natif')
     egglot=Lot.objects.create(exploitation=farm,espece=species,nom='Œufs natifs',type_production='OEUFS',date_debut=timezone.localdate())
     at=timezone.now()-timedelta(days=1)
     collections=[]
@@ -210,7 +298,7 @@ def seed():
         sync_collection_stock_movement(row);collections.append(row.pk)
     task=Task.objects.create(exploitation=farm,title='Visite native réelle',date=timezone.localdate(),assigned_to=jean,status='IN_PROGRESS')
     STATE.update(owner=owner.pk,farm=farm.pk,jean=jean.pk,paul=paul.pk,species=species.pk,
-      jean_membership=jean.memberships.get(exploitation=farm).pk,
+      jean_membership=jean.memberships.get(exploitation=farm).pk,category=category.pk,
       egg_lot=egglot.pk,egg_sale_at=at.isoformat(),task=task.pk,collections=collections)
     key=ed25519.Ed25519PrivateKey.generate()
     settings.OFFLINE_SIGNING_PRIVATE_KEY=key.private_bytes(serialization.Encoding.PEM,
