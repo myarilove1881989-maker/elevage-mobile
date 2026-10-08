@@ -4,6 +4,22 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Provisioned by the custodian outside the repository; never fall back to debug.
+val releaseSecrets = listOf("ELEVAGE_KEYSTORE_PATH", "ELEVAGE_KEYSTORE_PASSWORD",
+    "ELEVAGE_KEY_ALIAS", "ELEVAGE_KEY_PASSWORD").associateWith { System.getenv(it) }
+val releaseRequested = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+if (releaseRequested) {
+    require(releaseSecrets.values.all { !it.isNullOrBlank() }) {
+        "Release signing requires the four ELEVAGE signing environment variables."
+    }
+    val keyFile = file(releaseSecrets.getValue("ELEVAGE_KEYSTORE_PATH")!!).canonicalFile
+    require(keyFile.isFile && !keyFile.toPath().startsWith(rootProject.projectDir.parentFile.canonicalFile.toPath())) {
+        "Release keystore must exist outside the repository."
+    }
+}
+
 android {
     namespace = "com.elevage.app"
     compileSdk = flutter.compileSdkVersion
@@ -30,14 +46,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseSecrets.values.all { !it.isNullOrBlank() }) {
+            create("permanentRelease") {
+                storeFile = file(releaseSecrets.getValue("ELEVAGE_KEYSTORE_PATH")!!)
+                storePassword = releaseSecrets.getValue("ELEVAGE_KEYSTORE_PASSWORD")
+                keyAlias = releaseSecrets.getValue("ELEVAGE_KEY_ALIAS")
+                keyPassword = releaseSecrets.getValue("ELEVAGE_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         debug {
             // Isolated installation for emulator validation, separate from customer app data.
             applicationIdSuffix = ".offlinevalidation"
         }
         release {
-            // APK de test uniquement. Configurer une clé privée pérenne avant publication.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("permanentRelease")
         }
     }
 }

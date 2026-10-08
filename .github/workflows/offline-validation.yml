@@ -102,12 +102,14 @@ jobs:
       - run: python3 tool/check_encryption.py
       - run: flutter build web --release
       - run: flutter build apk --debug
-      - run: flutter build apk --release --target-platform android-arm64
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: pilote-test-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 7
+      - name: Release must refuse missing permanent signing credentials
+        shell: bash
+        run: |
+          if flutter build apk --release --target-platform android-arm64 > build/release-signing-gate.log 2>&1; then
+            echo "Release unexpectedly built without permanent signing credentials"
+            exit 1
+          fi
+          grep -F "Release signing requires the four ELEVAGE signing environment variables." build/release-signing-gate.log
   android-foundations:
     runs-on: ubuntu-latest
     timeout-minutes: 45
