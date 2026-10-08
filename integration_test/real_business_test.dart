@@ -121,6 +121,7 @@ void main() {
     expect(tablet.outboxRows,hasLength(2));
     final purchase=tablet.outboxRows.singleWhere((e)=>e.declaration['entity_type']=='ACHAT');
     expect(purchase.authorId,fixture['jean']);expect((purchase.declaration['payload'] as Map)['prix_total'],'20000.00');
+    expect(tester.takeException(),isNull,reason:'Offline purchase UI must render without overflow');
     debugPrint('REAL_NATIVE_UI_OFFLINE_SAVED client=1 purchase=1 author=Jean network_blocked=true');
     // The actual screen owns its controller; replace it before opening a fresh controller.
     await tester.pumpWidget(const MaterialApp(home:Scaffold(body:Text('Reprise du parcours métier'))));

@@ -1,7 +1,8 @@
 """Four launches of one isolated package; intentional crashes must have exact witnesses.
 
-An unavailable real server is suspended only by its own Popen PID. No customer
-package, emulator global clock/network, deployment URL or external DB is used.
+An unavailable real server is suspended only by its own Popen PID. Clock and
+packet changes are confined to the disposable CI emulator. No customer package,
+deployment URL or external DB is used.
 """
 import base64
 import json
@@ -95,16 +96,31 @@ def main():
     changed=subprocess.check_output(['git','-C',str(BASELINE),'diff','--name-only'],text=True).splitlines()
     # Pub can replace the hand-written lockfile header with generated comments.
     # Permit only comments/blank lines to differ, never the dependency graph.
-    if changed==['pubspec.lock']:
+    if 'pubspec.lock' in changed:
         original=subprocess.check_output(['git','-C',str(BASELINE),'show','HEAD:pubspec.lock'])
         resolved=(BASELINE/'pubspec.lock').read_bytes()
         def lock_content(value):
             return [line for line in value.decode().splitlines() if line.strip() and not line.lstrip().startswith('#')]
         assert lock_content(original)==lock_content(resolved),'2H dependency graph must stay identical'
         (BASELINE/'pubspec.lock').write_bytes(original)
+    # Pub also regenerates registrants for unused desktop targets. Restore these
+    # exact baseline blobs; they are never compiled by the Android upgrade test.
+    desktop_generated={
+        'linux/flutter/generated_plugin_registrant.cc','linux/flutter/generated_plugins.cmake',
+        'macos/Flutter/GeneratedPluginRegistrant.swift',
+        'windows/flutter/generated_plugin_registrant.cc','windows/flutter/generated_plugins.cmake',
+    }
+    for relative in changed:
+        if relative in desktop_generated:
+            original=subprocess.check_output(['git','-C',str(BASELINE),'show','HEAD:'+relative])
+            (BASELINE/relative).write_bytes(original)
     remaining=subprocess.check_output(['git','-C',str(BASELINE),'diff','--name-only'],text=True).strip()
     assert not remaining,'Unexpected 2H tracked changes: '+remaining
     PROOF.mkdir(parents=True,exist_ok=True)
+    (PROOF/'baseline-source-integrity.json').write_text(json.dumps({'source':BASELINE_SHA,
+      'tracked_source_changes':False,'dependency_graph_changes':False,
+      'restored_unused_desktop_generated_files':sorted(set(changed)&desktop_generated),
+      'shared_test_instrumentation_untracked':True},indent=2)+'\n')
     with (PROOF/'server.log').open('w',encoding='utf-8') as server_log:
         server=subprocess.Popen([sys.executable,'tool/native_business_server.py'],cwd=ROOT,
           stdout=server_log,stderr=subprocess.STDOUT)
