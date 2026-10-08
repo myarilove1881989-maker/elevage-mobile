@@ -26,17 +26,31 @@ def prepare_emulator_clock():
     assert run(ADB+['shell','id','-u']).strip()=='0'
     help_text=run(ADB+['shell','date','--help'])
     assert 'MMDDhhmm' in help_text,'Supported POSIX date input required'
-    before=int(run(ADB+['shell','date','+%s']).strip())-time.time()
-    # POSIX date input has second resolution. A bounded forward offset avoids
-    # integer iat appearing future due to emulator initialization/truncation.
-    target=datetime.fromtimestamp(time.time()+2,timezone.utc).strftime('%m%d%H%M%Y.%S')
-    run(ADB+['shell','date','-u',target])
-    after=int(run(ADB+['shell','date','+%s']).strip())-time.time()
-    assert 0<=after<=3,'Ephemeral emulator clock must be within three seconds ahead of runner UTC'
-    PROOF.mkdir(parents=True,exist_ok=True)
-    (PROOF/'emulator-clock.json').write_text(json.dumps({'sdk':24,'before_delta_seconds':round(before,3),
-      'after_delta_seconds':round(after,3),'before_profiles':True,'production':False,
-      'grant_validation_leeway_changed':False},indent=2)+'\n')
+    previous=run(ADB+['shell','settings','get','global','auto_time']).strip()
+    assert previous in ['0','1','null'],'Known ephemeral automatic-time state required'
+    run(ADB+['shell','settings','put','global','auto_time','0'])
+    try:
+        before=int(run(ADB+['shell','date','+%s']).strip())-time.time()
+        # POSIX date input has second resolution. A bounded forward offset avoids
+        # integer iat appearing future due to emulator initialization/truncation.
+        target=datetime.fromtimestamp(time.time()+2,timezone.utc).strftime('%m%d%H%M%Y.%S')
+        run(ADB+['shell','date','-u',target])
+        after=int(run(ADB+['shell','date','+%s']).strip())-time.time()
+        assert 0<=after<=3,'Ephemeral emulator clock must be within three seconds ahead of runner UTC'
+        PROOF.mkdir(parents=True,exist_ok=True)
+        (PROOF/'emulator-clock.json').write_text(json.dumps({'sdk':24,'before_delta_seconds':round(before,3),
+          'after_delta_seconds':round(after,3),'before_profiles':True,'production':False,
+          'previous_automatic_time':previous,'automatic_time_disabled_only_in_ephemeral_test':True,
+          'grant_validation_leeway_changed':False},indent=2)+'\n')
+        return previous
+    except BaseException:
+        restore_emulator_clock(previous)
+        raise
+
+def restore_emulator_clock(previous):
+    assert os.environ.get('GITHUB_ACTIONS')=='true' and previous in ['0','1','null']
+    if previous=='null':run(ADB+['shell','settings','delete','global','auto_time'])
+    else:run(ADB+['shell','settings','put','global','auto_time',previous])
 
 def require_completed(log):
     assert 'REAL_NATIVE_BUSINESS_COMPLETE originals=7 jean=6 paul=1 server_verified=true' in log
@@ -48,7 +62,6 @@ def main():
     # Disposable CI emulator only; one synthetic destination, no global flush.
     run(ADB+['root']);run(ADB+['wait-for-device'],timeout=30)
     assert run(ADB+['shell','id','-u']).strip()=='0','Isolated emulator root required for packet interruption'
-    prepare_emulator_clock()
     rule=['OUTPUT','-d','10.0.2.2/32','-p','tcp','--dport','9443','-j','DROP']
     def firewall(action):return run(ADB+['shell','iptables','-w',action,*rule],timeout=30)
     existing=subprocess.run(ADB+['shell','iptables','-w','-C',*rule],capture_output=True,text=True,timeout=30)
@@ -66,6 +79,7 @@ def main():
           stdout=server_log,stderr=subprocess.STDOUT)
         port=None;process=None
         blocked=False;driver=None
+        previous_auto_time=None
         try:
             deadline=time.monotonic()+90
             while not (PRIVATE/'ready').exists():
@@ -77,6 +91,7 @@ def main():
               '--target-platform=android-x64','--dart-define=NATIVE_TEST_CA='+public_ca],cwd=ROOT,check=True,timeout=600)
             installed=run(ADB+['install','--no-streaming','-r','-t','build/app/outputs/flutter-apk/app-debug.apk'])
             assert re.search(r'^Success\s*$',installed,re.MULTILINE)
+            previous_auto_time=prepare_emulator_clock()
             run(ADB+['shell','am','force-stop',PACKAGE])
             run(ADB+['shell','am','start','-n',PACKAGE+'/com.elevage.app.MainActivity'])
             deadline=time.monotonic()+90
@@ -129,8 +144,11 @@ def main():
                 run(ADB+['shell','am','force-stop',PACKAGE])
                 if port:run(ADB+['forward','--remove','tcp:'+port])
             finally:
-                server.terminate()
-                try:server.wait(timeout=15)
-                except subprocess.TimeoutExpired:server.kill();server.wait(timeout=10)
+                try:
+                    if previous_auto_time is not None:restore_emulator_clock(previous_auto_time)
+                finally:
+                    server.terminate()
+                    try:server.wait(timeout=15)
+                    except subprocess.TimeoutExpired:server.kill();server.wait(timeout=10)
 
 if __name__=='__main__':main()

@@ -228,6 +228,8 @@ void main() {
       payload:{'lot_ref':{'server_id':fixture['foreign_lot']},'quantite':1},businessOccurredAt:controlledNow());
     final before=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['nom']=='Lot natif acheté')['data'] as Map;
     expect(before['stock'],17);expect(before['projected_stock'],13);
+    final beforeEggs=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['id']==fixture['egg_lot'])['data'] as Map;
+    expect(beforeEggs['stock_oeufs'],99);expect(beforeEggs['projected_egg_stock'],107);
     final fieldOperations=[expense,feed,weighing,collection,mortality,birth,donation,theft,outside];
     tablet.lock();expect(tablet.api.personal,isNull);
     tablet.api.close();tablet.dispose();
@@ -246,12 +248,15 @@ void main() {
     }
     await tablet.unlockProfile(fixture['paul'] as int,'Paul','654321');
     final after=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['nom']=='Lot natif acheté')['data'] as Map;
-    expect(after['stock'],13);expect(after['projected_stock'],13);tablet.lock();
+    expect(after['stock'],13);expect(after['projected_stock'],13);
+    final afterEggs=(await tablet.readPage('lots')).singleWhere((e)=>(e['data'] as Map)['id']==fixture['egg_lot'])['data'] as Map;
+    expect(afterEggs['stock_oeufs'],107);expect(afterEggs['projected_egg_stock'],107);tablet.lock();
     await tablet.signIn('native-owner','SyntheticNativeI-2026-only');
     final fullJourney=await tablet.api.request('POST','/test-fixture/verify-full-journey/',
       data:{'operation_ids':fieldOperations.map((e)=>e.operationId).toList()});
     expect(fullJourney['verified'],isTrue);expect(fullJourney['parent_stock'],13);expect(fullJourney['newborn_stock'],3);
     expect(fullJourney['foreign_stock'],9);expect(fullJourney['foreign_reference_applied'],isFalse);
+    expect(fullJourney['egg_stock'],107);
     stage('REAL_CONTROLLED_GRANT_EXPIRY');
     tablet.api.personal=null;
     await tablet.unlockProfile(fixture['jean'] as int,'Jean','123456');

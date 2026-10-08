@@ -50,6 +50,7 @@ from core.models import (User,Espece,Lot,Task,CollecteOeufs,Client,Achat,Vente,V
     Payment,Lettrage,EncaissementTerrain,AffectationMouvementOeufs,
     TerrainSubmission,TerrainDecision,AuditEvent,DeviceRegistration)
 from core.egg_services import sync_collection_stock_movement
+from core.cache_views import lot_stock_queryset
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes,serialization
@@ -183,6 +184,7 @@ def verify_full_journey(request):
     assert str(weighing.poids_total_kg)=='1.234' and weighing.created_by_id==STATE['jean']
     collection=CollecteOeufs.objects.exclude(pk__in=STATE['collections']).get()
     assert collection.nombre_commercialisable==8 and collection.created_by_id==STATE['jean']
+    assert lot_stock_queryset(STATE['farm']).get(pk=STATE['egg_lot']).confirmed_egg_stock==107
     parent=Achat.objects.get().lot
     assert parent.stock==13
     birth=Mouvement.objects.get(type_mouvement='NAISSANCE')
@@ -194,7 +196,7 @@ def verify_full_journey(request):
     assert AuditEvent.objects.filter(action='TERRAIN_APPLIED',operation_id__in=ids).count()==8
     assert not BEARER_ON_DEVICE
     result={'verified':True,'operations':9,'parent_stock':13,'newborn_stock':3,'collection_available':8,
-      'jean':4,'paul':5,'duplicates':False,'foreign_stock':9,'foreign_reference_applied':False}
+      'jean':4,'paul':5,'duplicates':False,'foreign_stock':9,'foreign_reference_applied':False,'egg_stock':107}
     (EVIDENCE/'server-full-journey-verification.json').write_text(json.dumps(result,indent=2)+'\n')
     print('REAL_SERVER_FULL_JOURNEY_VERIFIED operations=9 parent_stock=13 newborn_stock=3 isolation=true authors=Jean+Paul',flush=True)
     return Response(result)
