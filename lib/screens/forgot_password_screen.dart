@@ -155,7 +155,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Une connexion Internet est nécessaire pour réinitialiser votre mot de passe.',
+                    'Une connexion Internet est nécessaire. Ouvrez le lien reçu par e-mail, ou utilisez le code ci-dessous.',
                     textAlign: TextAlign.center,
                   ),
                   Text(

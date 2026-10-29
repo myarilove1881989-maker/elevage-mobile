@@ -60,6 +60,7 @@ void main() {
     await tester.tap(find.text('Envoyer le code'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '123456');
+    await tester.ensureVisible(find.text('Vérifier'));
     await tester.tap(find.text('Vérifier'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'StrongPassword!987');

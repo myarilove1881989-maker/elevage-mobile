@@ -77,7 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     serverConnection,if(apiService is FarmerApiService) (apiService as FarmerApiService).runtime.tablet]),
     builder:(context,_) {
       final tablet=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.tablet:null;
-      return ConnectionIndicator(networkAvailable:serverConnection.available,lastSuccess:serverConnection.lastSuccess,
+      return ConnectionIndicator(networkAvailable:tablet?.sync?.networkAvailable,lastSuccess:serverConnection.lastSuccess,
         serverUnavailable:serverConnection.available==false,syncing:tablet?.sync?.busy??false,
         pending:tablet?.sync?.summary.pending,conflicts:tablet?.sync?.summary.conflicts,onSummary:_openHistory);
     });

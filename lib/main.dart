@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'config.dart';
+import 'screens/reset_password_link_screen.dart';
 import 'services/lab_network_gate.dart';
 import 'package:app_elevage/screens/dashboard_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -158,6 +159,14 @@ class _ElevageAppState extends State<ElevageApp> {
             ? 'Élev’Age PILOTE'
             : 'Élev’Age',
         navigatorKey: _navigatorKey,
+        onGenerateRoute: (settings) {
+          final uri = Uri.tryParse(settings.name ?? '');
+          if (uri?.path == '/reset-password') {
+            return MaterialPageRoute(settings: settings, builder: (_) => ResetPasswordLinkScreen(
+              api: widget.apiService, token: uri!.queryParameters['token'] ?? ''));
+          }
+          return null;
+        },
         debugShowCheckedModeBanner: false,
         locale: Locale(AppSettings.instance.languageCode),
         supportedLocales: const [Locale('fr'), Locale('en')],

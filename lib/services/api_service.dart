@@ -87,7 +87,7 @@ class ApiService {
   static void clearLocalPresentationIdentity() {_localPresentationIdentity=null;}
   Listenable? get sessionChanges=>null;
   Future<bool> probeServer() async {
-    final response=await _client.get(Uri.parse('$baseUrl/health/'),headers:{'Cache-Control':'no-cache'});
+    final response=await _client.get(Uri.parse('$baseUrl/health/'),headers:kIsWeb ? const <String,String>{} : {'Cache-Control':'no-cache'});
     if(response.statusCode!=200) return false;
     final body=jsonDecode(response.body);
     return body is Map && body['status']=='ok';
@@ -249,6 +249,19 @@ class ApiService {
         "new_password": newPassword,
       }),
     );
+    await _handleResponse(response, clearSessionOnUnauthorized: false);
+  }
+
+  Future<void> validatePasswordResetLink(String linkToken) async {
+    final response = await _client.post(Uri.parse('$baseUrl/password-reset/link/'),
+      headers: {'Content-Type': 'application/json'}, body: jsonEncode({'link_token': linkToken}));
+    await _handleResponse(response, clearSessionOnUnauthorized: false);
+  }
+
+  Future<void> confirmPasswordResetLink(String linkToken, String password) async {
+    final response = await _client.post(Uri.parse('$baseUrl/password-reset/confirm/'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'link_token': linkToken, 'new_password': password}));
     await _handleResponse(response, clearSessionOnUnauthorized: false);
   }
 
