@@ -266,7 +266,7 @@ class FarmerRuntime extends ChangeNotifier {
 
         final response=await request(http.Request('GET',Uri.parse('${Config.apiUrl}$path')));
 
-        if(response.statusCode!=200) {
+        if(response.statusCode!=200 && !(path=='/farm-profile/' && response.statusCode==404)) {
 
           if(!signedIn) throw StateError('La session a changé.');
 
@@ -727,6 +727,11 @@ class FarmerRuntime extends ChangeNotifier {
 
         }
 
+        if(prepared && response.statusCode==200 && request.method=='GET' &&
+            RegExp(r'^/clients/\d+/ventes/$').hasMatch(endpoint)) {
+          await tablet.refreshCache(collections:const ['sales']);
+          check();
+        }
         return response;
 
       } catch(error) {if(!isTransportFailure(error) || request.method!='GET') rethrow;}

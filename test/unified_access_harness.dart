@@ -108,6 +108,11 @@ class UnifiedAccessHarness {
       'server_entity_id':confirmed?'${100+sequence}':'','server_version':confirmed?'farm:$sequence':'',
       'reason_code':businessState=='NEEDS_RECONCILIATION'?'OFFLINE_PERMISSION_DENIED':'',
     };
+    if(confirmed && kind=='ENCAISSEMENT') {
+      final p=operation['payload'] as Map;
+      result['cash_recognition']={'montant_recu':p['montant_recu'],'montant_affecte':p['montant_recu'],
+        'montant_a_rapprocher':'0.00','payment_id':100+sequence,'mode':p['mode']};
+    }
     if(confirmed && {'ACHAT','VENTE_ANIMAUX','MORTALITE'}.contains(kind)) {
       result['stock_snapshots']=[{'id':42,'nom':'Lot fictif','exploitation':1,'type_production':'CHAIR',
         'stock':kind=='ACHAT'?10:kind=='VENTE_ANIMAUX'?8:7,'stock_oeufs':0,

@@ -10,9 +10,10 @@ class FarmApi extends ProductionTrackingApiFake {
   String name = 'Ferme La Gloire';
   String role = 'OWNER';
   int writes = 0;
+  bool missing=false;
   @override
   Future<dynamic> get(String endpoint) async {
-    if (endpoint == '/farm-profile/') return {'id': 1, 'nom': name};
+    if (endpoint == '/farm-profile/') { if(missing) throw const ApiHttpException(404,'missing'); return {'id': 1, 'nom': name}; }
     final result = await super.get(endpoint);
     result['role'] = role;
     result['permission_contract']['role'] = role;
@@ -68,4 +69,12 @@ void main() {
     expect(field.enabled, false);
     expect(api.writes, 0);
   });
+  testWidgets('absent profile API explains backend dependency without inventing a farm name',(tester) async {
+    final api=FarmApi()..missing=true;
+    await tester.pumpWidget(testApp(SettingsScreen(apiService:api)));await tester.pumpAndSettle();
+    expect(find.textContaining('Une mise à jour du serveur est nécessaire'),findsOneWidget);
+    expect(find.textContaining('Reconnectez-vous puis réessayez'),findsNothing);
+    expect(api.writes,0);
+  });
+
 }

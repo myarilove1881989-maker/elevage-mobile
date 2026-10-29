@@ -36,8 +36,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         originalFarmName = farmController.text;
         farmLoaded = true; farmError = null;
       });
-    } catch (_) {
-      if (mounted) setState(() => farmError = 'Nom de l’exploitation indisponible. Reconnectez-vous puis réessayez.');
+    } catch (error) {
+      if (mounted && session == ApiService.sessionIdentity) setState(() => farmError = error is ApiHttpException && error.status == 404
+        ? 'Le serveur actuel ne propose pas encore le nom partagé de l’exploitation. Une mise à jour du serveur est nécessaire.'
+        : 'Nom de l’exploitation indisponible. Vérifiez la connexion ou préparez la session hors ligne.');
     } finally { if (widget.apiService == null) api.close(); }
   }
   Future<void> loadOwner() async {
