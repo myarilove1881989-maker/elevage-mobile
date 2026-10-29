@@ -10,6 +10,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ProductionTrackingApiFake extends ApiService {
   @override
+  Future<dynamic> get(String endpoint) async {
+    if(endpoint!='/me/capabilities/') { throw StateError('Unmocked local request'); }
+    return {'user':1,'exploitation':1,'role':'OPERATEUR','offline_policy_enabled':false,'membership':{'version':1},
+      'permission_contract':{'version':1,'user':1,'exploitation':1,'role':'OPERATEUR',
+        'rights_version':1,'permissions':['finance.read','history.read','egg_collections.create','egg_sales.create','feed.create','weights.create']}};
+  }
+  @override
   Future<List<dynamic>> getEspeces() async => [
     {'id': 1, 'nom': 'Poulet'},
     {'id': 2, 'nom': 'Canard'},

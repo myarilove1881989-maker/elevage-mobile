@@ -32,7 +32,8 @@ BigInt _scaledInteger(String decimal)=>BigInt.parse(decimal.replaceAll('.',''));
 String _money(BigInt cents)=>'${cents~/BigInt.from(100)}.${(cents%BigInt.from(100)).toString().padLeft(2,'0')}';
 
 class _TerrainOperationDialog extends StatefulWidget {
-  const _TerrainOperationDialog({required this.lots,required this.species,required this.categories,required this.expenses,required this.searchLots});
+  const _TerrainOperationDialog({required this.lots,required this.species,required this.categories,required this.expenses,required this.searchLots,this.initialKind='DEPENSE'});
+  final String initialKind;
   final List<Map<String,dynamic>> lots,species,categories;
   final List<OutboxEntry> expenses;
   final Future<List<Map<String,dynamic>>> Function(String) searchLots;
@@ -53,6 +54,7 @@ class _TerrainOperationDialogState extends State<_TerrainOperationDialog> {
   @override
   void initState() {
     super.initState();
+    kind=widget.initialKind;
     for(final list in _terrainFields.values) {
       for(final spec in list) {
         fields.putIfAbsent(spec.key,()=>TextEditingController(text:spec.integer && spec.zero?'0':'')..addListener(_changed));
@@ -88,13 +90,7 @@ class _TerrainOperationDialogState extends State<_TerrainOperationDialog> {
     }
     return null;
   }
-  Future<void> chooseDate() async {
-    final date=await showDatePicker(context:context,initialDate:occurred,firstDate:DateTime(2010),lastDate:DateTime.now());
-    if(date==null || !mounted) {return;}
-    final time=await showTimePicker(context:context,initialTime:TimeOfDay.fromDateTime(occurred));
-    if(time==null || !mounted) {return;}
-    setState(()=>occurred=DateTime(date.year,date.month,date.day,time.hour,time.minute));
-  }
+
   Future<void> search() async {
     if(searching) {return;}
     setState(()=>searching=true);
@@ -105,7 +101,9 @@ class _TerrainOperationDialogState extends State<_TerrainOperationDialog> {
     finally {if(mounted) {setState(()=>searching=false);}}
   }
   void save() {
+    if(kind=='DEPENSE') {Navigator.pop(context,<String,dynamic>{'entity_type':'DEPENSE'});return;}
     if(!form.currentState!.validate()) {return;}
+    occurred=DateTime.now();
     if(occurred.isAfter(DateTime.now().add(const Duration(minutes:5)))) {setState(()=>error='Vérifiez la date et l’heure de l’opération réalisée.');return;}
     final payload=<String,dynamic>{};final dependencies=<String>[];
     for(final spec in _terrainFields[kind]!) {
@@ -142,7 +140,7 @@ class _TerrainOperationDialogState extends State<_TerrainOperationDialog> {
       const Text('Enregistrement sur la tablette. La confirmation et le stock définitifs appartiennent au serveur.'),
       DropdownButtonFormField<String>(isExpanded:true,initialValue:kind,decoration:const InputDecoration(labelText:'Opération'),
         items:[for(final entry in _terrainNames.entries)DropdownMenuItem(value:entry.key,child:Text(entry.value))],
-        onChanged:(value){if(value!=null) {setState((){kind=value;lot=null;expense=null;error=null;});}}),
+        onChanged:(value){if(value=='DEPENSE') {Navigator.pop(context,<String,dynamic>{'entity_type':'DEPENSE'});return;}if(value!=null) {setState((){kind=value;lot=null;expense=null;error=null;});}}),
       if(kind!='ACHAT') ...[
         TextField(controller:lotSearch,maxLength:100,decoration:const InputDecoration(labelText:'Rechercher un lot sur la tablette')),
         TextButton(onPressed:searching?null:search,child:Text(searching?'Recherche…':'Rechercher')),
@@ -170,7 +168,7 @@ class _TerrainOperationDialogState extends State<_TerrainOperationDialog> {
       if(kind=='ACHAT') DropdownButtonFormField<String>(isExpanded:true,initialValue:productionStatus,decoration:const InputDecoration(labelText:'État du lot'),
         items:const [DropdownMenuItem(value:'ELEVAGE',child:Text('Élevage')),DropdownMenuItem(value:'PONTE',child:Text('Ponte')),DropdownMenuItem(value:'REFORME',child:Text('Réforme')),DropdownMenuItem(value:'TERMINE',child:Text('Terminé'))],
         onChanged:(value){if(value!=null) {setState(()=>productionStatus=value);}}),
-      TextButton(onPressed:chooseDate,child:Text('Date / heure : ${occurred.day}/${occurred.month}/${occurred.year} ${occurred.hour.toString().padLeft(2,'0')}:${occurred.minute.toString().padLeft(2,'0')}')),
+      TextButton(onPressed:null,child:Text('Date / heure : ${occurred.day}/${occurred.month}/${occurred.year} ${occurred.hour.toString().padLeft(2,'0')}:${occurred.minute.toString().padLeft(2,'0')}')),
       if(error!=null) Text(error!,style:const TextStyle(color:Colors.red)),
     ])))),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
       FilledButton(onPressed:save,child:const Text('Conserver sur la tablette'))]);

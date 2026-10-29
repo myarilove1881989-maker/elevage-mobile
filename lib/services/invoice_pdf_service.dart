@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import '../config.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -391,6 +392,9 @@ class InvoicePdfService {
       customerPhone: customerPhone,
       languageCode: languageCode,
     );
+    if (Config.current.isLab) {
+      throw StateError('Impression réseau interdite au laboratoire.');
+    }
     await Printing.layoutPdf(
       name: documentName(sale, languageCode),
       onLayout: (_) async => bytes,

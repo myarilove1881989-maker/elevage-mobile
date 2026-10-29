@@ -24,6 +24,7 @@ Map<String,dynamic> capabilities({bool owner=true})=>{
   'primary_device':{'id':7,'installation_uuid':'fixture-installation'},
 };
 Map<String,dynamic> declaration({bool cancelled=false})=>{
+  'reconciliation_mode':'LEGACY_V1',
   'operation_uuid':operation,'entity_type':'CLIENT','original_author_id':2,'device_id':7,
   'business_occurred_at':'2026-10-06T08:00:00Z','received_at':'2026-10-07T08:00:00Z',
   'original_payload':{'nom':'Client original, inchangé','telephone':'123'},'decision_version':cancelled?1:0,
@@ -40,6 +41,7 @@ void main() {
     final effects=<String,Map<String,dynamic>>{},bodies=<String>[];
     final api=ApiService(client:MockClient((request) async {
       if(request.url.path.endsWith('/capabilities/')) {return response(capabilities());}
+      if(request.method=='GET' && request.url.path.contains('/reconciliation/')) {return response(declaration());}
       bodies.add(request.body);
       final data=jsonDecode(request.body) as Map;
       expect(request.headers['Authorization'],'Bearer synthetic-owner-session');
@@ -98,6 +100,7 @@ void main() {
     final pending=PendingReconciliationDecision(operationId:operation,version:0,action:'CANCEL',reason:'Doublon physique vérifié.');
     final api=ApiService(client:MockClient((request) async {
       if(request.url.path.endsWith('/capabilities/')) {return response(capabilities(owner:false));}
+      if(request.method=='GET' && request.url.path.contains('/reconciliation/')) {return response(declaration());}
       if(request.url.path.endsWith('/challenge/')) {return response({'id':'fixture-challenge','device_id':7,'user_id':2,'purpose':'WRITE','signature_contract':'ELEVAGE-DEVICE-V1'});}
       decisions++;actualPath=request.url.path;expect(request.body,pending.encoded);expect(request.headers['X-Elevage-Signature'],'fixture-signature');
       return response({'decision_uuid':pending.data['decision_uuid'],'decision_actor_id':2,'original_author_id':2});
@@ -111,6 +114,7 @@ void main() {
     int decisions=0;
     final api=ApiService(client:MockClient((request) async {
       if(request.url.path.endsWith('/capabilities/')) {return response(capabilities(owner:false));}
+      if(request.method=='GET' && request.url.path.contains('/reconciliation/')) {return response(declaration());}
       if(request.url.path.endsWith('/challenge/')) {return response({'id':'wrong-user','device_id':7,'user_id':999,'purpose':'WRITE','signature_contract':'ELEVAGE-DEVICE-V1'});}
       decisions++;return response({});
     }));
@@ -119,7 +123,55 @@ void main() {
     expect(decisions,0);api.close();
   });
 
-  testWidgets('narrow owner screen requires motive and keeps Jean as original author', (tester) async {
+  for(final owner in [true,false]) {
+    for(final mode in ['READ_ONLY_V2','UNKNOWN',null]) {
+      test('service refuses every decision without POST or proof for owner=$owner mode=$mode',() async {
+        var posts=0;final identity=NativeIdentityFake();
+        final api=ApiService(client:MockClient((request) async {
+          if(request.url.path.endsWith('/capabilities/')) return response(capabilities(owner:owner));
+          if(request.method=='POST') {posts++;throw StateError('Unexpected mutation');}
+          final row=declaration()..['reconciliation_mode']=mode;
+          return response(row);
+        }));
+        final service=SupervisionService(api:api,identity:identity);await service.initialize();
+        for(final action in ['APPLY_ORIGINAL','CORRECTION','CANCEL','REVERSE','CASH_ALLOCATION']) {
+          await expectLater(service.decide(PendingReconciliationDecision(operationId:operation,version:0,
+            action:action,reason:'Synthetic forbidden decision')),throwsStateError);
+        }
+        expect(posts,0);expect(identity.message,isNull);api.close();
+      });
+    }
+    testWidgets('V2 detail stays consultable with reason and history but no decision owner=$owner',(tester) async {
+      var posts=0;
+      final row=declaration()..['reconciliation_mode']='READ_ONLY_V2'
+        ..['decisions']=[{'action':'CANCEL','reason':'Ancienne décision conservée','decided_at':'2026-10-06T09:00:00Z'}];
+      (row['receipt'] as Map)['reason_text']='Permission retirée, original conservé.';
+      final api=ApiService(client:MockClient((request) async {
+        final path=request.url.path;
+        if(request.method=='POST') {posts++;throw StateError('Unexpected mutation');}
+        if(path.endsWith('/capabilities/')) return response(capabilities(owner:owner));
+        if(path.endsWith('/memberships/')) return response([{'user':2,'username':'Jean'}]);
+        if(path.endsWith('/audit-events/')) {return response({'count':1,'next':null,'results':[
+          {'exploitation_id':1,'actor_user_id':2,'decision_actor_id':1,'action':'CANCEL',
+            'received_at':'2026-10-06T09:00:00Z','reason_text':'Ancienne décision conservée','before_data':{},'after_data':{}}]});}
+        if(path.endsWith('/reconciliation/')) return response({'count':1,'results':[row],'next':null});
+        return response(row);
+      }));
+      await tester.pumpWidget(MaterialApp(home:SupervisionScreen(service:SupervisionService(api:api))));
+      await tester.pumpAndSettle();await tester.tap(find.text('Client'));await tester.pumpAndSettle();
+      expect(find.text('Auteur original : Jean'),findsOneWidget);
+      expect(find.text('Nom : Client original, inchangé'),findsOneWidget);
+      expect(find.textContaining('Aucune approbation du propriétaire'),findsOneWidget);
+      expect(find.textContaining('Permission retirée, original conservé.'),findsOneWidget);
+      expect(find.text('Prendre une décision avec motif'),findsNothing);
+      expect(find.text('Historique de cette opération'),findsOneWidget);
+      expect(find.text('Annuler sans supprimer'),findsOneWidget); // Historical label, not a command.
+      expect(posts,0);expect(tester.takeException(),isNull);
+      await tester.pumpWidget(const SizedBox.shrink());api.close();
+    });
+  }
+
+  testWidgets('narrow V1 owner screen requires motive and keeps Jean as original author', (tester) async {
     Future<void> tapVisible(Finder target) async {
       await Scrollable.ensureVisible(tester.element(target),alignment:0.5);
       await tester.pumpAndSettle();await tester.tap(target);await tester.pumpAndSettle();

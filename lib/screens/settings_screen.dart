@@ -2,18 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'offline_tablet_screen.dart';
 import 'supervision_screen.dart';
+import 'user_management_screen.dart';
+import '../services/api_service.dart';
 
 import '../l10n/app_localizations.dart';
 import '../services/app_settings.dart';
+import '../services/access_error.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key,this.apiService});
+  final ApiService? apiService;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  bool owner=false;
+  bool checkingOwner=false;
+  String? ownerError;
+  String? ownerSession;
+  Future<void> loadOwner() async {
+    if(checkingOwner) return;
+    setState(() {checkingOwner=true;owner=false;ownerSession=null;ownerError=null;});
+    final api=widget.apiService??ApiService();
+    final session=ApiService.sessionIdentity;
+    if(session==null) {if(mounted) setState(() {checkingOwner=false;ownerError='Connectez-vous pour vérifier votre accès à la création des utilisateurs.';});if(widget.apiService==null) api.close();return;}
+    try {
+      final data=await api.get('/me/capabilities/');
+      if(mounted && session==(ApiService.sessionIdentity)) {
+        if(data is! Map || !{'OWNER','OPERATEUR'}.contains(data['role'])) throw const FormatException();
+        setState(() {owner=data['role']=='OWNER';ownerSession=session;});
+      }
+    } catch (error) {if(mounted && session==(ApiService.sessionIdentity)) setState(() {ownerError=safeAccessError(error, 'Vérification du rôle');});}
+    finally {if(mounted) setState(() {checkingOwner=false;});if(widget.apiService==null) api.close();}
+  }
   final settings = AppSettings.instance;
   late final TextEditingController cityController;
   late String language;
@@ -23,6 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    loadOwner();
     language = settings.languageCode;
     currency = settings.currencyCode;
     countryCode = settings.countryCode;
@@ -56,11 +80,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          ListTile(leading:const Icon(Icons.fact_check),title:const Text('Supervision et journal d’activité'),
+          if(checkingOwner) const LinearProgressIndicator(),
+          if(ownerError!=null) ListTile(title:Text(ownerError!),trailing:TextButton(onPressed:checkingOwner?null:loadOwner,child:const Text('Réessayer'))),
+          if(owner && ownerSession==(ApiService.sessionIdentity)) ListTile(
+            leading:const Icon(Icons.manage_accounts),title:const Text('Création des utilisateurs'),
+            onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const UserManagementScreen()))),
+          if(owner && ownerSession==(ApiService.sessionIdentity)) ListTile(leading:const Icon(Icons.fact_check),title:const Text('Supervision et journal d’activité'),
             onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SupervisionScreen()))),
-          if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android)
-            ListTile(leading:const Icon(Icons.tablet_android),title:const Text('Tablette de l’exploitation'),
-              onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const OfflineTabletScreen()))),
+          if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android && owner && ownerSession==ApiService.sessionIdentity)
+            ListTile(leading:const Icon(Icons.tablet_android),title:const Text('Configurer ma tablette'),
+              onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const OfflineTabletScreen(configure:true)))),
           DropdownButtonFormField<String>(
             isExpanded: true,
             value: countryCode,

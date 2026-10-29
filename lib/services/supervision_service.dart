@@ -26,7 +26,10 @@ class SupervisionService {
   String? _session;
   bool get owner=>capabilities?['role']=='OWNER';
   int get farmId=>capabilities!['exploitation'] as int;
-  String? get _currentSession=>ApiService.token??globalToken;
+  // Only an explicit server classification can enable historical decisions.
+  // Unknown/old responses remain consultable, but cannot authorize a mutation.
+  static bool allowsLegacyDecisions(Map<String,dynamic> row)=>row['reconciliation_mode']=='LEGACY_V1';
+  String? get _currentSession=>ApiService.sessionIdentity;
   void _guard() {
     if(_session==null || _session!=_currentSession) {
       capabilities=null;
@@ -103,6 +106,10 @@ class SupervisionService {
   Future<Map<String,dynamic>> decide(PendingReconciliationDecision decision) async {
     _guard();
     if(!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(decision.operationId)) {throw ArgumentError('Opération invalide.');}
+    final original=await detail(decision.operationId);
+    if(!allowsLegacyDecisions(original)) {
+      throw StateError('Consultation uniquement : aucune décision manuelle V2 n’est autorisée.');
+    }
     final path='/offline/reconciliation/${decision.operationId}/';
     final data=decision.data;
     Map<String,String> proof={};

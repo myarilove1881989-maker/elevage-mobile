@@ -6,6 +6,14 @@ import 'package:app_elevage/screens/feed_distribution_screen.dart';
 import 'package:app_elevage/services/api_service.dart';
 
 class EggApiFake extends ApiService {
+  @override
+  Future<dynamic> get(String endpoint) async {
+    if(endpoint!='/me/capabilities/') throw StateError('Unmocked request');
+    return {'user':2,'exploitation':1,'role':'OPERATEUR','offline_policy_enabled':false,
+      'membership':{'version':1},'permission_contract':{'version':1,'user':2,
+        'exploitation':1,'role':'OPERATEUR','rights_version':1,
+        'permissions':['finance.read','egg_collections.create','egg_sales.create','feed.create']}};
+  }
   int loads = 0;
   int collectionsCreated = 0;
   int? lastTrays;

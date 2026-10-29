@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:cryptography/cryptography.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../services/secure_storage_policy.dart';
 import 'package:path_provider/path_provider.dart';
 import 'farm_database.dart';
 export 'farm_database.dart';
@@ -30,7 +30,7 @@ Future<FarmDatabase> _openAndroidFarmDatabase({required int farmId, required Uri
   final namespace = namespaceHash.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   final directory = await getApplicationSupportDirectory();
   final file = File('${directory.path}/farm_${namespace}_$farmId.db');
-  const secrets = FlutterSecureStorage();
+  const secrets = protectedSecureStorage;
   final keyName = 'farm_db_key_${namespace}_$farmId';
   var key = await secrets.read(key: keyName);
   if (key == null) {

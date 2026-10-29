@@ -16,6 +16,7 @@ import 'package:app_elevage/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
 import 'production_tracking_test.dart' show ProductionTrackingApiFake, testApp;
 
 class MobileApiFake extends ProductionTrackingApiFake {
@@ -109,7 +110,13 @@ class MobileApiFake extends ProductionTrackingApiFake {
     },
   ];
   @override
-  Future<dynamic> get(String endpoint) async => <dynamic>[];
+  Future<dynamic> get(String endpoint) async => endpoint=='/me/capabilities/'?{
+    'user':1,'exploitation':1,'role':'OPERATEUR','membership':{'version':1},
+    'offline_policy_enabled':false,
+    'permission_contract':{'version':1,'user':1,'exploitation':1,'role':'OPERATEUR',
+      'rights_version':1,'permissions':['finance.read','history.read','purchases.create',
+        'expenses.create','feed.create','mortality.create','animal_sales.create']},
+  }:<dynamic>[];
   @override
   Future<List<dynamic>> getDepenses(int lotId) async => [];
   @override
@@ -125,6 +132,7 @@ void testOnAndroid(String name, Future<void> Function(WidgetTester) body) {
 }
 
 void main() {
+  setUpAll(tzdata.initializeTimeZones);
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     AppSettings.instance.languageCode = 'fr';

@@ -83,6 +83,7 @@ void main() {
     await db.customStatement('DROP TABLE outbox');
     await db.customStatement('DROP TABLE local_sequence_counter');
     await db.customStatement('DROP TABLE confirmed_cache_staging');
+    await db.customStatement('DROP TABLE screen_snapshots');
     await db.customStatement('PRAGMA user_version=1');
     await db.close();
     db=open();

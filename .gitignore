@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+**/.gradle/
 
 # Symbolication related
 app.*.symbols
@@ -48,3 +49,54 @@ app.*.map.json
 **/key.properties
 **/*.jks
 **/*.keystore
+
+# Local secrets, signing material, databases and distributable artifacts
+.env*
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.db
+*.db-*
+*.apk
+*.aab
+**/key.properties
+.netrc
+.pgpass
+id_rsa
+id_ed25519
+secrets.json
+secrets.*.json
+credentials.json
+credentials.*.json
+service-account*.json
+# Public trust anchor of this isolated LAB flavor only; private keys stay ignored.
+!android/app/src/lab/res/raw/elevage_lab_ca.pem
+
+!android/app/src/labWifi/res/raw/elevage_lab_ca.pem
+
+# Local development infrastructure, evidence and private test data
+.local/
+.cache/
+.venv/
+venv/
+tmp/
+evidence/
+artifacts/
+*.log
+*.zip
+__pycache__/
+*.pyc
+.env*
+*.p12
+*.pfx
+*.key
+*.jks
+*.keystore
+**/key.properties

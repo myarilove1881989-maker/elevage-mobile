@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../theme/terre_et_or_theme.dart';
 import 'feed_distribution_screen.dart';
+import '../widgets/terrain_entry_gate.dart';
 
 class EggProductionScreen extends StatefulWidget {
   final ApiService apiService;
@@ -141,6 +142,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
   }
 
   Future<void> showCollectionDialog() async {
+    if(!await TerrainEntryGate.allowClassic(context,widget.apiService,{'egg_collections.create'}) || !mounted) return;
     final trays = TextEditingController(text: '0');
     final remainder = TextEditingController(text: '0');
     final broken = TextEditingController(text: '0');
@@ -178,32 +180,14 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                           icon: const Icon(Icons.calendar_today_outlined),
                           label: Text(MaterialLocalizations.of(dialogContext)
                               .formatMediumDate(selectedDate)),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: dialogContext,
-                              initialDate: selectedDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null && dialogContext.mounted) {
-                              setDialogState(() => selectedDate = picked);
-                            }
-                          },
+                          onPressed: null,
                         ),
                         TextButton.icon(
                           key: const Key('eggCollectionTime'),
                           icon: const Icon(Icons.access_time),
                           label: Text(MaterialLocalizations.of(dialogContext)
                               .formatTimeOfDay(selectedTime)),
-                          onPressed: () async {
-                            final picked = await showTimePicker(
-                              context: dialogContext,
-                              initialTime: selectedTime,
-                            );
-                            if (picked != null && dialogContext.mounted) {
-                              setDialogState(() => selectedTime = picked);
-                            }
-                          },
+                          onPressed: null,
                         ),
                       ],
                     ),
@@ -279,8 +263,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                   try {
                     await widget.apiService.createEggCollection(
                       lotId: widget.lotId,
-                      collectedAt: DateTime(selectedDate.year, selectedDate.month,
-                          selectedDate.day, selectedTime.hour, selectedTime.minute),
+                      collectedAt: DateTime.now(),
                       fullTrays: values[0]!,
                       remainingEggs: values[1]!,
                       broken: values[2]!,
@@ -317,6 +300,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
   }
 
   Future<void> showSaleDialog() async {
+    if(!await TerrainEntryGate.allowClassic(context,widget.apiService,{'egg_sales.create'}) || !mounted) return;
     List<dynamic> clients;
     try {
       clients = await widget.apiService.getClients();
@@ -798,27 +782,27 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                     children: [
                       SizedBox(
                         width: buttonWidth,
-                        child: ElevatedButton.icon(
+                        child: BusinessCommand(api: widget.apiService, actions: const {'egg_collections.create'}, child: ElevatedButton.icon(
                           onPressed: showCollectionDialog,
                           icon: const Icon(Icons.add),
                           label: const Text('Nouvelle collecte'),
-                        ),
+                        )),
                       ),
                       SizedBox(
                         width: buttonWidth,
-                        child: ElevatedButton.icon(
+                        child: BusinessCommand(api: widget.apiService, actions: const {'egg_sales.create'}, child: ElevatedButton.icon(
                           onPressed: showSaleDialog,
                           icon: const Icon(Icons.shopping_cart_checkout),
                           label: const Text('Vendre des œufs'),
-                        ),
+                        )),
                       ),
                       SizedBox(
                         width: buttonWidth,
-                        child: ElevatedButton.icon(
+                        child: BusinessCommand(api: widget.apiService, actions: const {'feed.create'}, child: ElevatedButton.icon(
                           onPressed: showFeedDialog,
                           icon: const Icon(Icons.grass_outlined),
                           label: const Text('Alimentation'),
-                        ),
+                        )),
                       ),
                     ],
                   );

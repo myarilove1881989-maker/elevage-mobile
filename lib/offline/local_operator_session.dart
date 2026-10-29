@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:cryptography/cryptography.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../services/secure_storage_policy.dart';
 import 'package:flutter/foundation.dart';
 import 'offline_grant.dart';
 
@@ -12,7 +12,7 @@ abstract interface class OperatorSecretStore {
 
 class AndroidOperatorSecretStore implements OperatorSecretStore {
   const AndroidOperatorSecretStore();
-  static const _storage = FlutterSecureStorage();
+  static const _storage = protectedSecureStorage;
   @override
   Future<String?> read(String key) {
     _requireAndroid();
@@ -55,13 +55,29 @@ class LocalOperatorSessions {
     return _session;
   }
   int _lockEpoch=0;
+  /// Read-only transition counter; existing lock/PIN behavior is unchanged.
+  int get sessionEpoch => _lockEpoch;
   bool _busy = false;
   static final _kdf = Pbkdf2(macAlgorithm: Hmac.sha256(), iterations: 210000, bits: 256);
 
-  String _key(VerifiedOfflineGrant grant) =>
-      'operator_pin_${namespace}_${grant.farmId}_${grant.deviceId}_${grant.userId}';
+  String _key(VerifiedOfflineGrant grant,{bool personalCode=false}) =>
+      '${personalCode?'operator_code':'operator_pin'}_${namespace}_${grant.farmId}_${grant.deviceId}_${grant.userId}';
 
   void lock() { _session = null; _lockEpoch++; }
+
+  /// Replaces authorization only within a still-open, PIN-verified identity.
+  /// A locked/expired profile is never reopened by a network response.
+  void replaceAuthorization(VerifiedOfflineGrant grant) {
+    final current = session;
+    _validateGrant(grant);
+    if (current == null || current.userId != grant.userId ||
+        current.grant.claims['membership_id'] != grant.claims['membership_id'] ||
+        !grant.hasFineContract) {
+      throw StateError('Un profil personnel ouvert est requis pour actualiser les droits.');
+    }
+    _lockEpoch++;
+    _session = LocalOperatorSession(grant: grant, openedAt: current.openedAt);
+  }
 
   Future<void> enroll(VerifiedOfflineGrant grant, String pin) async {
     if (_busy) throw StateError('Une opération de sécurité est déjà en cours.');
@@ -77,11 +93,34 @@ class LocalOperatorSessions {
     } finally { _busy = false; }
   }
 
-  Future<void> _savePin(VerifiedOfflineGrant grant, String pin) async {
+  /// Called only with the code just authenticated by the server. A new signed
+  /// credential epoch is required; legacy PIN records are never reinterpreted.
+  Future<void> enrollPersonalCode(VerifiedOfflineGrant grant,String code,{required int authenticatedCredentialVersion}) async {
+    if(_busy) throw StateError('Une vérification est déjà en cours.');
+    if(!grant.hasFineContract || grant.credentialVersion!=authenticatedCredentialVersion) {
+      throw StateError('La préparation de cet accès doit être actualisée.');
+    }
+    _busy=true;lock();
+    try {_validateGrant(grant);_validateCode(code);await _savePin(grant,code,personalCode:true);}
+    finally {_busy=false;}
+  }
+  Future<bool> unlockPersonalCode(VerifiedOfflineGrant grant,String code) async {
+    if(_busy) throw StateError('Une vérification est déjà en cours.');
+    if(!grant.hasFineContract || grant.credentialVersion==null) return false;
+    _busy=true;lock();
+    try {return await _unlock(grant,code,personalCode:true);}
+    finally {_busy=false;}
+  }
+  void _validateCode(String code) {
+    if(code.trim().length<4 || code.length>256) throw ArgumentError('Code personnel incorrect.');
+  }
+
+  Future<void> _savePin(VerifiedOfflineGrant grant, String pin,{bool personalCode=false}) async {
     final random = Random.secure();
     final salt = List.generate(32, (_) => random.nextInt(256));
     final verifier = await _derive(pin, salt);
-    await store.write(_key(grant), jsonEncode({
+    await store.write(_key(grant,personalCode:personalCode), jsonEncode({
+      if(personalCode) 'credential_version':grant.credentialVersion,
       'salt': base64.encode(salt), 'verifier': base64.encode(verifier),
       'failures': 0, 'blocked_until': 0,
       'clock_floor': clock().toUtc().millisecondsSinceEpoch,
@@ -96,13 +135,15 @@ class LocalOperatorSessions {
     finally { _busy = false; }
   }
 
-  Future<bool> _unlock(VerifiedOfflineGrant grant, String pin) async {
+  Future<bool> _unlock(VerifiedOfflineGrant grant, String pin,{bool personalCode=false}) async {
     final epoch=_lockEpoch;
     _validateGrant(grant);
-    _validatePin(pin);
-    final encoded = await store.read(_key(grant));
+    if(personalCode) {_validateCode(pin);} else {_validatePin(pin);}
+    final key=_key(grant,personalCode:personalCode);
+    final encoded = await store.read(key);
     if (encoded == null) return false;
     final record = jsonDecode(encoded) as Map<String, dynamic>;
+    if(personalCode && record['credential_version']!=grant.credentialVersion) return false;
     final now = clock().toUtc().millisecondsSinceEpoch;
     if (now < (record['clock_floor'] as int) || now < (record['blocked_until'] as int)) return false;
     final actual = await _derive(pin, base64.decode(record['salt'] as String));
@@ -116,12 +157,12 @@ class LocalOperatorSessions {
       final failures = (record['failures'] as int) + 1;
       record['failures'] = failures;
       if (failures >= 5) record['blocked_until'] = now + min(3600000, 30000 * (1 << min(failures - 5, 7)));
-      await store.write(_key(grant), jsonEncode(record));
+      await store.write(key, jsonEncode(record));
       return false;
     }
     record['failures'] = 0;
     record['blocked_until'] = 0;
-    await store.write(_key(grant), jsonEncode(record));
+    await store.write(key, jsonEncode(record));
     _validateGrant(grant);
     if(epoch!=_lockEpoch || clock().toUtc().millisecondsSinceEpoch<now) return false;
     _session = LocalOperatorSession(grant: grant, openedAt: clock().toUtc());
@@ -148,8 +189,7 @@ class LocalOperatorSessions {
     if(grant.farmId!=farmId || grant.deviceId!=deviceId || grant.generation!=generation) {
       throw StateError('Ce profil ne correspond pas à cette tablette et exploitation.');
     }
-    if (!clock().toUtc().isBefore(grant.expiresAt) ||
-        clock().toUtc().millisecondsSinceEpoch < (grant.claims['iat'] as int) * 1000) {
+    if (!grant.validAt(clock())) {
       throw StateError('Autorisation expirée : connexion requise.');
     }
   }

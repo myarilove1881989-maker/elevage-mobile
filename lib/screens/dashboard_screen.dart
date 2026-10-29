@@ -1,5 +1,7 @@
 import 'package:app_elevage/services/api_service.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/financial_indicators.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +12,20 @@ import 'package:app_elevage/screens/lot_list_screen.dart';
 import 'package:app_elevage/screens/production_tracking_screen.dart';
 
 import '../main.dart';
+import '../config.dart';
+import '../widgets/connection_indicator.dart';
+import '../widgets/farm_navigation.dart';
+import '../widgets/cancellation_dialog.dart';
+import '../services/farm_session.dart';
+import '../services/farmer_runtime.dart';
+import '../services/server_connection.dart';
+import '../services/permission_contract.dart';
+import '../services/user_administration_service.dart';
+import '../offline/sync_state.dart';
+import 'operation_history_screen.dart';
+
+import 'owner_operation_history_screen.dart';
+import 'user_management_screen.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import 'package:app_elevage/screens/stock_detail_screen.dart';
@@ -25,6 +41,12 @@ import 'package:app_elevage/l10n/app_localizations.dart';
 import 'package:app_elevage/services/app_settings.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+class _DashboardReadFailure implements Exception {
+  const _DashboardReadFailure(this.label,this.connectionFailed);
+  final String label;
+  final bool connectionFailed;
+}
+
 class DashboardScreen extends StatefulWidget {
   final ApiService apiService;
 
@@ -36,6 +58,68 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late ApiService apiService;
+  String _receiptState='';
+  Timer? _receiptTimer;
+  String get _confirmedReceipts=>apiService.localOperations.where((r)=>r.businessStatus=='CONFIRMED')
+      .map((r)=>r.operationId).join('|');
+  void _receiptsChanged() {
+    final next=_confirmedReceipts;
+    if(next==_receiptState) return;
+    _receiptState=next;
+    _receiptTimer?.cancel();
+    _receiptTimer=Timer(const Duration(milliseconds:400),() {if(mounted) _reload();});
+  }
+  Widget _expenseScreen()=>apiService is FarmerApiService && apiService.hasUnifiedOfflineSession
+    ?AddDepenseScreen(tablet:(apiService as FarmerApiService).runtime.tablet,simple:true)
+    :AddDepenseScreen(apiService:apiService);
+  late final ServerConnection serverConnection;
+  Widget _connectionIndicator()=>AnimatedBuilder(animation:Listenable.merge([
+    serverConnection,if(apiService is FarmerApiService) (apiService as FarmerApiService).runtime.tablet]),
+    builder:(context,_) {
+      final tablet=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.tablet:null;
+      return ConnectionIndicator(networkAvailable:serverConnection.available,lastSuccess:serverConnection.lastSuccess,
+        serverUnavailable:serverConnection.available==false,syncing:tablet?.sync?.busy??false,
+        pending:tablet?.sync?.summary.pending,conflicts:tablet?.sync?.summary.conflicts,onSummary:_openHistory);
+    });
+  FarmSession? commonSession;
+  String? commonSessionToken;
+
+  Future<void> _loadCommonSession() async {
+    final token=(ApiService.sessionIdentity);
+    if(token==null) return;
+    try {
+      final result=await apiService.get('/me/capabilities/');
+      final rights=PermissionContract.decode(Map<String,dynamic>.from(result['permission_contract'] as Map),
+        userId:result['user'] as int,farmId:result['exploitation'] as int,
+        role:result['role'] as String,rightsVersion:result['membership']['version'] as int);
+      if(!mounted || token!=(ApiService.sessionIdentity)) return;
+      setState(() {commonSessionToken=token;commonSession=FarmSession(userId:rights.userId,farmId:rights.farmId,
+        role:rights.role,permissions:rights,origin:apiService.hasUnifiedOfflineSession?SessionOrigin.tabletProfile:SessionOrigin.personalHttp,
+        network:NetworkState.available,sync:const SyncSummary());});
+    } catch(_) { if(mounted) setState(()=>commonSession=null); }
+  }
+
+  Future<bool> _cancelTask(Map<String,dynamic> task) async {
+    await _loadCommonSession();
+    if(!mounted || commonSessionToken!=(ApiService.sessionIdentity) || commonSession?.canCancelTask!=true) return false;
+    final reason=await confirmCancellation(context,'Annuler cette tâche ?');
+    if(reason==null || !mounted || commonSessionToken!=(ApiService.sessionIdentity)) return false;
+    try {
+      await apiService.cancelTask(task['id'] as int,version:task['version'] as int,reason:reason);
+      if(!mounted || commonSessionToken!=(ApiService.sessionIdentity)) return false;
+      return true;
+    } catch(_) {
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Annulation non confirmée. Actualisez l’agenda avant de réessayer.')));
+      return false;
+    }
+  }
+
+  Widget? _taskCancellationButton(Map<String,dynamic> task) {
+    if(commonSession?.canCancelTask!=true || commonSessionToken!=(ApiService.sessionIdentity)) return null;
+    return IconButton(tooltip:'Annuler la tâche',icon:const Icon(Icons.cancel_outlined),onPressed:() async {
+      if(await _cancelTask(task)) await loadTasks();
+    });
+  }
 
   Map<String, dynamic>? data;
   List lots = [];
@@ -65,7 +149,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool isLoading = true;
 
-  double totalDettes = 0;
+  double? totalDettes;
+  String? loadError;
+  DateTime? lastApiSuccess;
+  bool serverUnavailable = false;
+  int? displayedLotId, displayedEspeceId;
   String username = '';
 
   DateTime _focusedDay = DateTime.now();
@@ -87,10 +175,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  void _openHistory() {
+    final owner = commonSessionToken == (ApiService.sessionIdentity) &&
+        commonSession?.role == 'OWNER';
+    Navigator.push(context, MaterialPageRoute<void>(builder: (_) => owner
+        ? OwnerOperationHistoryScreen(api: apiService)
+        : OperationHistoryScreen(api: apiService)));
+  }
+
   Future<void> _logout() async {
     await apiService.logout();
 
-    if (!mounted) return;
+    if (!mounted || apiService is FarmerApiService) return;
 
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => LoginScreen(apiService: apiService)),
@@ -102,6 +198,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     apiService = widget.apiService;
+    _receiptState=_confirmedReceipts;
+    apiService.sessionChanges?.addListener(_receiptsChanged);
+    serverConnection=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.connection
+      :ServerConnection(baseUrl:ApiService.baseUrl,check:apiService.probeServer);
+    if(apiService is! FarmerApiService) serverConnection.start();
+    _loadCommonSession();
     loadUsername();
     initData();
   }
@@ -119,168 +221,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
       temp[date]!.add(task); // ?? garde tout (id + title)
     }
 
+    if (!mounted) { return; }
     setState(() {
       events = temp;
     });
   }
 
-  Future<void> initData() async {
-    try {
+  Map<String, List<Map<String, dynamic>>> _taskEvents(List rawTasks) {
+    final result = <String, List<Map<String, dynamic>>>{};
+    for (final task in rawTasks) {
+      final date = task['date'].split('T')[0] as String;
+      result.putIfAbsent(date, () => []).add(Map<String, dynamic>.from(task));
+    }
+    return result;
+  }
 
-      final results = await Future.wait([
-        widget.apiService.getDashboard(),
-        widget.apiService.getLots(),
-        widget.apiService.getEspeces(),
-        widget.apiService.getTasks(),
-        widget.apiService.getTotalDettes(),
+  Future<T> _requiredRead<T>(String label,Future<T> work) async {
+    try {return await work;} catch(error) {
+      throw _DashboardReadFailure(label,error is ApiConnectionException);
+    }
+  }
+  void _loadFailed(Object error) {
+    loadError = data == null
+        ? error is _DashboardReadFailure
+            ? 'Chargement incomplet : ${error.label}. Reconnectez-vous avec Internet pour préparer ces données.'
+            : 'Données indisponibles. Réessayez lorsque la connexion le permet.'
+        : 'Actualisation impossible. Les dernières données affichées sont conservées.';
+    serverUnavailable = error is ApiConnectionException ||
+      (error is _DashboardReadFailure && error.connectionFailed);
+    lastApiSuccess = null;
+    // Keep the filter consistent with the retained snapshot after a failed read.
+    selectedLotId = displayedLotId;
+    selectedEspeceId = displayedEspeceId;
+  }
+
+  Future<void> initData() async { await _reload(includeTasks: true); }
+
+  Future<bool> _reload({bool includeTasks = false}) async {
+    final lotId = selectedLotId;
+    final speciesId = selectedEspeceId;
+    if (mounted) { setState(() { isLoading = true; loadError = null; }); }
+    try {
+      final results = await Future.wait<Object>([
+        _requiredRead('bilan du tableau de bord',lotId == null ? apiService.getDashboard(especeId: speciesId)
+            : apiService.getLotDetail(lotId)),
+        _requiredRead('liste des lots',apiService.getLots()),
+        _requiredRead('liste des espèces',apiService.getEspeces()),
+        _requiredRead('total des dettes',apiService.getTotalDettes()),
+        if (includeTasks) _requiredRead('liste des tâches',apiService.getTasks()),
       ]);
-
-      if (!mounted) return;
-
+      final nextData = Map<String, dynamic>.from(results[0] as Map);
+      final nextLots = results[1] as List;
+      final nextSpecies = _createdSpecies(results[2] as List, nextLots);
+      if ((speciesId != null && !nextSpecies.any((item) => _intValue(item['id']) == speciesId)) ||
+          (lotId != null && !nextLots.any((item) => _intValue(item['id']) == lotId))) {
+        throw StateError('Le périmètre affiché ne figure plus dans les données reçues.');
+      }
+      final nextDebt = results[3] as double;
+      final nextEvents = includeTasks ? _taskEvents(results[4] as List) : events;
+      if (!mounted) { return false; }
+      // Commit the view snapshot only when every requested read succeeded.
       setState(() {
-        data = results[0] as Map<String, dynamic>;
-        lots = results[1] as List;
-        especes = _createdSpecies(results[2] as List, lots);
-
-        // ?? tasks
-        final rawTasks = results[3] as List;
-        Map<String, List<Map<String, dynamic>>> temp = {};
-        for (var task in rawTasks) {
-          final date = task["date"].split("T")[0];
-          temp.putIfAbsent(date, () => []);
-          temp[date]!.add(task);
-        }
-        events = temp;
-
-        totalDettes = (results[4] as double);
-
-        isLoading = false;
+        data = nextData; lots = nextLots; especes = nextSpecies;
+        totalDettes = nextDebt; events = nextEvents;
+        displayedLotId = lotId; displayedEspeceId = speciesId;
+        lastApiSuccess = DateTime.now(); serverUnavailable = false;
       });
-    } catch (e) {
-
-      if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Erreur: $e")));
+      return true;
+    } catch (error) {
+      if (mounted) { setState(() => _loadFailed(error)); }
+      return false;
+    } finally {
+      if (mounted) { setState(() => isLoading = false); }
     }
   }
 
-  Future<void> fetchDashboard() async {
+  Future<void> _loadScope({int? lotId, int? speciesId}) async {
+    if (mounted) { setState(() { isLoading = true; loadError = null; }); }
     try {
-      final result = await widget.apiService.getDashboard();
-
-      if (!mounted) return;
-
+      final result = lotId == null ? await apiService.getDashboard(especeId: speciesId)
+          : await apiService.getLotDetail(lotId);
+      if (!mounted) { return; }
       setState(() {
-        data = result;
+        data = result; displayedLotId = lotId; displayedEspeceId = speciesId;
+        lastApiSuccess = DateTime.now(); serverUnavailable = false;
       });
-    } catch (e) {
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Erreur dashboard")));
+    } catch (error) {
+      if (mounted) { setState(() => _loadFailed(error)); }
+    } finally {
+      if (mounted) { setState(() => isLoading = false); }
     }
   }
 
-  Future<void> fetchDashboardByEspece(int? especeId) async {
-    try {
-      setState(() => isLoading = true);
-
-      final result = await widget.apiService.getDashboard(especeId: especeId);
-
-      if (!mounted) return;
-
-      setState(() {
-        data = result;
-        isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() => isLoading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Erreur chargement des données de l'espèce"),
-        ),
-      );
-    }
-  }
-
-  Future<void> fetchLots() async {
-    try {
-      final result = await widget.apiService.getLots();
-
-      if (!mounted) return;
-
-      setState(() {
-        lots = result;
-      });
-    } catch (e) {
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Erreur chargement lots")));
-    }
-  }
-
-  Future<void> fetchEspeces() async {
-    try {
-      final result = await widget.apiService.getEspeces();
-
-      if (!mounted) return;
-
-      setState(() {
-        especes = _createdSpecies(result, lots);
-
-        if (selectedEspeceId != null &&
-            !especes.any(
-              (species) => _intValue(species['id']) == selectedEspeceId,
-            )) {
-          selectedEspeceId = null;
-          selectedLotId = null;
-        }
-      });
-    } catch (e) {
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Erreur chargement espèces")),
-      );
-    }
-  }
-
-  Future<void> fetchLotDetail(int lotId) async {
-    try {
-      setState(() => isLoading = true);
-
-      final result = await widget.apiService.getLotDetail(lotId);
-
-      if (!mounted) return;
-
-      setState(() {
-        data = result;
-        isLoading = false;
-      });
-    } catch (e) {
-
-      if (!mounted) return;
-
-      setState(() => isLoading = false);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Erreur chargement lot")));
-    }
-  }
+  Future<void> fetchDashboard() => _loadScope();
+  Future<void> fetchDashboardByEspece(int? especeId) => _loadScope(speciesId: especeId);
+  Future<void> fetchLotDetail(int lotId) => _loadScope(lotId: lotId, speciesId: selectedEspeceId);
 
   Future<void> scheduleNotification(String title, DateTime date) async {
     final scheduledDate = tz.TZDateTime.from(
@@ -317,7 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     bool isMoney = false,
     String? unit,
   }) {
-    final subtitle =
+    final subtitle = value == null ? '' :
         unit ?? (isMoney ? AppSettings.instance.currency.symbol : '');
 
     return Material(
@@ -374,7 +409,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isMoney
+                      value == null ? 'Indisponible' : isMoney
                           ? AppSettings.instance
                                 .formatMoney(value)
                                 .replaceAll(
@@ -446,25 +481,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return events[key] ?? [];
   }
 
-  Future<void> refreshDashboard() async {
-    if (selectedLotId != null) {
-      await fetchLotDetail(selectedLotId!);
-    } else if (selectedEspeceId != null) {
-      await fetchDashboardByEspece(selectedEspeceId);
-    } else {
-      // ? CAS GLOBAL (IMPORTANT)
-      await fetchDashboard();
-    }
-
-    await fetchLots();
-    await fetchEspeces();
-
-    final dettes = await apiService.getTotalDettes();
-
-    setState(() {
-      totalDettes = dettes;
-    });
-  }
+  Future<void> refreshDashboard() async { await _reload(); }
 
   void showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -494,23 +511,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         title: Text(t["title"]),
 
                         // ?? BOUTON SUPPRIMER
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () async {
-                            await apiService.deleteTask(t["id"]);
-                            await loadTasks();
-
-                            if (mounted && Navigator.canPop(context)) {
-                              Navigator.pop(context);
-                            } // ferme popup
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(context.tr('task_deleted')),
-                              ),
-                            );
-                          },
-                        ),
+                        trailing: _taskCancellationButton(t),
                       ),
                     )
                     .toList(),
@@ -525,7 +526,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _addTask() {
+  bool get _mayPlanTasks => commonSessionToken == (ApiService.sessionIdentity) &&
+      commonSession?.role == 'OWNER' && commonSession?.permissions?.allows('agenda.plan') == true;
+
+  void _addTask() async {
+    await _loadCommonSession();
+    if(!mounted || !_mayPlanTasks) return;
     String newTask = "";
 
     showDialog(
@@ -542,6 +548,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () async {
               final day = _selectedDay ?? DateTime.now();
 
+              await _loadCommonSession();
+              if(!mounted || !_mayPlanTasks) return;
               await apiService.createTask(newTask, day);
 
               try {
@@ -561,15 +569,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refreshAll() async {
-    setState(() => isLoading = true);
-    await refreshDashboard();
-    await fetchEspeces();
-    await loadTasks();
-    if (!mounted) return;
-    setState(() => isLoading = false);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(context.tr('data_updated'))));
+    if (isLoading) { return; }
+    final succeeded = await _reload(includeTasks: true);
+    if (!mounted || !succeeded) { return; }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(context.tr('data_updated'))));
   }
 
   Future<void> _openLots() async {
@@ -584,7 +588,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AddDepenseScreen(apiService: apiService),
+        builder: (_) => _expenseScreen(),
       ),
     );
     if (result == true) await refreshDashboard();
@@ -635,6 +639,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _openTutorial(String languageCode) async {
+    if (!Config.current.externalLinksAllowed) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Les liens externes sont désactivés dans le pilote.'),
+        ));
+      }
+      return;
+    }
     final fileName = languageCode == 'en'
         ? 'elevage-user-guide-en.pdf'
         : 'guide-utilisateur-elevage.pdf';
@@ -701,6 +713,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _brandTitle() {
     return RichText(
       text: const TextSpan(
+        style:TextStyle(fontFamily:'Roboto'),
         children: [
           TextSpan(
             text: "Elev'",
@@ -723,6 +736,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _dashboardHeading(double height) {
+    // A fixed heading prevents scrolling content underneath the toolbar from
+    // cutting the title. Compact viewports (including the keyboard) need less height.
+    if (height < 70) { return const SizedBox.shrink(); }
+    final compact = height < 350;
+    return Padding(
+                padding: EdgeInsets.fromLTRB(8, compact ? 8 : 28, 8, compact ? 8 : 22),
+                child: Column(
+                  children: [
+                    RichText(
+                      key: const Key('dashboardHeading'),
+                      textScaler: MediaQuery.textScalerOf(context),
+                      maxLines: compact ? 2 : null,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style:const TextStyle(fontFamily:'Roboto'),
+                        children: [
+                          TextSpan(
+                            text: context.tr('dashboard'),
+                            style: TextStyle(
+                              color: Color(0xFF063B63),
+                              fontSize: compact ? 28 : 42,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (username.isNotEmpty)
+                            TextSpan(
+                              text: " $username",
+                              style: TextStyle(
+                                color: Color(0xFF16834B),
+                                fontSize: compact ? 28 : 42,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (height >= 160) Text(
+                      context.tr('overview'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF607080),
+                        fontSize: compact ? 16 : 22,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+  }
+
   Widget _navigationDrawer() {
     Widget item(String label, IconData icon, VoidCallback action) {
       return ListTile(
@@ -737,7 +803,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Drawer(
       child: SafeArea(
-        child: Column(
+        child: ListView(
+          padding: EdgeInsets.zero,
           children: [
             Container(
               width: double.infinity,
@@ -745,43 +812,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
               child: _brandTitle(),
             ),
-            item(
-              context.tr('purchases'),
-              Icons.shopping_bag_outlined,
-              () => _openAchat(),
-            ),
-            item(
-              context.tr('expenses'),
-              Icons.shopping_cart_outlined,
-              () => _openDepense(),
-            ),
-            item(
-              context.tr('production_tracking'),
-              Icons.monitor_heart_outlined,
-              () => _openProductionTracking(),
-            ),
-            item(
-              context.tr('movements'),
-              Icons.swap_horiz,
-              () => _openMouvement(),
-            ),
-            item(
-              context.tr('billing'),
-              Icons.receipt_long_outlined,
-              _openClients,
-            ),
-            item(context.tr('history'), Icons.history, () => _openLots()),
-            item(
-              context.tr('settings'),
-              Icons.settings_outlined,
-              _openSettings,
-            ),
+            FarmNavigation(session:commonSessionToken==(ApiService.sessionIdentity)?commonSession:null,labels:{
+              FarmDestination.dashboard:context.tr('dashboard'),
+              FarmDestination.lots:AppLocalizations.of(context).languageCode=='en'?'Batches':'Lots',
+              FarmDestination.purchases:context.tr('purchases'),
+              FarmDestination.sales:context.tr('sale'),
+              FarmDestination.expenses:context.tr('expenses'),
+              FarmDestination.movements:context.tr('movements'),
+              FarmDestination.history:context.tr('history'),
+              FarmDestination.agenda:AppLocalizations.of(context).languageCode=='en'?'Tasks':'Agenda',
+              FarmDestination.production:context.tr('production_tracking'),
+              FarmDestination.settings:context.tr('settings'),
+              FarmDestination.users:AppLocalizations.of(context).languageCode=='en'?'User management':'Gestion des utilisateurs',
+            },actions:{
+              FarmDestination.dashboard:()=>Navigator.pop(context),
+              FarmDestination.lots:() {Navigator.pop(context);_openLots();},
+              FarmDestination.purchases:() {Navigator.pop(context);_openAchat();},
+              FarmDestination.sales:() {Navigator.pop(context);_openMouvement();},
+              FarmDestination.expenses:() {Navigator.pop(context);_openDepense();},
+              FarmDestination.movements:() {Navigator.pop(context);_openMouvement();},
+              FarmDestination.history:() {Navigator.pop(context);_openHistory();},
+              FarmDestination.agenda:() {Navigator.pop(context);_showTasksForDay(_selectedDay??_focusedDay);},
+              FarmDestination.production:() {Navigator.pop(context);_openProductionTracking();},
+              FarmDestination.settings:() {Navigator.pop(context);_openSettings();},
+              FarmDestination.users:() {Navigator.pop(context);Navigator.push(context,MaterialPageRoute(builder:(_)=>UserManagementScreen(service:UserAdministrationService(apiService))));},
+            }),
             item(
               context.tr('tutorial'),
               Icons.menu_book_outlined,
               _chooseTutorialLanguage,
             ),
-            const Spacer(),
             const Divider(height: 1),
             item(context.tr('logout'), Icons.logout, _logout),
           ],
@@ -792,88 +852,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _receiptTimer?.cancel();apiService.sessionChanges?.removeListener(_receiptsChanged);
+    if(apiService is! FarmerApiService) serverConnection.dispose();
     _tasksScrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF063B63),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 22,
-                    height: 3,
-                    margin: const EdgeInsets.symmetric(vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Container(
-                    width: 22,
-                    height: 3,
-                    margin: const EdgeInsets.symmetric(vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  Container(
-                    width: 22,
-                    height: 3,
-                    margin: const EdgeInsets.symmetric(vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              RichText(
-                text: const TextSpan(
-                  children: [
-                    TextSpan(
-                      text: "Elev'",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                      ),
-                    ),
-                    TextSpan(
-                      text: "Age",
-                      style: TextStyle(
-                        color: Color(0xFF4CAF50),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     final kpis = data?["kpis"] ?? {};
     final filteredLots = getFilteredLots();
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final showNavActions = screenWidth >= 1100;
-    final navSpacing = screenWidth < 1200 ? 12.0 : 18.0;
+    final showNavActions = screenWidth >= 1100 && MediaQuery.textScalerOf(context).scale(13) <= 16;
+    final navSpacing = screenWidth < 1200 ? 4.0 : 18.0;
 
     return Scaffold(
       drawer: _navigationDrawer(),
@@ -891,9 +882,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               title: const Text('Élev’Age'),
               actions: [
+                _connectionIndicator(),
                 IconButton(
                   tooltip: context.tr('refresh'),
-                  onPressed: _refreshAll,
+                  onPressed: isLoading ? null : _refreshAll,
                   icon: const Icon(Icons.refresh),
                 ),
               ],
@@ -923,6 +915,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(width: 6),
                       RichText(
                         text: const TextSpan(
+                          style:TextStyle(fontFamily:'Roboto'),
                           children: [
                             TextSpan(
                               text: "Elev'",
@@ -957,9 +950,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        _connectionIndicator(),
                         // ACTUALISER
                         InkWell(
-                          onTap: _refreshAll,
+                          onTap: isLoading ? null : _refreshAll,
                           child: SizedBox(
                             width: screenWidth < 700 ? 44 : 76,
                             child: Column(
@@ -1024,7 +1018,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
-                                      AddDepenseScreen(apiService: apiService),
+                                      _expenseScreen(),
                                 ),
                               );
 
@@ -1158,7 +1152,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           // HISTORIQUE
                           InkWell(
-                            onTap: _openLots,
+                            onTap: _openHistory,
                             child: SizedBox(
                               width: 80,
                               child: Column(
@@ -1218,60 +1212,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-      body: SingleChildScrollView(
+      body: LayoutBuilder(builder: (context, constraints) => Column(children: [
+        if(apiService is FarmerApiService && (apiService as FarmerApiService).runtime.warning!=null)
+          Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),
+            color:const Color(0xFFFFF4DF),child:Text((apiService as FarmerApiService).runtime.warning!,
+              key:const Key('farmer-online-only-notice'),style:const TextStyle(color:Color(0xFF694A17)))),
+        if(apiService.lastOperationMessage!=null) Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),
+          child:Text(apiService.lastOperationMessage!,key:const Key('last-operation-receipt'))),
+        _dashboardHeading(constraints.maxHeight),
+        Expanded(child: data == null
+          ? Center(child: isLoading
+              ? const CircularProgressIndicator()
+              : Padding(padding: const EdgeInsets.all(24), child: Column(
+                  mainAxisSize: MainAxisSize.min, children: [
+                    Text(loadError ?? 'Données indisponibles.', textAlign: TextAlign.center),
+                    TextButton(onPressed: _refreshAll, child: const Text('Réessayer')),
+                  ])))
+          : SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Column(
             children: [
-              /// ?? TITRE SECTION (remplace AppBar subtitle)
-              Padding(
-                padding: const EdgeInsets.only(top: 28, bottom: 22),
-                child: Column(
-                  children: [
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: context.tr('dashboard'),
-                            style: const TextStyle(
-                              color: Color(0xFF063B63),
-                              fontSize: 42,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          if (username.isNotEmpty)
-                            TextSpan(
-                              text: " $username",
-                              style: const TextStyle(
-                                color: Color(0xFF16834B),
-                                fontSize: 42,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      context.tr('overview'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Color(0xFF607080),
-                        fontSize: 22,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              if (isLoading) const LinearProgressIndicator(),
+              if (isLoading) const Padding(padding: EdgeInsets.all(8), child: Text(
+                'Actualisation en cours : les données précédentes restent affichées.')),
+              if (loadError != null) Padding(padding: const EdgeInsets.all(8),
+                child: Text(loadError!, style: TextStyle(color: Colors.orange.shade800))),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final bool horizontal = constraints.maxWidth >= 900;
 
                   Widget especeFilter() {
                     return DropdownButtonFormField<int>(
-
+                      key: ValueKey('dashboardSpecies:$selectedEspeceId'),
                       isExpanded: true,
 
                       value: selectedEspeceId ?? 0,
@@ -1314,7 +1287,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           );
                         }),
                       ],
-                      onChanged: (value) {
+                      onChanged: isLoading ? null : (value) {
                         setState(() {
                           selectedEspeceId = value == 0 ? null : value;
                           selectedLotId = null;
@@ -1327,7 +1300,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   Widget lotFilter() {
                     return DropdownButtonFormField<int?>(
-
+                      key: ValueKey('dashboardLot:$selectedLotId'),
 
                       isExpanded: true,
 
@@ -1375,7 +1348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           );
                         }),
                       ],
-                      onChanged: (value) {
+                      onChanged: isLoading ? null : (value) {
                         setState(() {
                           selectedLotId = value;
                         });
@@ -1415,28 +1388,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
               LayoutBuilder(
                 builder: (context, constraints) {
                   int columns;
-                  double cardRatio;
 
                   if (constraints.maxWidth >= 1400) {
                     // Grand écran : 5 cards sur une ligne
                     columns = 5;
-                    cardRatio = 1.55;
                   } else if (constraints.maxWidth >= 1100) {
                     // écran moyen : 5 cards sur une ligne
                     columns = 5;
-                    cardRatio = 1.45;
                   } else if (constraints.maxWidth >= 800) {
                     // écran réduit : 3 cards par ligne
                     columns = 3;
-                    cardRatio = 1.50;
                   } else if (constraints.maxWidth >= 550) {
                     // Tablette : 2 cards par ligne
                     columns = 2;
-                    cardRatio = 1.55;
                   } else {
                     // Téléphone : 1 card par ligne
                     columns = 1;
-                    cardRatio = 1.70;
                   }
 
                   return GridView.count(
@@ -1445,11 +1412,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: cardRatio,
+                    childAspectRatio: ((constraints.maxWidth - 16 * (columns - 1)) / columns / 190) /
+                        (MediaQuery.textScalerOf(context).scale(24) / 24).clamp(1.0, 2.0),
                     children: [
                       buildCard(
                         context.tr('stock_total'),
-                        kpis["stock"] ?? kpis["stock_total"] ?? 0,
+                        kpis["stock"] ?? kpis["stock_total"],
                         Icons.inventory_2,
                         Colors.green,
                         () {
@@ -1472,7 +1440,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       buildCard(
                         context.tr('revenue'),
-                        kpis["chiffre_affaires"] ?? 0,
+                        kpis["chiffre_affaires"],
                         Icons.trending_up,
                         Colors.blue,
                         () {
@@ -1495,7 +1463,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       buildCard(
                         context.tr('expenses'),
-                        kpis["depenses"] ?? 0,
+                        kpis["depenses"],
                         Icons.account_balance_wallet,
                         Colors.orange,
                         () {
@@ -1517,8 +1485,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         isMoney: true,
                       ),
                       buildCard(
-                        context.tr('performance'),
-                        kpis["performance"] ?? 0,
+                        'Solde / CA (hors achats)',
+                        operatingBalanceRate(kpis)?.toStringAsFixed(1),
                         Icons.pie_chart,
                         Colors.deepPurple,
                         () {
@@ -1530,7 +1498,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           );
                         },
-                        unit: context.tr('margin_revenue'),
+                        unit: '% · pas un bénéfice',
                       ),
                       buildCard(
                         context.tr('client_balance'),
@@ -1595,7 +1563,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            if (isLargeScreen)
+                            if (isLargeScreen && _mayPlanTasks)
                               ElevatedButton.icon(
                                 onPressed: _addTask,
                                 icon: const Icon(Icons.add, size: 18),
@@ -1818,7 +1786,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ],
 
                             // ================= AJOUT SUR PETIT ÉCRAN =================
-                            if (!isLargeScreen)
+                            if (!isLargeScreen && _mayPlanTasks)
                               IconButton(
                                 tooltip: context.tr('add_task'),
                                 onPressed: _addTask,
@@ -1887,9 +1855,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   padding: const EdgeInsets.only(bottom: 6),
                                   child: Dismissible(
                                     key: Key(task["id"].toString()),
-                                    direction: DismissDirection.endToStart,
+                                    direction: DismissDirection.none,
                                     onDismissed: (_) async {
-                                      await apiService.deleteTask(task["id"]);
+                                      if(!await _cancelTask(task)) return;
                                       await loadTasks();
 
                                       if (!mounted) return;
@@ -1898,7 +1866,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         context,
                                       ).showSnackBar(
                                         const SnackBar(
-                                          content: Text("Tâche supprimée"),
+                                          content: Text("Tâche annulée — historique conservé"),
                                         ),
                                       );
                                     },
@@ -1912,7 +1880,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         horizontal: 20,
                                       ),
                                       child: const Icon(
-                                        Icons.delete,
+                                        Icons.cancel_outlined,
                                         color: Colors.white,
                                       ),
                                     ),
@@ -1937,32 +1905,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                        trailing: IconButton(
-                                          tooltip: "Supprimer",
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red,
-                                            size: 21,
-                                          ),
-                                          onPressed: () async {
-                                            await apiService.deleteTask(
-                                              task["id"],
-                                            );
-                                            await loadTasks();
-
-                                            if (!mounted) return;
-
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  "Tâche supprimée",
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
+                                        trailing: _taskCancellationButton(task),
                                       ),
                                     ),
                                   ),
@@ -2002,7 +1945,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-      ),
+      )),
+      ])),
     );
   }
 }

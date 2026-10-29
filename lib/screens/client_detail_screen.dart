@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../config.dart';
 import 'package:flutter/foundation.dart';
 import 'invoice_preview_screen.dart';
 import '../services/app_settings.dart';
@@ -6,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../services/invoice_pdf_service.dart';
 import '../theme/terre_et_or_theme.dart';
+import '../widgets/terrain_entry_gate.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ClientDetailScreen extends StatefulWidget {
@@ -39,14 +42,36 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   bool loading = true;
   String? loadError;
   bool isPaying = false;
+  bool _loading=false,_reloadRequested=false;
+  String _receiptState='';
+  Timer? _receiptTimer;
+  String get _confirmedReceipts=>api.localOperations.where((r)=>r.businessStatus=='CONFIRMED')
+      .map((r)=>r.operationId).join('|');
+  void _receiptsChanged() {
+    final next=_confirmedReceipts;
+    if(next==_receiptState) return;
+    _receiptState=next;
+    _receiptTimer?.cancel();
+    _receiptTimer=Timer(const Duration(milliseconds:250),() {if(mounted) load();});
+  }
+  @override
+  void dispose() {
+    _receiptTimer?.cancel();api.sessionChanges?.removeListener(_receiptsChanged);
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _receiptState=_confirmedReceipts;
+    api.sessionChanges?.addListener(_receiptsChanged);
     load();
   }
 
   Future<void> load() async {
+    if(_loading) {_reloadRequested=true;return;}
+    if(!mounted) return;
+    _loading=true;
     setState(() {
       loading = true;
       loadError = null;
@@ -88,6 +113,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
             ? context.tr('server_unreachable')
             : e.toString();
       });
+    } finally {
+      _loading=false;
+      if(_reloadRequested && mounted) {_reloadRequested=false;unawaited(load());}
     }
   }
 
@@ -124,13 +152,18 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   // ================= PAIEMENT =================
 
   Future<void> payer(int venteId, double resteVente) async {
+    if(isPaying) return;
+    if(!await TerrainEntryGate.allowClassic(context,api,{'cash.create'}) || !mounted) return;
     final controller = TextEditingController();
+    String? paymentMode;
+    String? paymentError;
 
     await showDialog(
       context: context,
+      barrierDismissible:false,
       builder: (_) => StatefulBuilder(
         builder: (context, setStateDialog) {
-          return AlertDialog(
+          return PopScope(canPop:!isPaying,child:AlertDialog(
             title: Row(
               children: [
                 const Icon(Icons.payment),
@@ -138,9 +171,10 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 Text(context.tr('save_payment')),
               ],
             ),
-            content: Column(
+            content: SingleChildScrollView(child:Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if(paymentError!=null) Text(paymentError!,style:const TextStyle(color:Colors.red)),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
@@ -169,6 +203,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: controller,
+                  enabled:!isPaying,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -179,11 +214,21 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     border: OutlineInputBorder(),
                   ),
                 ),
+                if(api.hasUnifiedOfflineSession) ...[
+                  const SizedBox(height:14),
+                  DropdownButtonFormField<String>(initialValue:paymentMode,
+                    decoration:const InputDecoration(labelText:'Mode de paiement'),
+                    items:const [DropdownMenuItem(value:'ESPECES',child:Text('Espèces')),
+                      DropdownMenuItem(value:'MOBILE_MONEY',child:Text('Mobile Money')),
+                      DropdownMenuItem(value:'VIREMENT',child:Text('Virement')),
+                      DropdownMenuItem(value:'CHEQUE',child:Text('Chèque'))],
+                    onChanged:isPaying?null:(value)=>setStateDialog(()=>paymentMode=value)),
+                ],
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: resteVente <= 0
+                    onPressed: isPaying || resteVente <= 0
                         ? null
                         : () {
                             controller.text = resteVente.toStringAsFixed(2);
@@ -193,7 +238,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                   ),
                 ),
               ],
-            ),
+            )),
             actions: [
               TextButton(
                 onPressed: isPaying
@@ -207,6 +252,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 onPressed: isPaying
                     ? null
                     : () async {
+                        if(api.hasUnifiedOfflineSession && paymentMode==null) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Choisissez le mode de paiement.')));return;
+                        }
                         final montant = double.tryParse(controller.text.trim());
 
                         if (montant == null || montant <= 0) {
@@ -232,7 +280,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                         }
 
                         setState(() {
-                          isPaying = true;
+                          isPaying = true;paymentError=null;
                         });
 
                         setStateDialog(() {});
@@ -242,10 +290,12 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                             widget.clientId,
                             venteId,
                             montant,
+                            mode:paymentMode,
                           );
 
                           if (!mounted) return;
 
+                          isPaying=false;
                           Navigator.pop(context);
 
                           await load();
@@ -254,13 +304,14 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(context.tr('payment_saved')),
+                              content: Text(api.operationFeedback(context.tr('payment_saved'))),
                             ),
                           );
                         } catch (e) {
 
                           if (!mounted) return;
 
+                          setStateDialog(() {isPaying=false;paymentError='Paiement non enregistré : $e';});
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text("Erreur : $e")),
                           );
@@ -281,7 +332,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                     : Text(context.tr('validate')),
               ),
             ],
-          );
+          ));
         },
       ),
     );
@@ -292,6 +343,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   // ================= CONTACT =================
 
   Future<void> appeler() async {
+    if (!Config.current.externalLinksAllowed) return;
     if (widget.telephone.trim().isEmpty) return;
 
     final uri = Uri.parse("tel:${widget.telephone}");
@@ -302,6 +354,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   }
 
   Future<void> sms() async {
+    if (!Config.current.externalLinksAllowed) return;
     if (widget.telephone.trim().isEmpty) return;
 
     final uri = Uri.parse("sms:${widget.telephone}");
@@ -746,11 +799,11 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: BusinessCommand(api: api, actions: const {'cash.create'}, child: ElevatedButton.icon(
                   onPressed: () => payer((venteId as num).toInt(), reste),
                   icon: const Icon(Icons.payment, size: 18),
                   label: Text(context.tr('pay')),
-                ),
+                )),
               ),
             ],
           ],

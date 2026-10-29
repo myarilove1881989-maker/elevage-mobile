@@ -17,6 +17,8 @@ class LotListScreen extends StatefulWidget {
 class _LotListScreenState extends State<LotListScreen> {
   List<dynamic> lots = [];
   bool isLoading = true;
+  bool hasLoaded = false;
+  String? loadError;
 
   @override
   void initState() {
@@ -25,6 +27,9 @@ class _LotListScreenState extends State<LotListScreen> {
   }
 
   Future<void> fetchLots() async {
+    if (mounted) {
+      setState(() { isLoading = true; loadError = null; });
+    }
     try {
       final result = await widget.apiService.getLots();
 
@@ -32,20 +37,24 @@ class _LotListScreenState extends State<LotListScreen> {
 
       setState(() {
         lots = result;
-        isLoading = false;
+        hasLoaded = true;
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        isLoading = false;
+        loadError = hasLoaded
+            ? 'Actualisation impossible. Les lots affichés sont conservés.'
+            : 'Lots indisponibles. Réessayez lorsque la connexion le permet.';
       });
+    } finally {
+      if (mounted) { setState(() => isLoading = false); }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (isLoading && !hasLoaded) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
@@ -55,6 +64,14 @@ class _LotListScreenState extends State<LotListScreen> {
         appBar: AppBar(title: Text(context.tr('batches'))),
         body: Column(
           children: [
+            if (isLoading) const LinearProgressIndicator(),
+            if (loadError != null) Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(children: [
+                Text(loadError!, textAlign: TextAlign.center),
+                TextButton(onPressed: isLoading ? null : fetchLots,
+                  child: const Text('Réessayer')),
+              ])),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
               child: TerreEtOrHeader(
@@ -70,8 +87,14 @@ class _LotListScreenState extends State<LotListScreen> {
                 onRefresh: fetchLots,
                 child: ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: lots.length,
+                  itemCount: lots.isEmpty ? 1 : lots.length,
                   itemBuilder: (context, index) {
+                    if (lots.isEmpty) {
+                      return Padding(padding: const EdgeInsets.all(24),
+                        child: Text(hasLoaded ? 'Aucun lot enregistré.'
+                            : 'Les données ne sont pas disponibles.',
+                          textAlign: TextAlign.center));
+                    }
                     final lot = lots[index];
 
                     return Card(

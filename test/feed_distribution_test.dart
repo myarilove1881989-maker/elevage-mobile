@@ -6,6 +6,13 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FeedApiFake extends ApiService {
+  @override
+  Future<dynamic> get(String endpoint) async {
+    if(endpoint!='/me/capabilities/') throw StateError('Unmocked request');
+    return {'user':2,'exploitation':1,'role':'OPERATEUR','offline_policy_enabled':false,
+      'membership':{'version':1},'permission_contract':{'version':1,'user':2,
+        'exploitation':1,'role':'OPERATEUR','rights_version':1,'permissions':['finance.read','feed.create']}};
+  }
   final List<Map<String, dynamic>> saved = [];
   bool failRead = false;
   bool failSave = false;

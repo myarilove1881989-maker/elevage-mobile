@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../config.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import '../l10n/app_localizations.dart';
@@ -59,8 +60,8 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
           canChangePageFormat: false,
           canChangeOrientation: false,
           canDebug: false,
-          allowPrinting: true,
-          allowSharing: true,
+          allowPrinting: !Config.current.isLab,
+          allowSharing: !Config.current.isLab,
           onError: (_, _) =>
               Center(child: Text(context.tr('invoice_unavailable'))),
           onPrintError: (_, _) => ScaffoldMessenger.of(context).showSnackBar(

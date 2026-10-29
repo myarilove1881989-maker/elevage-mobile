@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:sqlite3/sqlite3.dart' as sql;
 import 'farm_cache.dart';
+import 'screen_snapshots_sql.dart';
 import 'offline_grant.dart';
 import 'outbox_database.dart';
 import 'terrain_projection.dart';
@@ -28,7 +29,7 @@ QueryExecutor encryptedExecutor(File file, String key) => NativeDatabase.createI
 );
 
 /// A shared encrypted farm database. Personal PIN/grant/JWT remain elsewhere.
-class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, TerrainProjection implements FarmCache {
+class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, TerrainProjection, ScreenSnapshotsSql implements FarmCache {
   FarmDatabase(super.executor, {required this.farmId, required this.serverNamespace,DateTime Function()? clock})
     :outboxClock=clock??DateTime.now;
   final int farmId;
@@ -39,9 +40,11 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   final DateTime Function() outboxClock;
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 9;
   @override
   Future<void> applyProjectionReceipt(Map<String,dynamic> receipt)=>projectReceipt(receipt);
+  @override
+  Future<void> finishProjectionReceipts()=>finishStockCheckpoint();
   @override
   Iterable<TableInfo<Table, dynamic>> get allTables => const [];
   @override
@@ -66,6 +69,8 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
       await createTerrainCash();
       await createDecisionReceiptColumns();
       await createSyncState();
+      await createStockCheckpoint();
+      await createScreenSnapshots();
     },
     onUpgrade: (_,from,to) async {
       if(from<2) await _createStaging();
@@ -74,6 +79,8 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
       if(from<5) await createTerrainCash();
       if(from<6) await createDecisionReceiptColumns();
       if(from<7) await createSyncState();
+      if(from<8) await createStockCheckpoint(migrating:true);
+      if(from<9) await createScreenSnapshots();
     },
     beforeOpen: (_) async {
       final identity = await customSelect('SELECT farm_id,server_namespace FROM farm_identity').getSingle();
@@ -117,6 +124,16 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   Future<void> commitCacheRefresh(String collection,{int? taskUserId,int? businessRevision}) async {
     if(!cacheCollections.contains(collection) || (taskUserId!=null && taskUserId<1)) throw ArgumentError('Contexte invalide.');
     await transaction(() async {
+      if(collection=='lots') {
+        // A cache revision alone cannot identify which unacknowledged local
+        // originals it includes. Keep the last coherent baseline until their
+        // receipts arrive, rather than subtracting their effects twice.
+        final unresolved=await customSelect("SELECT 1 FROM outbox WHERE business_status IN ('UNREVIEWED','WAITING_DEPENDENCY') "
+          "AND json_extract(declaration,'\$.entity_type') IN ('ACHAT','NAISSANCE','MORTALITE','DON','VOL','COLLECTE_OEUFS','VENTE_ANIMAUX','VENTE_OEUFS') LIMIT 1").getSingleOrNull();
+        if(unresolved!=null) {
+          throw StateError('Actualisation du stock différée : attendez les confirmations de synchronisation, puis réessayez.');
+        }
+      }
       final newerLots=collection=='lots'?await customSelect("SELECT * FROM confirmed_cache c WHERE collection='lots' "
         "AND COALESCE(json_extract(c.payload,'\$.confirmed_business_revision'),0)>COALESCE((SELECT json_extract(s.payload,'\$.confirmed_business_revision') "
         "FROM confirmed_cache_staging s WHERE s.collection=c.collection AND s.entity_id=c.entity_id),?)",
@@ -134,6 +151,9 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
       for(final row in newerLots) {
         await customStatement('INSERT OR REPLACE INTO confirmed_cache VALUES(?,?,?,?)',
           [row.read<String>('collection'),row.read<String>('entity_id'),row.read<String>('payload'),row.read<int>('received_at')]);
+      }
+      if(collection=='lots') {
+        await customStatement('UPDATE tablet_sync_state SET stock_rebase_required=0 WHERE singleton=1');
       }
     });
   }

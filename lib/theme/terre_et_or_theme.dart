@@ -155,7 +155,7 @@ class TerreEtOrPanel extends StatelessWidget {
 
 class TerreEtOrDateTile extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const TerreEtOrDateTile({
     super.key,
@@ -172,7 +172,7 @@ class TerreEtOrDateTile extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         leading: const Icon(Icons.calendar_month, color: TerreEtOrColors.gold),
         title: Text(label),
-        trailing: const Icon(Icons.chevron_right, color: TerreEtOrColors.navy),
+          trailing: onTap==null?null:const Icon(Icons.chevron_right, color: TerreEtOrColors.navy),
         onTap: onTap,
       ),
     );

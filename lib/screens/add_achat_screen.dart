@@ -1,31 +1,31 @@
 import 'package:flutter/material.dart';
+import '../widgets/operation_status.dart';
 import '../l10n/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/api_service.dart';
 import '../theme/terre_et_or_theme.dart';
+import '../widgets/terrain_entry_gate.dart';
 
-class AddAchatScreen extends StatefulWidget {
+class AddAchatScreen extends StatelessWidget {
+  const AddAchatScreen({super.key,required this.apiService});
   final ApiService apiService;
-
-  const AddAchatScreen({super.key, required this.apiService});
-
   @override
-  State<AddAchatScreen> createState() => _AddAchatScreenState();
+  Widget build(BuildContext context)=>TerrainEntryGate(api:apiService,actions:const {'purchases.create'},
+    ownerBuilder:(_)=>_ClassicAchatScreen(apiService:apiService,readOnly:true),
+    builder:(_)=>_ClassicAchatScreen(apiService:apiService));
 }
 
-class _AddAchatScreenState extends State<AddAchatScreen> {
-  static const speciesCatalog = <String>[
-    'Poulet',
-    'Dinde',
-    'Canard',
-    'Pintade',
-    'Porc',
-    'Bovin',
-    'Mouton',
-    'Chèvre',
-    'Lapin',
-    'Poisson',
-  ];
+class _ClassicAchatScreen extends StatefulWidget {
+  final ApiService apiService;
+
+  const _ClassicAchatScreen({required this.apiService,this.readOnly=false});
+  final bool readOnly;
+
+  @override
+  State<_ClassicAchatScreen> createState() => _AddAchatScreenState();
+}
+
+class _AddAchatScreenState extends State<_ClassicAchatScreen> {
 
   final _formKey = GlobalKey<FormState>();
 
@@ -57,26 +57,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
 
     try {
       var data = await widget.apiService.getEspeces();
-      final existingNames = data
-          .map((item) => item['nom'].toString().toLowerCase())
-          .toSet();
-      final missing = speciesCatalog
-          .where((name) => !existingNames.contains(name.toLowerCase()))
-          .toList();
-
-      if (missing.isNotEmpty) {
-        await Future.wait(
-          missing.map((name) async {
-            try {
-              await widget.apiService.createEspece(name);
-            } catch (_) {
-              // Une autre requête peut avoir créé l'espèce entre-temps.
-            }
-          }),
-        );
-        data = await widget.apiService.getEspeces();
-      }
-
+      // Consultation never creates species. Only server-provided references are used.
       if (!mounted) return;
       setState(() {
         especes = data;
@@ -126,6 +107,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
 
   // ================= SUBMIT =================
   Future<void> submit() async {
+    if(widget.readOnly || !await TerrainEntryGate.allowClassic(context,widget.apiService,{'purchases.create'}) || !mounted) return;
     if (!_formKey.currentState!.validate()) return;
 
     if (selectedEspece == null) {
@@ -162,7 +144,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
         quantite: quantite,
         prixTotal: prixTotal,
         prixUnitaire: prixUnitaire,
-        date: selectedDate,
+        date: DateTime.now(),
         typeProduction: selectedProductionType,
         statutProduction: selectedProductionStatus,
         dateDebutPonte: layingStartDate,
@@ -171,13 +153,13 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
       if (!mounted) return;
 
       if (success) {
-        showMessage(context.tr('purchase_created'));
+        showMessage(widget.apiService.operationFeedback(context.tr('purchase_created')));
         Navigator.pop(context, true);
       } else {
         showMessage("Erreur création ❌");
       }
     } catch (e) {
-      showMessage(e.toString()); // 🔥 IMPORTANT
+      if (mounted) { showMessage(unconfirmedOperationMessage); }
     }
 
     if (!mounted) return;
@@ -424,18 +406,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
                       TerreEtOrDateTile(
                         label:
                             "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2100),
-                          );
-
-                          if (picked != null) {
-                            setState(() => selectedDate = picked);
-                          }
-                        },
+                        onTap: null,
                       ),
 
                       const SizedBox(height: 20),
@@ -443,7 +414,7 @@ class _AddAchatScreenState extends State<AddAchatScreen> {
                       // ================= BOUTON =================
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton(
+                        child: widget.readOnly ? const SizedBox.shrink() : ElevatedButton(
                           onPressed: isSubmitting ? null : submit,
                           child: isSubmitting
                               ? const CircularProgressIndicator(

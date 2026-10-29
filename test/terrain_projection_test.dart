@@ -75,7 +75,7 @@ void main() {
   test('schema 3 queue survives additive mapping migration',() async {
     final entry=await client(jean,'Client Jean');
     await db.customStatement('DROP TABLE terrain_cash_recognition');
-    await db.customStatement('DROP TABLE terrain_entity_mapping');await db.customStatement('PRAGMA user_version=3');
+    await db.customStatement('DROP TABLE terrain_entity_mapping');await db.customStatement('DROP TABLE screen_snapshots');await db.customStatement('PRAGMA user_version=3');
     await db.close();db=open();
     expect((await db.listOutbox()).single.operationId,entry.operationId);
     expect((await db.projectedPage('clients')).single['data'],containsPair('nom','Client Jean'));

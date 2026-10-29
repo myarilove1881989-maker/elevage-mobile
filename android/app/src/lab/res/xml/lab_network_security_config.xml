@@ -1,0 +1,5 @@
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors><certificates src="@raw/elevage_lab_ca"/></trust-anchors>
+  </base-config>
+</network-security-config>

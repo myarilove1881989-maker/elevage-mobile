@@ -1,20 +1,33 @@
 import 'package:flutter/material.dart';
+import '../widgets/operation_status.dart';
 import '../l10n/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/api_service.dart';
 import '../models/lot.dart';
 import '../theme/terre_et_or_theme.dart';
+import '../widgets/terrain_entry_gate.dart';
 
-class AddMouvementScreen extends StatefulWidget {
+class AddMouvementScreen extends StatelessWidget {
+  const AddMouvementScreen({super.key,required this.apiService});
   final ApiService apiService;
-
-  const AddMouvementScreen({super.key, required this.apiService});
-
   @override
-  State<AddMouvementScreen> createState() => _AddMouvementScreenState();
+  Widget build(BuildContext context)=>TerrainEntryGate(api:apiService,
+    actions:const {'animal_sales.create','egg_sales.create','births.create','mortality.create','donations.create','thefts.create'},
+    ownerBuilder:(_)=>_ClassicMouvementScreen(apiService:apiService,readOnly:true),
+    builder:(_)=>_ClassicMouvementScreen(apiService:apiService));
 }
 
-class _AddMouvementScreenState extends State<AddMouvementScreen> {
+class _ClassicMouvementScreen extends StatefulWidget {
+  final ApiService apiService;
+
+  const _ClassicMouvementScreen({required this.apiService,this.readOnly=false});
+  final bool readOnly;
+
+  @override
+  State<_ClassicMouvementScreen> createState() => _AddMouvementScreenState();
+}
+
+class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
   List<Lot> lots = [];
   int? selectedLotId;
 
@@ -49,7 +62,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   bool isLoading = true;
   bool isSubmitting = false;
 
-  final List<String> types = ["VENTE", "MORTALITE", "DON", "VOL", "NAISSANCE"];
+  List<String> types = ["VENTE", "MORTALITE", "DON", "VOL", "NAISSANCE"];
 
   String movementLabel(String type) {
     switch (type) {
@@ -95,6 +108,15 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
   // ================= FETCH DATA =================
   Future<void> fetchData() async {
     try {
+      if(!widget.readOnly) {
+        final access=await TerrainEntryAccess.read(widget.apiService, const {'animal_sales.create','egg_sales.create','births.create','mortality.create','donations.create','thefts.create'});
+        final rights=access.rights;
+        types=types.where((type) => type=='VENTE'
+          ? rights.allows('animal_sales.create') || rights.allows('egg_sales.create')
+          : rights.allows({'MORTALITE':'mortality.create','DON':'donations.create','VOL':'thefts.create','NAISSANCE':'births.create'}[type]!)).toList();
+        if(types.isNotEmpty && !types.contains(selectedType)) selectedType=types.first;
+        if(!rights.allows('animal_sales.create') && rights.allows('egg_sales.create')) selectedProduct='OEUFS';
+      }
       final lotsResult = await widget.apiService.getLots();
       final clientsResult = await widget.apiService.getClients();
 
@@ -156,6 +178,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
   // ================= CREATE CLIENT =================
   Future<void> showCreateClientDialog() async {
+    if(widget.readOnly || !await TerrainEntryGate.allowClassic(context,widget.apiService,{'clients.create'}) || !mounted) return;
     final nomController = TextEditingController();
     final telController = TextEditingController();
     final villeController = TextEditingController();
@@ -224,7 +247,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
               child: Text(context.tr('cancel')),
               onPressed: () => Navigator.pop(dialogContext),
             ),
-            ElevatedButton(
+            BusinessCommand(api: widget.apiService, actions: const {'clients.create'}, child: ElevatedButton(
               child: Text(context.tr('add')),
               onPressed: () async {
                 final nom = nomController.text.trim();
@@ -247,9 +270,9 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                 await fetchData();
 
                 if (!mounted) return;
-                showMessage("Client créé");
+                showMessage(widget.apiService.operationFeedback("Client créé"));
               },
-            ),
+            )),
           ],
         ),
       ),
@@ -262,6 +285,10 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
 
   // ================= SUBMIT =================
   Future<void> submit() async {
+    final action = selectedType == 'VENTE'
+      ? (selectedProduct == 'OEUFS' ? 'egg_sales.create' : 'animal_sales.create')
+      : {'MORTALITE':'mortality.create','DON':'donations.create','VOL':'thefts.create','NAISSANCE':'births.create'}[selectedType];
+    if(widget.readOnly || action==null || !await TerrainEntryGate.allowClassic(context,widget.apiService,{action}) || !mounted) return;
     if (isSubmitting) return;
 
     if (selectedLotId == null) {
@@ -298,10 +325,14 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
           stillborn: stillborn,
           newLotName: newLotName,
           productionType: birthProductionType,
-          date: selectedDate,
+          date: DateTime.now(),
           note: birthNoteController.text.trim(),
         );
         if (mounted) {
+          if(saved['local_only']==true) {
+            showMessage(widget.apiService.operationFeedback('Naissance enregistrée.'));
+            Navigator.pop(context,true);return;
+          }
           setState(() => isSubmitting = false);
           await showDialog<void>(
             context: context,
@@ -325,7 +356,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
         }
       } catch (error) {
         if (mounted)
-          showMessage(error.toString().replaceFirst('Exception: ', ''));
+          showMessage(unconfirmedOperationMessage);
       } finally {
         if (mounted) setState(() => isSubmitting = false);
       }
@@ -373,12 +404,12 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
           fullTrays: trays,
           extraEggs: extra,
           totalPrice: price,
-          date: selectedDate,
+          date: DateTime.now(),
         );
         if (mounted) Navigator.pop(context, true);
       } catch (error) {
         if (mounted)
-          showMessage(error.toString().replaceFirst('Exception: ', ''));
+          showMessage(unconfirmedOperationMessage);
       } finally {
         if (mounted) setState(() => isSubmitting = false);
       }
@@ -421,7 +452,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
         type: selectedType,
         quantite: quantite,
         prixUnitaire: prix,
-        date: selectedDate,
+        date: DateTime.now(),
         clientId: selectedClientId,
       );
 
@@ -692,25 +723,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                         TerreEtOrDateTile(
                           label:
                               "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: selectedDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2100),
-                            );
-
-                            if (picked != null) {
-                              setState(() {
-                                if (birthLotNameController.text ==
-                                    defaultBirthLotName(selectedDate)) {
-                                  birthLotNameController.text =
-                                      defaultBirthLotName(picked);
-                                }
-                                selectedDate = picked;
-                              });
-                            }
-                          },
+                          onTap: null,
                         ),
 
                         const SizedBox(height: 16),
@@ -868,7 +881,7 @@ class _AddMouvementScreenState extends State<AddMouvementScreen> {
                         // BOUTON
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton(
+                          child: widget.readOnly ? const SizedBox.shrink() : ElevatedButton(
                             key: const Key('saveMovement'),
                             onPressed: isSubmitting ? null : submit,
                             child: isSubmitting

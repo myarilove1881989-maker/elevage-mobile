@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'offline_tablet_screen.dart';
+import 'farmer_access_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/initial_password.dart';
+import 'initial_password_screen.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/screens/dashboard_screen.dart';
 import 'package:app_elevage/screens/register_screen.dart';
@@ -32,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String errorMessage = '';
 
   Future<void> handleLogin() async {
+    FocusScope.of(context).unfocus();
     setState(() {
       isLoading = true;
       errorMessage = '';
@@ -50,6 +54,29 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       if (success) {
+        final caps=await widget.apiService.get('/me/capabilities/');
+        if(!mounted) return;
+        if (kIsWeb && caps['role'] != 'OWNER') {
+          await widget.apiService.logout();
+          passwordController.clear();
+          if (!mounted) return;
+          setState(() { errorMessage = 'L’espace opérateur nécessite l’application Android et son appareil autorisé.'; });
+          return;
+        }
+        if(caps['role']=='OPERATEUR' && !kIsWeb && defaultTargetPlatform==TargetPlatform.android) {
+          final runtime=createFarmerRuntime();
+          try {
+            final api=await runtime.signIn(usernameController.text.trim(),passwordController.text);
+            passwordController.clear();
+            if(!mounted) {runtime.dispose();return;}
+            Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>FarmerSessionHost(runtime:runtime,api:api)));
+          } catch (_) {runtime.dispose();rethrow;}
+          return;
+        }
+        ApiService.farmerSession=false;
+        final prefs=await SharedPreferences.getInstance();await prefs.setString('session_kind','owner');
+        if(!mounted) return;
+        passwordController.clear();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -62,6 +89,14 @@ class _LoginScreenState extends State<LoginScreen> {
           errorMessage = context.tr('invalid_credentials');
         });
       }
+    } on InitialPasswordRequired catch(requiredChange) {
+      passwordController.clear();
+      if (!mounted) {return;}
+      final changed=await Navigator.push<bool>(context,MaterialPageRoute(builder:(_)=>
+        InitialPasswordScreen(api:widget.apiService,changeToken:requiredChange.changeToken)));
+      if(mounted) {setState(() {isLoading=false;errorMessage=changed==true?
+        'Mot de passe modifié. Connectez-vous avec votre nouveau mot de passe.':
+        'Le changement de mot de passe est nécessaire pour vous connecter.';});}
     } on ApiConnectionException {
       if (!mounted) return;
       setState(() {
@@ -105,11 +140,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android)
-                    OutlinedButton.icon(icon:const Icon(Icons.tablet_android),
-                      label:const Text('Ouvrir mon profil sur cette tablette'),
-                      onPressed:isLoading?null:()=>Navigator.push(context,
-                        MaterialPageRoute(builder:(_)=>const OfflineTabletScreen()))),
+                    Padding(padding:const EdgeInsets.only(bottom:24),child:SizedBox(width:double.infinity,
+                      child:FilledButton.icon(style:FilledButton.styleFrom(backgroundColor:const Color(0xFF0A9B4A),
+                        padding:const EdgeInsets.symmetric(vertical:18,horizontal:20)),
+                        icon:const Icon(Icons.agriculture_outlined,size:32),
+                        label:const Column(children:[Text('Espace éleveur',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
+                          Text('Accéder à mon compte')]),
+                        onPressed:isLoading?null:()=>Navigator.push(context,
+                          MaterialPageRoute(builder:(_)=>const FarmerAccessScreen()))))),
                   Image.asset('assets/images/elevage_logo.png', height: 180),
+                  if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android)
+                    const Text('Connexion propriétaire',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
                   const SizedBox(height: 40),
                   TextField(
                     controller: usernameController,

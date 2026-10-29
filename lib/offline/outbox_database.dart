@@ -8,6 +8,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
   int get outboxFarmId;
   DateTime Function() get outboxClock;
   Future<void> applyProjectionReceipt(Map<String,dynamic> receipt) async {}
+  Future<void> finishProjectionReceipts() async {}
 
   Future<void> createSyncState() async {
     await customStatement('CREATE TABLE IF NOT EXISTS tablet_sync_state '
@@ -87,7 +88,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
     final id=operationId??newOperationUuid();
     final grantId=grant.claims['jti'] as String;
     final entityId=localEntityId??(operationType=='CREATE'?id:null);
-    if(grant.farmId!=outboxFarmId || !grant.permits('can_create_terrain_operation',now) ||
+    if(grant.farmId!=outboxFarmId || !grant.permitsOperation(entityType,operationType,now) ||
       !isSessionCurrent() || !operationUuidPattern.hasMatch(id) || !operationUuidPattern.hasMatch(grantId) ||
       (entityId!=null && !operationUuidPattern.hasMatch(entityId)) ||
       !RegExp(r'^[A-Z][A-Z_]{0,31}$').hasMatch(entityType) ||
@@ -106,7 +107,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
       'dependencies':List<String>.from(dependencies),'expected_server_version':expectedServerVersion,
       'business_occurred_at':businessOccurredAt.toUtc().toIso8601String()};
     return transaction(() async {
-      if(!isSessionCurrent() || !grant.permits('can_create_terrain_operation',outboxClock())) throw StateError('Profil verrouillé.');
+      if(!isSessionCurrent() || !grant.permitsOperation(entityType,operationType,outboxClock())) throw StateError('Profil verrouillé ou permission refusée.');
       final previous=await customSelect('SELECT * FROM outbox WHERE operation_id=?',variables:[Variable(id)]).getSingleOrNull();
       if(previous!=null) {
         final original=Map<String,dynamic>.from(jsonDecode(previous.read<String>('declaration')) as Map);
@@ -122,7 +123,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
         "VALUES(?,?,?,?,?,?,?,'LOCAL_PENDING','UNREVIEWED',?,?)",[id,sequence,grant.farmId,grant.userId,grant.deviceId,grant.generation,
           canonicalDeclaration(declaration),now.millisecondsSinceEpoch,now.millisecondsSinceEpoch]);
       if(project!=null) await project();
-      if(!isSessionCurrent() || !grant.permits('can_create_terrain_operation',outboxClock())) throw StateError('Profil verrouillé pendant la déclaration.');
+      if(!isSessionCurrent() || !grant.permitsOperation(entityType,operationType,outboxClock())) throw StateError('Profil verrouillé ou permission refusée pendant la déclaration.');
       return _entry(await customSelect('SELECT * FROM outbox WHERE operation_id=?',variables:[Variable(id)]).getSingle());
     });
   }
@@ -200,7 +201,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
         final nextRevision=RegExp(r'^farm:([0-9]+)$').firstMatch((receipt['server_version']??'').toString());
         if(previousRevision!=null && nextRevision!=null && BigInt.parse(nextRevision[1]!)<BigInt.parse(previousRevision[1]!)) {continue;}
       if({'CONFIRMED','NOT_APPLIED','SUPERSEDED'}.contains(row.read<String>('business_status')) &&
-        {'UNREVIEWED','WAITING_DEPENDENCY'}.contains(receipt['business_status'])) throw StateError('Reçu métier obsolète.');
+        {'UNREVIEWED','WAITING_DEPENDENCY'}.contains(receipt['business_status'])) {throw StateError('Reçu métier obsolète.');}
       final reason=receipt['reason_code']??'';
       if(reason is! String || !RegExp(r'^[A-Z0-9_]{0,50}$').hasMatch(reason)) throw StateError('Code métier invalide.');
       final received=DateTime.parse(receipt['received_at'] as String).toUtc();
@@ -211,6 +212,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
           receipt['server_entity_id']??'',receipt['server_version']??'',decisionVersion,action,actor,outboxClock().toUtc().millisecondsSinceEpoch,id]);
       await applyProjectionReceipt(receipt);
     }
+    await finishProjectionReceipts();
   });
 
   @override

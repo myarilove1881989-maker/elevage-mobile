@@ -5,6 +5,46 @@ import 'terrain_store.dart';
 
 /// Projection is derived from the immutable ledger, so it cannot precede its commit.
 mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
+  static const stockKinds={'ACHAT','NAISSANCE','MORTALITE','DON','VOL','COLLECTE_OEUFS','VENTE_ANIMAUX','VENTE_OEUFS'};
+  static const unresolvedStockSql="business_status IN ('UNREVIEWED','WAITING_DEPENDENCY') AND "
+    "json_extract(declaration,'\$.entity_type') IN ('ACHAT','NAISSANCE','MORTALITE','DON','VOL','COLLECTE_OEUFS','VENTE_ANIMAUX','VENTE_OEUFS')";
+
+  Future<void> createStockCheckpoint({bool migrating=false}) async {
+    final columns=(await customSelect('PRAGMA table_info(outbox)').get()).map((r)=>r.read<String>('name')).toSet();
+    final added=!columns.contains('stock_projection_folded');
+    if(added) await customStatement('ALTER TABLE outbox ADD COLUMN stock_projection_folded INTEGER NOT NULL DEFAULT 0 CHECK(stock_projection_folded IN (0,1))');
+    await customStatement('CREATE TABLE IF NOT EXISTS terrain_pending_stock_snapshot ('
+      'operation_id TEXT PRIMARY KEY REFERENCES outbox(operation_id),snapshot TEXT NOT NULL CHECK(json_valid(snapshot)))');
+    final syncColumns=(await customSelect('PRAGMA table_info(tablet_sync_state)').get()).map((r)=>r.read<String>('name')).toSet();
+    if(!syncColumns.contains('stock_rebase_required')) {
+      await customStatement('ALTER TABLE tablet_sync_state ADD COLUMN stock_rebase_required INTEGER NOT NULL DEFAULT 0');
+    }
+    if(migrating && added) {
+      // Old confirmed originals had already been folded into the old cache.
+      await customStatement("UPDATE outbox SET stock_projection_folded=1 WHERE business_status IN ('CONFIRMED','SUPERSEDED','NOT_APPLIED')");
+      // Schema 7 may already contain a mixed baseline. Do not invent its
+      // provenance; keep all data and require a full authenticated cache refresh.
+      final ambiguous=await customSelect("SELECT 1 FROM outbox WHERE $unresolvedStockSql "
+        "AND EXISTS(SELECT 1 FROM confirmed_cache WHERE collection='lots') LIMIT 1").getSingleOrNull();
+      if(ambiguous!=null) await customStatement('UPDATE tablet_sync_state SET stock_rebase_required=1 WHERE singleton=1');
+    }
+  }
+
+  Future<void> finishStockCheckpoint() async {
+    if(await customSelect('SELECT 1 FROM outbox WHERE $unresolvedStockSql LIMIT 1').getSingleOrNull()!=null) return;
+    final pending=await customSelect('SELECT snapshot FROM terrain_pending_stock_snapshot').get();
+    final latest=<int,Map<String,dynamic>>{};
+    for(final row in pending) {
+      final snapshot=Map<String,dynamic>.from(jsonDecode(row.read<String>('snapshot')) as Map);
+      final prior=latest[snapshot['id']];
+      if(prior==null || snapshot['confirmed_business_revision']>prior['confirmed_business_revision']) latest[snapshot['id'] as int]=snapshot;
+    }
+    for(final snapshot in latest.values) {await _storeStockSnapshot(snapshot);}
+    // These flags describe projection coverage, never business confirmation.
+    // Only individual receipts above may change an original's business status.
+    await customStatement('UPDATE outbox SET stock_projection_folded=1 WHERE operation_id IN (SELECT operation_id FROM terrain_pending_stock_snapshot)');
+    await customStatement('DELETE FROM terrain_pending_stock_snapshot');
+  }
   Future<void> createTerrainMappings() async {
     await customStatement('CREATE TABLE terrain_entity_mapping ('
       'entity_type TEXT NOT NULL,local_entity_id TEXT NOT NULL,server_entity_id INTEGER NOT NULL CHECK(server_entity_id>0),'
@@ -17,8 +57,9 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
   Future<void> projectReceipt(Map<String,dynamic> receipt) async {
     final mappings=receipt['entity_mappings']??const [];
     if(mappings is! List || mappings.length>10) {throw StateError('Correspondances serveur invalides.');}
-    final reversed=receipt['business_status']=='SUPERSEDED' && receipt['decision_action']=='REVERSE' &&
-      receipt['decision_version'] is int && (receipt['decision_version'] as int)>0;
+    final reversed=receipt['business_status']=='SUPERSEDED' && (
+      (receipt['decision_action']=='REVERSE' && receipt['decision_version'] is int && (receipt['decision_version'] as int)>0) ||
+      (receipt['cancellation_operation_id'] is String && operationUuidPattern.hasMatch(receipt['cancellation_operation_id'] as String)));
     if(mappings.isNotEmpty && receipt['business_status']!='CONFIRMED' && !reversed &&
       !(receipt['business_status']=='NEEDS_RECONCILIATION' && receipt['cash_recognition']!=null)) {
       throw StateError('Correspondance non confirmée.');
@@ -108,11 +149,11 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
   }
 
   Future<void> _projectStockReceipt(Map<String,dynamic> receipt,Map declaration) async {
-    const stockKinds={'ACHAT','NAISSANCE','MORTALITE','DON','VOL','COLLECTE_OEUFS','VENTE_ANIMAUX','VENTE_OEUFS'};
     final snapshots=receipt['stock_snapshots']??const [];
     if(snapshots is! List || snapshots.length>1 ||
       (snapshots.isNotEmpty && (!stockKinds.contains(declaration['entity_type']) ||
-        (receipt['business_status']!='CONFIRMED' && !(receipt['business_status']=='SUPERSEDED' && receipt['decision_action']=='REVERSE')))) ||
+        (receipt['business_status']!='CONFIRMED' && !(receipt['business_status']=='SUPERSEDED' &&
+          (receipt['decision_action']=='REVERSE' || receipt['cancellation_operation_id'] is String))))) ||
       (stockKinds.contains(declaration['entity_type']) && receipt['business_status']=='CONFIRMED' && snapshots.length!=1)) {
       throw StateError('Stock confirmé hors déclaration.');
     }
@@ -148,11 +189,38 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
       final previous=jsonDecode(existing.read<String>('payload')) as Map;
       final revision=previous['confirmed_business_revision']??0;
       if(revision is! int) {throw StateError('Révision de stock invalide.');}
-      if(revision>snapshot['confirmed_business_revision']) {return;}
+      if(revision>snapshot['confirmed_business_revision']) {
+        await customStatement('UPDATE outbox SET stock_projection_folded=1 WHERE operation_id=?',[receipt['client_operation_id']]);
+        return;
+      }
       if(revision==snapshot['confirmed_business_revision'] &&
         (previous['stock']!=snapshot['stock'] || (previous['stock_oeufs']??0)!=snapshot['stock_oeufs'])) {
         throw StateError('Stock contradictoire pour une même révision.');
       }
+      if(revision==snapshot['confirmed_business_revision']) {
+        await customStatement('UPDATE outbox SET stock_projection_folded=1 WHERE operation_id=?',[receipt['client_operation_id']]);
+        return;
+      }
+    }
+    final staged=await customSelect('SELECT snapshot FROM terrain_pending_stock_snapshot').get();
+    for(final row in staged) {
+      final prior=jsonDecode(row.read<String>('snapshot')) as Map;
+      if(prior['id']==lotId && prior['confirmed_business_revision']==snapshot['confirmed_business_revision'] &&
+          (prior['stock']!=snapshot['stock'] || prior['stock_oeufs']!=snapshot['stock_oeufs'])) {
+        throw StateError('Stock contradictoire pour une même révision.');
+      }
+    }
+    await customStatement('INSERT INTO terrain_pending_stock_snapshot VALUES(?,?) ON CONFLICT(operation_id) DO UPDATE SET snapshot=excluded.snapshot '
+      "WHERE json_extract(excluded.snapshot,'\$.confirmed_business_revision')>=json_extract(terrain_pending_stock_snapshot.snapshot,'\$.confirmed_business_revision')",
+      [receipt['client_operation_id'],jsonEncode(snapshot)]);
+  }
+
+  Future<void> _storeStockSnapshot(Map<String,dynamic> snapshot) async {
+    final lotId=snapshot['id'];
+    final existing=await customSelect("SELECT payload FROM confirmed_cache WHERE collection='lots' AND entity_id=?",variables:[Variable('$lotId')]).getSingleOrNull();
+    if(existing!=null) {
+      final prior=jsonDecode(existing.read<String>('payload')) as Map;
+      if((prior['confirmed_business_revision']??0)>snapshot['confirmed_business_revision']) return;
     }
     await customStatement("INSERT OR REPLACE INTO confirmed_cache VALUES('lots',?,?,?)",
       ['$lotId',jsonEncode(snapshot),DateTime.now().toUtc().millisecondsSinceEpoch]);
@@ -162,7 +230,9 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
   Future<List<Map<String,dynamic>>> projectedPage(String collection,{int offset=0,int limit=50,int? taskUserId,String search=''}) async {
     if(!{'clients','tasks','lots','sales','cash'}.contains(collection) || offset<0 || limit<1 || limit>200 || search.length>100 ||
       (collection=='tasks' && (taskUserId==null || taskUserId<1))) {throw ArgumentError('Page terrain invalide.');}
-    if(collection=='lots') {return _projectedLots(offset,limit,search);}
+    // The confirmed baseline, mappings and pending deltas must describe the
+    // same committed state even if a receipt arrives between SQL queries.
+    if(collection=='lots') {return transaction(()=>_projectedLots(offset,limit,search));}
     if(collection=='sales') {return _projectedSales(offset,limit,search);}
     if(collection=='cash') {
       final rows=await customSelect("SELECT o.declaration,o.business_status,c.payload FROM outbox o LEFT JOIN terrain_cash_recognition c ON c.operation_id=o.operation_id "
@@ -204,6 +274,8 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
         variables:[Variable(taskUserId),Variable(data['id'] as int)]).get();
       for(final operation in operations) {
         final declaration=jsonDecode(operation.read<String>('declaration')) as Map;
+        // Pending cancellations never invent a restored stock before server checks.
+        if(declaration['operation_type']=='REVERSE') {continue;}
         final expected=int.tryParse(declaration['expected_server_version'] as String);
         if(expected==null || (data['version'] as int)>expected) {continue;}
         final payload=declaration['payload'] as Map;
@@ -249,13 +321,16 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
   }
 
   Future<List<Map<String,dynamic>>> _projectedLots(int offset,int limit,String search) async {
+    final state=await customSelect('SELECT stock_rebase_required FROM tablet_sync_state WHERE singleton=1').getSingle();
+    if(state.read<int>('stock_rebase_required')==1) throw StateError('Stock historique à vérifier : actualisez avec Internet après la synchronisation.');
+    final checkpointPending=await customSelect('SELECT 1 FROM terrain_pending_stock_snapshot LIMIT 1').getSingleOrNull()!=null;
     final pattern='%${search.replaceAll('\\','\\\\').replaceAll('%','\\%').replaceAll('_','\\_')}%';
     final rows=await customSelect("SELECT payload AS data,NULL AS declaration,NULL AS operation_id,'CONFIRMED_CACHE' AS state,received_at,'0:'||printf('%020d',CAST(entity_id AS INTEGER)) AS sort_key FROM confirmed_cache WHERE collection='lots' AND json_extract(payload,'\$.nom') LIKE ? ESCAPE '\\' "
       "UNION ALL SELECT NULL AS data,declaration,operation_id,business_status AS state,received_at,'1:'||operation_id AS sort_key FROM outbox "
       "WHERE json_extract(declaration,'\$.entity_type') IN ('ACHAT','NAISSANCE') AND json_extract(declaration,'\$.operation_type')='CREATE' "
       "AND (json_extract(declaration,'\$.entity_type')='ACHAT' OR json_extract(declaration,'\$.payload.total_naissances')>json_extract(declaration,'\$.payload.mort_nes')) "
       "AND COALESCE(json_extract(declaration,'\$.payload.nom_lot'),json_extract(declaration,'\$.payload.nom_nouveau_lot')) LIKE ? ESCAPE '\\' "
-      "AND business_status NOT IN ('CONFIRMED','NOT_APPLIED','SUPERSEDED') ORDER BY sort_key LIMIT ? OFFSET ?",
+      "AND (business_status NOT IN ('CONFIRMED','NOT_APPLIED','SUPERSEDED') OR (business_status='CONFIRMED' AND stock_projection_folded=0)) ORDER BY sort_key LIMIT ? OFFSET ?",
       variables:[Variable(pattern),Variable(pattern),Variable(limit),Variable(offset)]).get();
     final result=<Map<String,dynamic>>[];
     for(final row in rows) {
@@ -278,11 +353,16 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
           'type_production':payload['type_production']??'CHAIR','stock':0,'stock_oeufs':0,
           'espece':payload['espece'],'confirmed_business_revision':0};
         dependency=row.read<String>('operation_id');
+        if(row.read<String>('state')=='CONFIRMED') {
+          final mapping=await customSelect("SELECT server_entity_id FROM terrain_entity_mapping WHERE entity_type='LOT' AND local_entity_id=?",
+            variables:[Variable(localId)]).getSingleOrNull();
+          if(mapping!=null) {data['id']=mapping.read<int>('server_entity_id');dependency=null;}
+        }
       }
       var delta=incoming;var eggDelta=0;var reconcile=row.read<String>('state')=='NEEDS_RECONCILIATION';
-      final operations=await customSelect("SELECT declaration,business_status FROM outbox WHERE business_status NOT IN ('CONFIRMED','NOT_APPLIED','SUPERSEDED') "
+      final operations=await customSelect("SELECT declaration,business_status FROM outbox WHERE (business_status NOT IN ('CONFIRMED','NOT_APPLIED','SUPERSEDED') OR (business_status='CONFIRMED' AND stock_projection_folded=0)) "
         "AND (json_extract(declaration,'\$.payload.lot_ref.server_id')=? OR json_extract(declaration,'\$.payload.lot_ref.local_uuid')=?) ORDER BY local_sequence",
-        variables:[Variable(encoded==null?-1:data['id'] as int),Variable(localId??'')]).get();
+        variables:[Variable(data['id'] is int?data['id'] as int:-1),Variable(localId??'')]).get();
       for(final operation in operations) {
         final declaration=jsonDecode(operation.read<String>('declaration')) as Map;
         final payload=declaration['payload'] as Map;
@@ -297,6 +377,7 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
       data['local_delta']=delta;data['projected_stock']=(data['stock'] as int)+delta;
       data['local_egg_delta']=eggDelta;data['projected_egg_stock']=((data['stock_oeufs']??0) as int)+eggDelta;
       result.add({'data':data,'state':reconcile?'NEEDS_RECONCILIATION':row.read<String>('state'),
+        'stock_checkpoint_pending':checkpointPending,
         'local_uuid':localId,'dependency':dependency,'confirmed_received_at':row.readNullable<int>('received_at')});
     }
     return result;
