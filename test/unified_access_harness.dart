@@ -33,6 +33,8 @@ class UnifiedAccessHarness {
   int posts=0,grants=0,capabilityReads=0;
   List<Map<String,dynamic>>? serverSales;
   final onlineWrites=<String>[];
+  final preparedReads=<String>[];
+  bool layingFixture=false;
   int version=1;
   bool down=false,lost=false,disabled=false,refuseGrant=false;
   bool expiredPersonal=false;
@@ -231,6 +233,14 @@ class UnifiedAccessHarness {
     return FarmerRuntime(tablet:tablet,connection:connection,tokenStore:TokenService(useSecureStorage:false),
       onlineClient:MockClient((request) async {
         if(down) throw http.ClientException('Synthetic read offline');
+        preparedReads.add(request.url.toString());
+        if(layingFixture) {
+          if(request.url.path.endsWith('/farm-profile/')) return http.Response('{"id":1,"nom":"Ferme partagée"}',200,headers:{'content-type':'application/json; charset=utf-8'});
+          if(request.url.path.endsWith('/oeufs/collectes/')) return http.Response('[{"id":90,"nombre_collecte":40}]',200);
+          if(request.url.path.endsWith('/oeufs/statistiques/')) return http.Response('{"stock_oeufs":38}',200);
+          if(request.url.path.endsWith('/oeufs/stock-date/')) return http.Response('{"stock_global":38}',200);
+          if(request.url.path.endsWith('/oeufs/kpi/')) return http.Response('{"production_jour":40}',200);
+        }
         if(request.method!='GET') onlineWrites.add('${request.method} ${request.url.path}');
         if(request.url.path.endsWith('/dashboard/')) return http.Response('{"stock_total":10}',200);
         if(request.url.path.endsWith('/clients/total-dettes/')) return http.Response('{"total_dettes":25.50}',200);

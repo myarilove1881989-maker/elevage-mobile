@@ -155,6 +155,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool serverUnavailable = false;
   int? displayedLotId, displayedEspeceId;
   String username = '';
+  String farmName = '';
+  Future<void> loadFarmName() async {
+    final identity = ApiService.sessionIdentity;
+    try {
+      final profile = await apiService.get('/farm-profile/');
+      if (mounted && identity == ApiService.sessionIdentity) {
+        setState(() => farmName = profile['nom']?.toString().trim() ?? '');
+      }
+    } catch (_) { /* Keep the last confirmed name during a connection failure. */ }
+  }
 
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -258,6 +268,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> initData() async { await _reload(includeTasks: true); }
 
   Future<bool> _reload({bool includeTasks = false}) async {
+    unawaited(loadFarmName());
     final lotId = selectedLotId;
     final speciesId = selectedEspeceId;
     if (mounted) { setState(() { isLoading = true; loadError = null; }); }
@@ -633,9 +644,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+      MaterialPageRoute(builder: (_) => SettingsScreen(apiService: apiService)),
     );
-    if (mounted) setState(() {});
+    if (mounted) await loadFarmName();
   }
 
   Future<void> _openTutorial(String languageCode) async {
@@ -762,9 +773,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (username.isNotEmpty)
+                          if (farmName.isNotEmpty)
                             TextSpan(
-                              text: " $username",
+                              text: " $farmName",
                               style: TextStyle(
                                 color: Color(0xFF16834B),
                                 fontSize: compact ? 28 : 42,

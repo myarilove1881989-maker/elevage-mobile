@@ -47,6 +47,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> {
       setState(() {
         species = results[0];
         lots = results[1];
+        errorMessage = null;
         loading = false;
       });
     } catch (_) {
