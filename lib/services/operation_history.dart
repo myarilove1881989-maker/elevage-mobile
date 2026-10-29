@@ -14,6 +14,8 @@ class OperationHistoryItem {
     this.reason,
     this.original,
     this.compensation,
+    this.data = const {}, this.authorId, this.entityType = '', this.businessState = '',
+    this.transportState = 'SERVER_RECEIVED',
   });
   final String identity,
       author,
@@ -23,12 +25,16 @@ class OperationHistoryItem {
       recordedDate,
       details;
   final String? receivedDate, reason, original, compensation;
+  final Map<String,dynamic> data;
+  final int? authorId;
+  final String entityType, businessState, transportState;
 
   factory OperationHistoryItem.local(OutboxEntry entry) {
     final d = entry.declaration;
     final p = d['payload'] as Map;
     return OperationHistoryItem(
-      identity: entry.operationId,
+      identity: entry.operationId, data:Map<String,dynamic>.from(p), authorId:entry.authorId,
+      entityType:d['entity_type'].toString(), businessState:entry.businessStatus, transportState:entry.transportStatus,
       author: 'Utilisateur ${entry.authorId}',
       type: '${d['operation_type']=='REVERSE'?'Annulation — ':''}${historyTypeLabel(d['entity_type'].toString())}',
       status: entry.businessStatus=='SUPERSEDED' && entry.lastError=='BUSINESS_EFFECT_REVERSED'
@@ -186,6 +192,9 @@ List<OperationHistoryItem> serverHistory(List<Map<String, dynamic>> events) {
     final author = originalAuthors.isEmpty ? actor : originalAuthors.join(', ');
     return OperationHistoryItem(
       identity: group.key,
+      data:{for(final event in group.value.reversed) ...Map<String,dynamic>.from(event['after_data'] as Map? ?? {})},
+      authorId:first['actor_user_id'] as int?, entityType:first['entity_type'].toString(),
+      businessState:businessStatus??(cancelled?'SUPERSEDED':'CONFIRMED'),
       author:
           '$author${author == actor ? '' : ' • événement par $actor'}${decisionActors.isEmpty ? '' : ' • décision par ${decisionActors.join(', ')}'}',
       type: group.value

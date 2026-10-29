@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/operation_history.dart';
+import '../services/history_presentation.dart';
+import '../widgets/operation_history_list.dart';
 import '../widgets/operation_status.dart';
-import '../offline/outbox.dart';
 import '../theme/terre_et_or_theme.dart';
 
 class OwnerOperationHistoryScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class OwnerOperationHistoryScreen extends StatefulWidget {
 class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScreen> {
   final author=TextEditingController(),lot=TextEditingController();
   List<Map<String,dynamic>> rows=[];
+  final names=HistoryNames();
   String kind='',status='',operation='';
   DateTime? start,end;
   bool busy=false,failed=false,hasNext=false;
@@ -27,10 +29,15 @@ class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScree
     if(busy) return;
     final token=ApiService.sessionIdentity;
     setState(()=>busy=true);
+    for(final path in ['/lots/','/clients/','/categories-depense/']) {
+      try {final data=await widget.api.get(path); if(!mounted || token!=ApiService.sessionIdentity) return;
+        names.add(path=='/lots/'?'lots':path=='/clients/'?'clients':'categories',data);
+      } catch (_) {}
+    }
     final params={'view':'operations','page':'${next?page+1:1}',
       if(author.text.trim().isNotEmpty) 'author':author.text.trim(),
       if(lot.text.trim().isNotEmpty) 'lot':lot.text.trim(),
-      if(kind.isNotEmpty) 'kind':kind, if(status.isNotEmpty) 'status':status,
+      if(kind.isNotEmpty) 'kind':kind,
       if(start!=null) 'start':start!.toUtc().toIso8601String(),
       if(end!=null) 'end':DateTime(end!.year,end!.month,end!.day+1).toUtc().toIso8601String(),
       if(operation.isNotEmpty) 'operation':operation};
@@ -62,58 +69,47 @@ class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScree
     'EXPENSE_HAS_ACTIVE_FEED':'La dépense est liée à une distribution d’aliment.',
     'DEPENDENCY_NOT_APPLIED':'Une opération liée n’a pas été confirmée.',
   }[code]??(code==null || code==''?'':'Anomalie documentée : $code');
-  Widget detail(Map<String,dynamic> row)=>ExpansionTile(
-    title:Text('${row['operation_type']=='REVERSE'?'Annulation : ':''}${historyTypeLabel(row['entity_type'] as String)} — ${state(row)}'),
-    subtitle:Text('${row['author_name']} • ${row['business_occurred_at']}'),
-    childrenPadding:const EdgeInsets.all(12),children:[
-      Text('Saisie déclarée : ${row['local_recorded_at']}'),
-      Text('Réception serveur : ${row['received_at']}'),
-      if(row['late_sync']==true) const Text('Synchronisation tardive : plus de cinq minutes après la saisie déclarée.'),
-      if(row['received_with_old_permissions']==true) const Text('Reçue sous une ancienne autorisation après un retrait métier.'),
-      if(row['ordinary_business_tolerance']==true) const Text('Acceptée avec les anciennes permissions après un retrait métier.'),
-      const Text('La date de saisie provient de la tablette.'),
-      Text('Employé : ${row['author_name']} (${row['actor_user_id']})'),
-      for(final lot in row['lots'] as List? ?? const []) Text('Lot : ${lot['nom']} (${lot['id']})'),
-      Text('Permission utilisée : ${row['permission']}'),
-      SelectableText('Autorisation : ${row['authorization_id']} • version ${row['rights_version']}'),
-      Text('Motif : ${(row['payload'] as Map)['reason']??row['reason_text']??''} ${reason(row['reason_code'])}'),
-      Text(historyDetails(row['payload'] as Map)),
-      for(final entry in (row['payload'] as Map).entries) Text('${const {
-        'lot_ref':'Lot','client_ref':'Client','quantite':'Quantité','prix_unitaire':'Prix unitaire',
-        'montant':'Montant','montant_recu':'Montant reçu','reason':'Motif d’annulation',
-        'original_operation_id':'Opération initiale','note':'Note','categorie_id':'Catégorie',
-        'nombre_oeufs':'Œufs','prix_total':'Prix total','nom_lot':'Nom du lot',
-      }[entry.key]??entry.key} : ${entry.value}'),
-      SelectableText('Identifiant : ${row['operation_id']}'),
+  Widget detail(Map<String,dynamic> row) {
+    final id=row['actor_user_id'];
+    if(row['author_name'] is String) names.authors[id.toString()]=row['author_name'];
+    names.add('lots',row['lots']);
+    final item=OperationHistoryItem(identity:row['operation_id'],author:row['author_name']??'Éleveur non renseigné',
+      authorId:id,entityType:row['entity_type'],type:historyTypeLabel(row['entity_type']),
+      status:state(row),businessState:row['business_status'],businessDate:row['business_occurred_at']??'',
+      recordedDate:row['local_recorded_at']??'',details:'',reason:(row['payload'] as Map?)?['reason'],data:Map<String,dynamic>.from(row['payload']??{}));
+    return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[OperationHistoryList(items:[item],names:names),
       if(row['original_operation_id']!=null) TextButton(onPressed:busy?null:() {
-        operation=row['original_operation_id'] as String;load();
-      },child:const Text('Ouvrir l’opération initiale')),
-      for(final cancellation in row['cancellations'] as List) TextButton(onPressed:busy?null:() {
-        operation=cancellation['operation_id'] as String;load();
-      },child:Text('Ouvrir l’annulation — ${cancellation['reason']}')),
+        operation=row['original_operation_id'];load();},child:const Text('Voir l’opération initiale')),
+      for(final cancellation in row['cancellations'] as List? ?? []) TextButton(onPressed:busy?null:() {
+        operation=cancellation['operation_id'];load();},child:const Text('Voir l’annulation')),
     ]);
+  }
   @override
   Widget build(BuildContext context)=>Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(appBar:AppBar(title:const Text('Activité complète reçue')),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       const TerreEtOrHeader(icon:Icons.history,title:'Historique de l’exploitation',subtitle:'Consultez et filtrez les opérations de votre équipe'),
       const Text('Les opérations encore sur une tablette apparaîtront après transmission. Aucune validation du propriétaire n’est nécessaire.'),
-      TextField(controller:author,enabled:!busy,decoration:const InputDecoration(labelText:'Employé — nom ou identifiant')),
-      TextField(controller:lot,enabled:!busy,decoration:const InputDecoration(labelText:'Lot — nom ou identifiant')),
+      ExpansionTile(title:const Text('Filtres'),children:[
+      TextField(controller:author,enabled:!busy,decoration:const InputDecoration(labelText:'Éleveur — nom')),
+      TextField(controller:lot,enabled:!busy,decoration:const InputDecoration(labelText:'Lot — nom')),
       DropdownButtonFormField<String>(initialValue:kind,decoration:const InputDecoration(labelText:'Type d’opération'),
         items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['VENTE_ANIMAUX','VENTE_OEUFS','DEPENSE','ACHAT','NAISSANCE','MORTALITE','DON','VOL','CLIENT','COLLECTE_OEUFS','ENCAISSEMENT','ALIMENTATION','PESEE','TASK'])
           DropdownMenuItem(value:code,child:Text(historyTypeLabel(code)))],onChanged:busy?null:(v)=>setState(()=>kind=v!)),
       DropdownButtonFormField<String>(initialValue:status,decoration:const InputDecoration(labelText:'Statut'),
-        items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in businessStates)
-          DropdownMenuItem(value:code,child:Text(code=='SUPERSEDED'?'Annulée':operationStatus(transport:'SERVER_RECEIVED',business:code)))],
+        items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['En attente','Synchronisée','Échec'])
+          DropdownMenuItem(value:code,child:Text(code))],
         onChanged:busy?null:(v)=>setState(()=>status=v!)),
       TextButton(onPressed:busy?null:()=>date(true),child:Text('Du : ${start?.toString().split(' ').first??'sans limite'}')),
       TextButton(onPressed:busy?null:()=>date(false),child:Text('Au : ${end?.toString().split(' ').first??'sans limite'}')),
       FilledButton(onPressed:busy?null:()=>load(),child:const Text('Appliquer les filtres')),
-      TextButton(onPressed:busy?null:() {author.clear();lot.clear();start=null;end=null;operation='';load();},child:const Text('Effacer les dates, l’employé, le lot et le lien')),
+      TextButton(onPressed:busy?null:() {author.clear();lot.clear();start=null;end=null;operation='';kind='';status='';load();},child:const Text('Effacer les filtres')),
+      ]),
       if(busy) const LinearProgressIndicator(),
       if(failed) const Text('Lecture indisponible. Ce registre est réservé au propriétaire. Vérifiez les filtres et la connexion.'),
       if(displayedToken==(ApiService.sessionIdentity)) ...[
-        for(final row in rows) Card(child:detail(row)),
+        for(final row in rows) if(status.isEmpty || status==(
+          {'CONFIRMED','SUPERSEDED'}.contains(row['business_status'])?'Synchronisée':
+          {'NOT_APPLIED','NEEDS_RECONCILIATION'}.contains(row['business_status'])?'Échec':'En attente')) detail(row),
         if(rows.isEmpty) const Text('Aucune opération reçue pour ces filtres.')],
       if(hasNext) TextButton(onPressed:busy?null:()=>load(next:true),child:const Text('Charger la suite')),
     ]))));

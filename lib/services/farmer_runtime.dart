@@ -256,7 +256,7 @@ class FarmerRuntime extends ChangeNotifier {
 
     // login completes, rather than relying on a previous visit of that screen.
 
-    final paths=['/dashboard/','/clients/total-dettes/'];
+    final paths=['/dashboard/','/clients/total-dettes/','/farm-profile/'];
 
     if(grant?.finePermissions?.allows('agenda.read')==true) paths.add('/tasks/?active=true');
 
@@ -266,7 +266,7 @@ class FarmerRuntime extends ChangeNotifier {
 
         final response=await request(http.Request('GET',Uri.parse('${Config.apiUrl}$path')));
 
-        if(response.statusCode!=200) {
+        if(response.statusCode!=200 && !(path=='/farm-profile/' && response.statusCode==404)) {
 
           if(!signedIn) throw StateError('La session a changé.');
 
@@ -318,6 +318,27 @@ class FarmerRuntime extends ChangeNotifier {
 
             warning='Certaines fiches de lots ne sont pas encore disponibles sans Internet.';
 
+          }
+
+          // Prepare laying views as well as the lot sheet. Otherwise a first
+          // visit after disconnecting has references but no laying snapshots.
+          if ((row['data'] as Map)['type_production'] == 'OEUFS') {
+            final end = DateTime.now();
+            final start = end.subtract(const Duration(days: 6));
+            for (final endpoint in ['statistiques', 'collectes', 'stock-date', 'kpi']) {
+              final uri = Uri.parse('${Config.apiUrl}/oeufs/$endpoint/').replace(queryParameters: {
+                'lot': '$id',
+                if (endpoint != 'stock-date') ...{
+                  'date_debut': start.toIso8601String().split('T')[0],
+                  'date_fin': end.toIso8601String().split('T')[0],
+                },
+              });
+              final laying = await request(http.Request('GET', uri));
+              if (!signedIn || identity != captured) throw StateError('La session a changé.');
+              if (laying.statusCode != 200) {
+                warning = 'Le suivi de ponte n’est pas entièrement préparé sans Internet. Reconnectez-vous pour le charger.';
+              }
+            }
           }
 
         } catch(error) {
@@ -706,6 +727,11 @@ class FarmerRuntime extends ChangeNotifier {
 
         }
 
+        if(prepared && response.statusCode==200 && request.method=='GET' &&
+            RegExp(r'^/clients/\d+/ventes/$').hasMatch(endpoint)) {
+          await tablet.refreshCache(collections:const ['sales']);
+          check();
+        }
         return response;
 
       } catch(error) {if(!isTransportFailure(error) || request.method!='GET') rethrow;}

@@ -22,6 +22,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool checkingOwner=false;
   String? ownerError;
   String? ownerSession;
+  final farmController = TextEditingController();
+  String? farmError;
+  String originalFarmName = '';
+  bool farmLoaded = false, saving = false;
+  Future<void> loadFarm() async {
+    final api = widget.apiService ?? ApiService();
+    final session = ApiService.sessionIdentity;
+    try {
+      final profile = await api.get('/farm-profile/');
+      if (mounted && session == ApiService.sessionIdentity) setState(() {
+        farmController.text = profile['nom']?.toString() ?? '';
+        originalFarmName = farmController.text;
+        farmLoaded = true; farmError = null;
+      });
+    } catch (error) {
+      if (mounted && session == ApiService.sessionIdentity) setState(() => farmError = error is ApiHttpException && error.status == 404
+        ? 'Le serveur actuel ne propose pas encore le nom partagé de l’exploitation. Une mise à jour du serveur est nécessaire.'
+        : 'Nom de l’exploitation indisponible. Vérifiez la connexion ou préparez la session hors ligne.');
+    } finally { if (widget.apiService == null) api.close(); }
+  }
   Future<void> loadOwner() async {
     if(checkingOwner) return;
     setState(() {checkingOwner=true;owner=false;ownerSession=null;ownerError=null;});
@@ -47,6 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     loadOwner();
+    loadFarm();
     language = settings.languageCode;
     currency = settings.currencyCode;
     countryCode = settings.countryCode;
@@ -56,10 +77,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     cityController.dispose();
+    farmController.dispose();
     super.dispose();
   }
 
   Future<void> save() async {
+    if (saving) return;
+    if (owner && farmLoaded && ownerSession == ApiService.sessionIdentity && farmController.text.trim() != originalFarmName) {
+      if (farmController.text.trim().isEmpty) {
+        setState(() => farmError = 'Renseignez le nom de l’exploitation.'); return;
+      }
+      setState(() { saving = true; farmError = null; });
+      final api = widget.apiService ?? ApiService();
+      try {
+        await api.patch('/farm-profile/', {'nom': farmController.text.trim()});
+      } catch (_) {
+        if (mounted) setState(() { saving = false; farmError = 'Nom non enregistré. Vérifiez la connexion et réessayez.'; });
+        return;
+      } finally { if (widget.apiService == null) api.close(); }
+    }
     await settings.save(
       language: language,
       currency: currency,
@@ -80,6 +116,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          TextField(controller: farmController, maxLength: 100,
+            enabled: farmLoaded && owner && ownerSession == ApiService.sessionIdentity && !saving,
+            decoration: InputDecoration(labelText: 'Nom de l’exploitation', errorText: farmError,
+              helperText: 'Nom partagé par tous les utilisateurs de cette exploitation.')),
+          if (!farmLoaded) TextButton(onPressed: loadFarm, child: const Text('Recharger le nom')),
           if(checkingOwner) const LinearProgressIndicator(),
           if(ownerError!=null) ListTile(title:Text(ownerError!),trailing:TextButton(onPressed:checkingOwner?null:loadOwner,child:const Text('Réessayer'))),
           if(owner && ownerSession==(ApiService.sessionIdentity)) ListTile(
@@ -162,7 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 24),
           FilledButton.icon(
-            onPressed: save,
+            onPressed: saving ? null : save,
             icon: const Icon(Icons.save_outlined),
             label: Text(context.tr('save')),
           ),
