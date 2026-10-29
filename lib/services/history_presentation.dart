@@ -61,8 +61,9 @@ List<String> businessHistoryDetails(OperationHistoryItem item,HistoryNames names
   } else if(kind.contains('ALIMENTATION') || kind.contains('consommationaliment')) {
     amount('',p['quantite_kg'],'kg'); final food=text(p['aliment']); if(food!=null) result.add(food);
   } else if(kind.contains('VENTE_OEUFS') || kind.contains('venteoeufs')) {
-    final qty=number(p['nombre_oeufs'])??(number(p['nombre_conditionnements'])!=null && number(p['oeufs_par_conditionnement'])!=null
-      ?number(p['nombre_conditionnements'])!*number(p['oeufs_par_conditionnement'])!:null);
+    final perUnit=number(p['oeufs_par_conditionnement'])??(p['conditionnement']=='UNITE'?1:null);
+    final qty=number(p['nombre_oeufs'])??(number(p['nombre_conditionnements'])!=null && perUnit!=null
+      ?number(p['nombre_conditionnements'])!*perUnit:null);
     amount('',qty,'œufs');
   } else {amount('',p['quantite'],'animaux');}
   dynamic total=value(['montant_total','prix_total','montant','montant_recu']);

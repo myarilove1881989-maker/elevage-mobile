@@ -15,6 +15,7 @@ void main() {
    expect(businessHistoryDetails(item('NAISSANCE',{'total_naissances':11,'mort_nes':1}),names),containsAll(['Nés vivants : 10 animaux','Mort-nés : 1 animaux']));
    expect(businessHistoryDetails(item('DEPENSE',{'lot_ref':{'server_id':30},'categorie_id':148,'montant':'200.00'}),names),containsAll(['Pondeuses','Transport','Montant : 200 FCFA']));
    expect(businessHistoryDetails(item('COLLECTE_OEUFS',{'nombre_collecte':9,'nombre_casses':1,'nombre_declasses':1}),names),containsAll(['Collectés : 9 œufs','Écartés : 2 œufs','Commercialisables : 7 œufs']));
+   expect(businessHistoryDetails(item('VENTE_OEUFS',{'conditionnement':'UNITE','nombre_conditionnements':5,'prix_unitaire_conditionnement':'100.00'}),names),containsAll(['5 œufs','Total : 500 FCFA']));
    expect(simpleHistoryStatus(item('DEPENSE',{},state:'UNREVIEWED')),'En attente');
    expect(simpleHistoryStatus(item('DEPENSE',{},state:'NOT_APPLIED')),'Échec');
  });
