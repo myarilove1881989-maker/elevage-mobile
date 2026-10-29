@@ -24,4 +24,4 @@ jobs:
       - run: test "$(git -C "$FLUTTER_ROOT" rev-parse HEAD)" = 5fc346839b5d0eef006ed8404392afb4dfae428d
       - run: python3 tools/guard_push.py --check
       - run: flutter pub get --enforce-lockfile
-      - run: flutter test --no-pub --concurrency=1 test/password_reset_test.dart test/permission_contract_test.dart test/financial_indicators_test.dart test/production_network_safety_test.dart
+      - run: flutter test --no-pub --concurrency=1 test/password_reset_test.dart test/reset_password_link_test.dart test/auth_connection_test.dart test/permission_contract_test.dart test/financial_indicators_test.dart test/production_network_safety_test.dart
