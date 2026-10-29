@@ -22,6 +22,7 @@ class LotDetailScreen extends StatefulWidget {
 class _LotDetailScreenState extends State<LotDetailScreen> {
   Map<String, dynamic>? lot;
   bool isLoading = true;
+  String? loadError;
   @override
   void initState() {
     super.initState();
@@ -29,40 +30,22 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
   }
 
   Future<void> fetchLot() async {
+    if (mounted) { setState(() { isLoading = true; loadError = null; }); }
     try {
       final result = await widget.apiService.getLotDetail(widget.lotId);
       if (!mounted) return;
       setState(() {
         lot = result;
-        isLoading = false;
       });
     } catch (_) {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) { setState(() => loadError = lot == null
+          ? 'Lot indisponible. Réessayez lorsque la connexion le permet.'
+          : 'Actualisation impossible. Les données du lot sont conservées.'); }
+    } finally {
+      if (mounted) { setState(() => isLoading = false); }
     }
   }
 
-  Future<bool> confirmDelete() async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text(context.tr('confirmation')),
-          content: Text(context.tr('delete_item')),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(context.tr('cancel')),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(context.tr('delete')),
-            ),
-          ],
-        ),
-      ) ??
-      false;
-  void message(String value) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(value)));
   double numValue(dynamic value) {
     if (value is num) return value.toDouble();
     if (value is String) {
@@ -83,12 +66,17 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading)
+    if (isLoading && lot == null)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (lot == null)
-      return const Scaffold(
-        body: Center(child: Text('Impossible de charger ce lot')),
+    if (lot == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Lot')),
+        body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(loadError ?? 'Lot indisponible.', textAlign: TextAlign.center),
+          TextButton(onPressed: fetchLot, child: const Text('Réessayer')),
+        ])),
       );
+    }
     final purchases = List<dynamic>.from(lot!['achats'] ?? []);
     final movements = List<dynamic>.from(
       lot!['mouvements'] ?? [],
@@ -119,6 +107,9 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
+              if (isLoading) const LinearProgressIndicator(),
+              if (loadError != null) Padding(padding: const EdgeInsets.all(8),
+                child: Text(loadError!, style: TextStyle(color: Colors.orange.shade800))),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -291,17 +282,6 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                         subtitle:
                             '${a['quantite'] ?? 0} unités · ${money(a['prix_total'])}',
                         date: a['date']?.toString() ?? '',
-                        onDelete: () async {
-                          if (!await confirmDelete()) return;
-                          final id = intValue(a['id']);
-                          if (id == null) return;
-                          if (await widget.apiService.deleteAchat(id)) {
-                            if (mounted) {
-                              message('Lot supprimé');
-                              Navigator.pop(context, true);
-                            }
-                          }
-                        },
                       ),
                     ),
                     ...movements.map(
@@ -319,19 +299,6 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                                 '${(m['note'] ?? '').toString().isNotEmpty ? ' · ${m['note']}' : ''}'
                             : '${m['quantite'] ?? 0} unités${m['prix_unitaire'] != null ? ' · PU ${money(m['prix_unitaire'])}' : ''}',
                         date: m['date']?.toString() ?? '',
-                        onDelete: () async {
-                          if (!await confirmDelete()) return;
-                          final id = intValue(m['id']);
-                          try {
-                            if (id != null &&
-                                await widget.apiService.deleteMouvement(id)) {
-                              message('Supprimé');
-                              fetchLot();
-                            }
-                          } catch (error) {
-                            if (mounted) message(error.toString().replaceFirst('Exception: ', ''));
-                          }
-                        },
                       ),
                     ),
                     ...eggSales.map(
@@ -356,15 +323,6 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
                         title: d['categorie_nom']?.toString() ?? 'Dépense',
                         subtitle: money(d['montant']),
                         date: d['date']?.toString() ?? '',
-                        onDelete: () async {
-                          if (!await confirmDelete()) return;
-                          final id = intValue(d['id']);
-                          if (id != null &&
-                              await widget.apiService.deleteDepense(id)) {
-                            message('Supprimé');
-                            fetchLot();
-                          }
-                        },
                       ),
                     ),
                   ],
@@ -396,7 +354,6 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
     required String title,
     required String subtitle,
     required String date,
-    VoidCallback? onDelete,
     VoidCallback? onTap,
   }) => Container(
     padding: const EdgeInsets.symmetric(vertical: 9),
@@ -437,15 +394,6 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
           date,
           style: const TextStyle(color: TerreEtOrColors.muted, fontSize: 11),
         ),
-        if (onDelete != null)
-          IconButton(
-            onPressed: onDelete,
-            icon: const Icon(
-              Icons.delete_outline,
-              color: Color(0xFFD85B4B),
-              size: 20,
-            ),
-          ),
       ],
     ),
   );

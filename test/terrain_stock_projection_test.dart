@@ -31,7 +31,11 @@ void main() {
       {'entity_type':'ACHAT','local_entity_id':purchase.declaration['local_entity_id'],'server_entity_id':30},
     ])]);
     rows=await db.projectedPage('lots');final child=rows.firstWhere((row)=>(row['data'] as Map)['id']==42);
-    expect(child['data'],containsPair('stock',10));expect(child['data'],containsPair('local_delta',-2));expect(child['data'],containsPair('projected_stock',8));
+    // The purchase has its own confirmed mapping, but its current snapshot
+    // could already include the unknown child loss. Keep the pre-purchase
+    // checkpoint (0) and BOTH local effects (+10 -2) until that loss is known.
+    expect(child['stock_checkpoint_pending'],isTrue);
+    expect(child['data'],containsPair('stock',0));expect(child['data'],containsPair('local_delta',8));expect(child['data'],containsPair('projected_stock',8));
     await db.acceptReceipts([receipt(loss,31,lot(42,8,2))]);
     await db.close();db=open();rows=await db.projectedPage('lots');
     expect(rows.firstWhere((row)=>(row['data'] as Map)['id']==42)['data'],containsPair('local_delta',0));
@@ -72,6 +76,70 @@ void main() {
     await expectLater(db.acceptReceipts([receipt(loss,30,lot(7,9,1))]),throwsStateError);
     expect((await db.projectedPage('lots')).single['data'],containsPair('stock',8));
     expect((await db.listOutbox()).single.declaration['payload'],containsPair('quantite',2));
+  });
+
+  test('fresh cache before local receipt must not deduct the same sale twice',() async {
+    await db.replaceConfirmedCache('lots',[lot(7,100,0)]);
+    final sale=await enqueue('VENTE_ANIMAUX',{'lot_ref':{'server_id':7},
+      'client_ref':{'server_id':11},'quantite':10,'prix_unitaire':'1.00'});
+    // Server has applied this original, but its response was lost. A separate
+    // cache request arrives first. No receipt-to-cache coverage exists yet.
+    await expectLater(db.replaceConfirmedCache('lots',[lot(7,90,1)]),throwsA(
+      isA<StateError>().having((error)=>error.message,'reason',contains('Actualisation du stock différée'))));
+    expect((await db.projectedPage('lots')).single['data'],containsPair('stock',100));
+    expect((await db.projectedPage('lots')).single['data'],containsPair('projected_stock',90));
+    await db.acceptReceipts([receipt(sale,50,lot(7,90,1))]);
+    await db.replaceConfirmedCache('lots',[lot(7,90,1)]);
+    expect((await db.projectedPage('lots')).single['data'],containsPair('projected_stock',90));
+  });
+
+  test('projected lot reads stay coherent while a receipt commits',() async {
+    await db.replaceConfirmedCache('lots',[lot(7,100,0)]);
+    final sale=await enqueue('VENTE_ANIMAUX',{'lot_ref':{'server_id':7},
+      'client_ref':{'server_id':11},'quantite':10,'prix_unitaire':'1.00'});
+    final reads=[for(var i=0;i<20;i++) db.projectedPage('lots')];
+    final confirmation=db.acceptReceipts([receipt(sale,50,lot(7,90,1))]);
+    final observations=await Future.wait(reads);
+    await confirmation;
+    for(final rows in observations) {
+      final data=rows.single['data'] as Map;
+      expect(data['projected_stock'],90);
+      expect([data['stock'],data['local_delta']],anyOf(equals([100,-10]),equals([90,0])));
+    }
+    expect((await db.projectedPage('lots')).single['data'],containsPair('projected_stock',90));
+  });
+
+  test('known reconciliation keeps its original and no longer blocks cache refresh',() async {
+    await db.replaceConfirmedCache('lots',[lot(7,100,0)]);
+    final sale=await enqueue('VENTE_ANIMAUX',{'lot_ref':{'server_id':7},
+      'client_ref':{'server_id':11},'quantite':10,'prix_unitaire':'1.00'});
+    final denied=receipt(sale,50,lot(7,100,1))
+      ..['business_status']='NEEDS_RECONCILIATION'..['stock_snapshots']=[]
+      ..['applied_at']=null..['server_entity_id']=''..['reason_code']='OFFLINE_PERMISSION_DENIED';
+    await db.acceptReceipts([denied]);
+    await db.replaceConfirmedCache('lots',[lot(7,100,1)]);
+    final row=(await db.projectedPage('lots')).single;
+    expect(row['state'],'NEEDS_RECONCILIATION');
+    expect(row['data'],containsPair('stock',100));
+    expect((await db.listOutbox()).single.declaration,sale.declaration);
+  });
+
+  // An individual receipt contains CURRENT farm stock, not a list of covered
+  // originals. The local checkpoint must retain the correct projection of 80.
+  test('partial status receipts must not double deduct another already applied sale',() async {
+    await db.replaceConfirmedCache('lots',[lot(7,100,0)]);
+    final payload={'lot_ref':{'server_id':7},'client_ref':{'server_id':11},
+      'quantite':10,'prix_unitaire':'1.00'};
+    final first=await enqueue('VENTE_ANIMAUX',payload);
+    final second=await enqueue('VENTE_ANIMAUX',payload);
+    // Both have been applied on the simulated server. Only one status receipt
+    // arrives locally; its snapshot already includes both effects.
+    await db.acceptReceipts([receipt(first,50,lot(7,80,2))]);
+    final intermediate=(await db.projectedPage('lots')).single['data'];
+    await db.acceptReceipts([receipt(second,51,lot(7,80,2))]);
+    expect((await db.projectedPage('lots')).single['data'],containsPair('projected_stock',80));
+    expect(await db.listOutbox(),hasLength(2));
+    expect(intermediate,containsPair('projected_stock',80));
   });
 
   test('unknown secret-bearing stock fields are refused before SQL persistence',() async {

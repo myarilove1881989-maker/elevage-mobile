@@ -2,9 +2,10 @@ part of 'offline_tablet_screen.dart';
 
 class _TerrainSaleDialog extends StatefulWidget {
   const _TerrainSaleDialog({required this.lots,required this.clients,required this.searchLots,
-    required this.searchClients,required this.clientSales});
+    required this.searchClients,required this.clientSales,required this.refreshLot});
   final List<Map<String,dynamic>> lots,clients;
   final Future<List<Map<String,dynamic>>> Function(String) searchLots,searchClients,clientSales;
+  final Future<Map<String,dynamic>> Function(Map<String,dynamic>) refreshLot;
   @override
   State<_TerrainSaleDialog> createState()=>_TerrainSaleDialogState();
 }
@@ -19,7 +20,7 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
   Map<String,dynamic>? lot,client,sale;
   late List<Map<String,dynamic>> lots=widget.lots,clients=widget.clients;
   List<Map<String,dynamic>> sales=[];
-  bool searching=false;int version=0;
+  bool searching=false,saving=false;int version=0;
   String? error;
   DateTime occurred=DateTime.now();
   @override
@@ -60,14 +61,35 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
       if(mounted && identical(client,value)) {setState(()=>sales=result);}
     } catch (_) {if(mounted) {setState(()=>error='Ventes du client indisponibles sur cette tablette.');}}
   }
-  Future<void> chooseDate() async {
-    final day=await showDatePicker(context:context,initialDate:occurred,firstDate:DateTime(2010),lastDate:DateTime.now());
-    if(day==null || !mounted) {return;}
-    final time=await showTimePicker(context:context,initialTime:TimeOfDay.fromDateTime(occurred));
-    if(time!=null && mounted) {setState(()=>occurred=DateTime(day.year,day.month,day.day,time.hour,time.minute));}
-  }
-  void save() {
+
+  Future<void> save() async {
+    if(saving || searching) return;
     if(!form.currentState!.validate()) {return;}
+    final selectedLot=lot;
+    final selectedKind=kind;
+    if(selectedKind!='ENCAISSEMENT' && selectedLot!=null) {
+      setState(()=>saving=true);
+      try {
+        final fresh=await widget.refreshLot(selectedLot);
+        if(!mounted) return;
+        if(!identical(lot,selectedLot) || kind!=selectedKind) return;
+        final before=selectedLot['data'] as Map,after=fresh['data'] as Map;
+        final changed=['stock','stock_oeufs','projected_stock','projected_egg_stock']
+            .any((key)=>before[key]!=after[key]) || selectedLot['state']!=fresh['state'] ||
+            selectedLot['dependency']!=fresh['dependency'];
+        setState(() {
+          lots=[for(final row in lots) identical(row,selectedLot)?fresh:row];
+          lot=fresh;version++;
+          if(changed) error='Le stock a changé depuis l’ouverture. Vérifiez le stock actualisé, puis validez à nouveau.';
+        });
+        if(changed) return;
+      } catch (_) {
+        if(mounted) setState(()=>error='Stock indisponible ou profil changé. Rouvrez votre profil et rechargez le lot.');
+        return;
+      } finally {if(mounted) setState(()=>saving=false);}
+      if(!form.currentState!.validate()) return;
+    }
+    occurred=DateTime.now();
     if(occurred.isAfter(DateTime.now().add(const Duration(minutes:5)))) {setState(()=>error='Vérifiez la date métier.');return;}
     final payload=<String,dynamic>{'client_ref':reference(client!)};
     final dependencies=<String>{};
@@ -92,7 +114,9 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
         if(pack=='CARTON')'oeufs_par_conditionnement':int.parse(size.text.trim())});}
       if(note.text.trim().isNotEmpty) {payload['note']=note.text.trim();}
     }
-    Navigator.pop(context,<String,dynamic>{'entity_type':kind,'payload':payload,'dependencies':dependencies.toList(),'occurred':occurred.toUtc()});
+    Navigator.pop(context,<String,dynamic>{'entity_type':kind,'payload':payload,'dependencies':dependencies.toList(),'occurred':occurred.toUtc(),
+      if(kind!='ENCAISSEMENT') 'validated_lot':lot,
+      if(kind!='ENCAISSEMENT') 'stock_quantity':saleQuantity});
   }
   @override
   Widget build(BuildContext context)=>AlertDialog(title:const Text('Vente ou encaissement terrain'),
@@ -137,8 +161,8 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
           onChanged:(value) {if(value!=null) {setState(()=>mode=value);}}),
         TextFormField(controller:note,maxLength:10000,decoration:const InputDecoration(labelText:'Constat / note')),
       ],
-      TextButton(onPressed:chooseDate,child:Text('Date métier : ${occurred.day}/${occurred.month}/${occurred.year} ${occurred.hour}:${occurred.minute.toString().padLeft(2,'0')}')),
+      TextButton(onPressed:null,child:Text('Date métier : ${occurred.day}/${occurred.month}/${occurred.year} ${occurred.hour}:${occurred.minute.toString().padLeft(2,'0')}')),
       if(error!=null) Text(error!,style:const TextStyle(color:Colors.red)),
     ])))),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
-      FilledButton(onPressed:save,child:const Text('Conserver sur la tablette'))]);
+      FilledButton(onPressed:saving || searching?null:save,child:const Text('Conserver sur la tablette'))]);
 }

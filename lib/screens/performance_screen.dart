@@ -135,7 +135,7 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(context.tr('margin_ranking'),
+            Text('Solde ventes − dépenses par espèce (hors achats, pas un bénéfice)',
                 style: const TextStyle(
                   color: TerreEtOrColors.ink,
                   fontSize: 18,
@@ -179,7 +179,7 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
                               )),
                           const SizedBox(height: 4),
                           Text(
-                              '${context.tr('margin')}: ${money(item['marge'])}'),
+                              'Solde ventes − dépenses : ${money(item['marge'])}'),
                           Text(
                               '${context.tr('sell_through_rate')}: ${rate.toStringAsFixed(1)} %'),
                           Text(

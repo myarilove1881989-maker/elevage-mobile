@@ -6,21 +6,47 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:app_elevage/offline/farm_database.dart';
 import 'package:app_elevage/offline/offline_grant.dart';
 import 'package:app_elevage/offline/outbox.dart';
+import 'package:app_elevage/services/permission_contract.dart';
 
-Future<VerifiedOfflineGrant> testOutboxGrant(int user,DateTime now,{int farm=1}) async {
+Future<VerifiedOfflineGrant> testOutboxGrant(int user,DateTime now,{int farm=1,bool legacy=false}) async {
   final key=await Ed25519().newKeyPair();final public=await key.extractPublicKey();
   String encoded(dynamic value)=>base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=','');
   final header=encoded({'alg':'EdDSA','kid':'outbox-test'});
+  final iat=now.subtract(const Duration(seconds:1)).millisecondsSinceEpoch~/1000;
+  final exp=legacy ? now.add(const Duration(days:3)).millisecondsSinceEpoch~/1000 : iat+86400;
+  final contract={'version':2,'grant_version':1,
+    'grant_id':'00000000-0000-4000-8000-${user.toString().padLeft(12,'0')}',
+    'user':user,'membership_id':user,'exploitation':farm,'role':'OPERATEUR',
+    'device_id':7,'rights_version':1,'write_generation':1,'iat':iat,'exp':exp,
+    'permissions':PermissionContract.catalogue.where((code)=>!{'users.manage','devices.manage'}.contains(code)).toList()};
   final claims=encoded({'iss':'elevage-offline','aud':'elevage-device','typ':'offline-authorization',
     'jti':'00000000-0000-4000-8000-${user.toString().padLeft(12,'0')}','sub':'$user',
     'membership_id':user,'exploitation_id':farm,'device_id':7,'rights_version':1,'write_generation':1,
-    'capabilities':{'can_create_terrain_operation':true},'iat':now.subtract(const Duration(seconds:1)).millisecondsSinceEpoch~/1000,
-    'exp':now.add(const Duration(days:3)).millisecondsSinceEpoch~/1000});
+    'capabilities':{'can_create_terrain_operation':true,if(!legacy)'permission_contract':contract},
+    'iat':iat,'exp':exp});
   final signature=await Ed25519().sign(utf8.encode('$header.$claims'),keyPair:key);
   final token='$header.$claims.${base64Url.encode(signature.bytes).replaceAll('=','')}';
   final pem='-----BEGIN PUBLIC KEY-----\n${base64.encode([0x30,0x2a,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x03,0x21,0x00,...public.bytes])}\n-----END PUBLIC KEY-----';
   return VerifiedOfflineGrant.verify(token:token,publicKeyPem:pem,trustedKeyId:'outbox-test',
     farmId:farm,userId:user,deviceId:7,generation:1,rightsVersion:1,now:now);
+}
+
+Future<OutboxEntry> seedHistoricalV1(FarmDatabase db,VerifiedOfflineGrant grant,DateTime now,
+    {Map<String,dynamic> payload=const {'nom':'Historical client'}}) async {
+  if(grant.hasFineContract) throw StateError('Historical V1 fixture only');
+  await db.listOutbox(); // Open/migrate the encrypted fixture database.
+  final sequence=(await db.customSelect('SELECT next_sequence FROM local_sequence_counter').getSingle()).read<int>('next_sequence');
+  final id=newOperationUuid();
+  final declaration={'client_operation_id':id,'local_sequence':sequence,'author_user_id':grant.userId,
+    'author_membership_id':grant.claims['membership_id'],'exploitation_id':grant.farmId,
+    'device_id':grant.deviceId,'device_generation':grant.generation,'offline_authorization_id':grant.claims['jti'],
+    'entity_type':'CLIENT','operation_type':'CREATE','local_entity_id':id,'payload':payload,
+    'business_occurred_at':now.toUtc().toIso8601String(),'local_recorded_at':now.toUtc().toIso8601String(),
+    'expected_server_version':'','dependencies':<String>[]};
+  await db.customStatement("INSERT INTO outbox (operation_id,local_sequence,farm_id,author_user_id,device_id,device_generation,declaration,transport_status,business_status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'LOCAL_PENDING','UNREVIEWED',?,?)",
+    [id,sequence,grant.farmId,grant.userId,grant.deviceId,grant.generation,jsonEncode(declaration),now.millisecondsSinceEpoch,now.millisecondsSinceEpoch]);
+  await db.customStatement('UPDATE local_sequence_counter SET next_sequence=?',[sequence+1]);
+  return (await db.listOutbox()).singleWhere((row)=>row.operationId==id);
 }
 
 void main() {
@@ -150,6 +176,7 @@ void main() {
     await db.customStatement('DROP TABLE terrain_cash_recognition');
     await db.customStatement('DROP TABLE terrain_entity_mapping');
     await db.customStatement('DROP TABLE outbox');await db.customStatement('DROP TABLE local_sequence_counter');
+    await db.customStatement('DROP TABLE screen_snapshots');
     await db.customStatement('PRAGMA user_version=2');await db.close();db=open();
     expect((await db.cachedPage('clients')).single['data'],{'id':1,'nom':'Retained'});
     expect((await db.operatorProfiles()).single['display_name'],'Jean');
@@ -181,10 +208,11 @@ void main() {
     for(final name in ['decision_version','decision_action','decision_actor_id','receipt_poll_order']) {
       await db.customStatement('ALTER TABLE outbox DROP COLUMN $name');
     }
+    await db.customStatement('DROP TABLE screen_snapshots');
     await db.customStatement('PRAGMA user_version=5');await db.close();db=open();
     expect((await db.listOutbox()).single.declaration,original.declaration);
     expect((await db.operatorProfiles()).single['display_name'],'Jean');
-    expect((await db.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version'),7);
+    expect((await db.customSelect('PRAGMA user_version').getSingle()).read<int>('user_version'),9);
   });
 
   test('shared sync counts all authors and schema six upgrade preserves their originals',() async {
@@ -194,7 +222,7 @@ void main() {
       'applied_at':null,'server_entity_id':'','server_version':''}]);
     await db.leasePending();await db.transportFailure([second.operationId],code:'HTTP_403',blocked:true);
     final before=await db.syncSummary();expect(before.pending,1);expect(before.blocked,1);expect(before.conflicts,1);
-    await db.customStatement('DROP TABLE tablet_sync_state');await db.customStatement('PRAGMA user_version=6');
+    await db.customStatement('DROP TABLE tablet_sync_state');await db.customStatement('DROP TABLE screen_snapshots');await db.customStatement('PRAGMA user_version=6');
     await db.close();db=open();
     expect((await db.listOutbox()).map((row)=>row.authorId),containsAll([2,3]));
     final after=await db.syncSummary();expect(after.pending,1);expect(after.blocked,1);expect(after.conflicts,1);

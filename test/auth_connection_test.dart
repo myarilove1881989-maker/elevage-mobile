@@ -8,6 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthApiFake extends ApiService {
+  @override
+  Future<dynamic> get(String endpoint) async {
+    if(endpoint!='/me/capabilities/') { throw StateError('Unmocked local request'); }
+    return {'user':1,'exploitation':1,'role':'OWNER','membership':{'version':1},
+      'permission_contract':{'version':1,'user':1,'exploitation':1,'role':'OWNER',
+        'rights_version':1,'permissions':['finance.read','history.read']}};
+  }
   bool offline = true;
   bool succeeds = false;
 
@@ -66,12 +73,16 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'eleveur');
     await tester.enterText(find.byType(TextField).at(1), 'secret');
+    await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Se connecter'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ElevatedButton, 'Se connecter'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Impossible de joindre le serveur'), findsOneWidget);
     expect(find.text('Identifiants invalides'), findsNothing);
 
     api.offline = false;
+    await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Se connecter'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ElevatedButton, 'Se connecter'));
     await tester.pumpAndSettle();
     expect(find.text('Identifiants invalides'), findsOneWidget);
@@ -99,7 +110,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Connexion réussie ouvre le Dashboard avec le même service',
+  testWidgets('Connexion propriétaire réussie ouvre le Dashboard avec le même service',
       (tester) async {
     tester.view.physicalSize = const Size(1920, 1080);
     tester.view.devicePixelRatio = 1;
@@ -112,6 +123,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).at(0), 'eleveur');
     await tester.enterText(find.byType(TextField).at(1), 'secret');
+    await tester.ensureVisible(find.widgetWithText(ElevatedButton, 'Se connecter'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ElevatedButton, 'Se connecter'));
     await tester.pumpAndSettle();
     expect(find.byType(LoginScreen), findsNothing);

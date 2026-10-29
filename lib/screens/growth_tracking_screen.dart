@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../theme/terre_et_or_theme.dart';
+import '../widgets/terrain_entry_gate.dart';
 
 double? _number(dynamic value) =>
     value is num ? value.toDouble() : double.tryParse('$value');
@@ -87,6 +88,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
   }
 
   Future<void> _addWeighing() async {
+    if(!await TerrainEntryGate.allowClassic(context,widget.apiService,{'weights.create'}) || !mounted) return;
     final countController = _countController..clear();
     final weightController = _weightController..clear();
     final noteController = _noteController..clear();
@@ -148,29 +150,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: weighedAt,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now().add(const Duration(days: 1)),
-                        );
-                        if (date == null || !context.mounted) return;
-                        final time = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.fromDateTime(weighedAt),
-                        );
-                        if (time == null) return;
-                        setDialogState(() {
-                          weighedAt = DateTime(
-                            date.year,
-                            date.month,
-                            date.day,
-                            time.hour,
-                            time.minute,
-                          );
-                        });
-                      },
+                      onPressed: null,
                       icon: const Icon(Icons.event_outlined),
                       label: Text(_dateTime(weighedAt.toIso8601String())),
                     ),
@@ -211,7 +191,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
       try {
         await widget.apiService.createProductionWeight(
           lotId: widget.lotId,
-          weighedAt: weighedAt,
+          weighedAt: DateTime.now(),
           animalsWeighed: int.parse(countController.text),
           sampleWeightKg: double.parse(weightController.text.replaceAll(',', '.')),
           note: noteController.text,
@@ -339,7 +319,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
                         ),
                       SizedBox(
                         width: double.infinity,
-                        child: FilledButton.icon(
+                        child: BusinessCommand(api: widget.apiService, actions: const {'weights.create'}, child: FilledButton.icon(
                           onPressed: saving ? null : _addWeighing,
                           icon: saving
                               ? const SizedBox(
@@ -349,7 +329,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
                                 )
                               : const Icon(Icons.add),
                           label: Text(context.tr('add_weighing')),
-                        ),
+                        )),
                       ),
                       const SizedBox(height: 20),
                       Text(

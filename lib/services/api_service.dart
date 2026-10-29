@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'token_service.dart';
+import 'initial_password.dart';
+import '../offline/outbox.dart';
+import 'guarded_api_client.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_elevage/config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +13,14 @@ import 'package:app_elevage/models/dette_client.dart';
 String? globalToken;
 
 /// Réponse absente du serveur (connexion, adresse API ou CORS).
+class ApiHttpException implements Exception {
+  const ApiHttpException(this.status, this.message);
+  final int status;
+  final Object? message;
+  @override
+  String toString() => 'Exception: $message';
+}
+
 class ApiConnectionException implements Exception {
   const ApiConnectionException();
 
@@ -54,7 +65,7 @@ class ApiService {
     http.Client? client,
     TokenStore? tokenStore,
     Duration requestTimeout = const Duration(seconds: 30),
-  }) : _client = _ApiClient(client ?? http.Client(), requestTimeout),
+  }) : _client = _ApiClient(GuardedApiClient(client), requestTimeout),
        _tokenStore = tokenStore ?? TokenService();
 
   final http.Client _client;
@@ -68,6 +79,35 @@ class ApiService {
   }
 
   static String? token;
+  static String? _localPresentationIdentity;
+  static bool farmerSession=false;
+  /// Identity guards use this; it is never an HTTP authorization header.
+  static String? get sessionIdentity=>token ?? globalToken ?? _localPresentationIdentity;
+  static void setLocalPresentationIdentity(String value) {_localPresentationIdentity=value;}
+  static void clearLocalPresentationIdentity() {_localPresentationIdentity=null;}
+  Listenable? get sessionChanges=>null;
+  Future<bool> probeServer() async {
+    final response=await _client.get(Uri.parse('$baseUrl/health/'),headers:{'Cache-Control':'no-cache'});
+    if(response.statusCode!=200) return false;
+    final body=jsonDecode(response.body);
+    return body is Map && body['status']=='ok';
+  }
+  bool get hasUnifiedOfflineSession=>false;
+  List<OutboxEntry> get localOperations=>const [];
+  String? _operationFeedback,_lastOperationId;
+  bool lastReadWasCached=false;
+  String operationFeedback(String confirmed)=>lastOperationMessage ?? confirmed;
+  String? get lastOperationMessage {
+    for(final row in localOperations) {
+      if(row.operationId!=_lastOperationId) continue;
+      if(row.businessStatus=='CONFIRMED') return null;
+      if({'NEEDS_RECONCILIATION','NOT_APPLIED','SUPERSEDED'}.contains(row.businessStatus)) {
+        return 'Traitement à vérifier dans l’historique : ${row.businessStatus}. Ne ressaisissez pas cette opération.';
+      }
+    }
+    return _operationFeedback;
+  }
+
 
   // ================= HEADERS =================
   Map<String, String> _headers() {
@@ -88,6 +128,12 @@ class ApiService {
     http.Response response, {
     bool clearSessionOnUnauthorized = true,
   }) async {
+    if(response.request?.method=='GET') lastReadWasCached=response.headers['x-elevage-cached']=='1';
+    if(response.request?.method!=null && response.request!.method!='GET') {
+      _lastOperationId=response.headers['x-elevage-outbox-id'];
+      _operationFeedback=_lastOperationId!=null
+        ?'Enregistré sur cet appareil. Envoi automatique ; confirmation du serveur en attente.' : null;
+    }
     // ✅ SUCCÈS
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return true;
@@ -103,7 +149,7 @@ class ApiService {
         if (hadSession) sessionExpired.value++;
       }
 
-      throw Exception("Session expirée, reconnectez-vous 🔒");
+      throw ApiHttpException(response.statusCode, "Session expirée, reconnectez-vous 🔒");
     }
 
     // Message retourné par le backend, lorsqu'il est disponible.
@@ -112,33 +158,33 @@ class ApiService {
 
       if (data is Map) {
         if (data.containsKey("message")) {
-          return await Future.error(Exception(data["message"]));
+          return await Future.error(ApiHttpException(response.statusCode, data["message"]));
         }
 
         if (data.containsKey("error")) {
-          return await Future.error(Exception(data["error"]));
+          return await Future.error(ApiHttpException(response.statusCode, data["error"]));
         }
 
         if (data.containsKey("errors")) {
-          return await Future.error(Exception(data["errors"].toString()));
+          return await Future.error(ApiHttpException(response.statusCode, data["errors"].toString()));
         }
 
         // Les validations Django utilisent directement le nom du champ
         // (username, email, password...). On restitue leur message précis.
         for (final value in data.values) {
           if (value is List && value.isNotEmpty) {
-            return await Future.error(Exception(value.join(' ')));
+            return await Future.error(ApiHttpException(response.statusCode, value.join(' ')));
           }
           if (value is String && value.trim().isNotEmpty) {
-            return await Future.error(Exception(value));
+            return await Future.error(ApiHttpException(response.statusCode, value));
           }
         }
       }
 
-      return await Future.error(Exception(data.toString()));
+      return await Future.error(ApiHttpException(response.statusCode, data.toString()));
     } on FormatException {
       // Réponse non JSON : message générique mais compréhensible.
-      throw Exception("Erreur API (${response.statusCode})");
+      throw ApiHttpException(response.statusCode, "Erreur API (${response.statusCode})");
     }
   }
 
@@ -224,6 +270,10 @@ class ApiService {
       clearSessionOnUnauthorized: false,
     );
 
+    if (data['password_change_required'] == true) {
+      await logout();
+      throw InitialPasswordRequired(data['change_token'] as String);
+    }
     final prefs = await SharedPreferences.getInstance();
     final access = data["access"] as String;
     await _tokenStore.saveToken(access);
@@ -235,7 +285,32 @@ class ApiService {
     return true;
   }
 
+  /// Switch explicitly to an already authenticated personal online session.
+  Future<void> usePersonalOnlineSession(String access, String username) async {
+    if (access.isEmpty || username.trim().isEmpty) {
+      throw StateError('Connexion personnelle requise.');
+    }
+    await _tokenStore.saveToken(access);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('username', username.trim());
+    token = access;
+    globalToken = access;
+  }
+
   // ================= LOAD TOKEN =================
+  Future<void> changeInitialPassword(String changeToken, String newPassword) async {
+    final response = await _client.post(Uri.parse('$baseUrl/password/change-initial/'),
+      headers: {'Content-Type':'application/json'},
+      body: jsonEncode({'change_token':changeToken,'new_password':newPassword}));
+    await _handleResponse(response,clearSessionOnUnauthorized:false);
+  }
+
+  Future<dynamic> patch(String endpoint, Map<String,dynamic> data) async {
+    final response=await _client.patch(Uri.parse('$baseUrl${endpoint.startsWith('/')?'':'/'}$endpoint'),
+      headers:_headers(),body:jsonEncode(data));
+    return _handleResponse(response);
+  }
+
   Future<void> loadToken() async {
     final savedToken = await _tokenStore.getToken();
     token = savedToken == null || savedToken.isEmpty ? null : savedToken;
@@ -243,10 +318,13 @@ class ApiService {
   }
 
   Future<void> logout() async {
+    farmerSession = false;
+    clearLocalPresentationIdentity();
     token = null;
     globalToken = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('username');
+    await prefs.remove('session_kind');
     await _tokenStore.clearToken();
   }
 
@@ -311,6 +389,22 @@ class ApiService {
 
     await _handleResponse(response);
     return true;
+  }
+
+  /// Prepared online cancellation adapter. The caller retains the same UUID
+  /// after an uncertain response; it never submits a second compensation.
+  Future<Map<String,dynamic>> cancelExpense(int id, {required String reason, required String operationUuid}) async {
+    final sessionToken=token ?? globalToken;
+    if(sessionToken==null) throw StateError('Connexion personnelle requise.');
+    if(reason.trim().isEmpty || !RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$').hasMatch(operationUuid)) {
+      throw ArgumentError('Motif et UUID requis.');
+    }
+    final result=await post('/depenses/cancel/$id/', {'reason':reason.trim(),'operation_uuid':operationUuid});
+    if(sessionToken!=(token ?? globalToken)) throw StateError('Session modifiée. Vérifiez l’historique avant de réessayer.');
+    if(result is! Map || result['original_id']!=id || result['status']!='CANCELLED' || result['id'] is! int) {
+      throw StateError('Annulation non confirmée.');
+    }
+    return Map<String,dynamic>.from(result);
   }
 
   // ================= STOCK DETAIL =================
@@ -750,11 +844,12 @@ class ApiService {
     return res;
   }
 
-  Future<bool> createPayment(int clientId, int venteId, double montant) async {
+  Future<bool> createPayment(int clientId, int venteId, double montant,{String? mode}) async {
     final res = await post("/payments/create/", {
       "client": clientId,
       "vente": venteId,
       "montant": montant,
+      if(hasUnifiedOfflineSession && mode!=null) "mode":mode,
     });
 
     return res != null;
@@ -858,7 +953,7 @@ class ApiService {
 
   Future<List<dynamic>> getTasks() async {
     final response = await _client.get(
-      Uri.parse("$baseUrl/tasks/"),
+      Uri.parse("$baseUrl/tasks/?active=true"),
       headers: _headers(), // ✅ CORRECT
     );
 
@@ -888,11 +983,12 @@ class ApiService {
   }
 
   Future<void> deleteTask(int id) async {
-    final response = await _client.delete(
-      Uri.parse("$baseUrl/tasks/$id/"), // ✅ BONNE URL
-      headers: _headers(),
-    );
+    throw StateError('Utiliser l’annulation motivée ; aucun effacement historique.');
+  }
 
-    await _handleResponse(response);
+  Future<void> cancelTask(int id, {required int version, required String reason}) async {
+    if(reason.trim().isEmpty) throw ArgumentError('Motif obligatoire.');
+    await patch('/tasks/$id/', {'status':'CANCELLED','expected_version':version,
+      'cancellation_reason':reason.trim()});
   }
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../services/guarded_api_client.dart';
 import 'device_identity.dart';
 import 'outbox.dart';
 
@@ -16,7 +17,8 @@ class DeviceTransportException implements Exception {
 
 class DeviceOutboxApi {
   DeviceOutboxApi({required this.baseUrl,required this.identity,required this.deviceId,
-    required this.farmId,required this.generation,http.Client? client}) :client=client??http.Client() {
+    required this.farmId,required this.generation,http.Client? client}) :client=GuardedApiClient(client) {
+    this.client.validateBaseUrl(baseUrl);
     final uri=Uri.parse(baseUrl);
     if(uri.scheme!='https' || uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment ||
       deviceId<1 || farmId<1 || generation<1) throw ArgumentError('Transport appareil HTTPS requis.');
@@ -24,7 +26,7 @@ class DeviceOutboxApi {
   final String baseUrl;
   final DeviceIdentity identity;
   final int deviceId,farmId,generation;
-  final http.Client client;
+  final GuardedApiClient client;
   void close()=>client.close();
 
   Future<Map<String,dynamic>> _post(String path,Uint8List body,{Map<String,String> proof=const {}}) async {
@@ -52,7 +54,7 @@ class DeviceOutboxApi {
     return decoded;
   }
 
-  Future<List<Map<String,dynamic>>> _signed(String purpose,Map<String,dynamic> data) async {
+  Future<Map<String,dynamic>> _signedResponse(String purpose,Map<String,dynamic> data) async {
     final public=await identity.publicIdentity();
     final challenge=await _post('/offline/transport-challenge/',Uint8List.fromList(utf8.encode(jsonEncode({
       'device_id':deviceId,'installation_uuid':public['installation_uuid'],'purpose':purpose}))));
@@ -75,7 +77,17 @@ class DeviceOutboxApi {
       'X-Elevage-Signature':await identity.sign(Uint8List.fromList(utf8.encode(message)))});
     final receipts=response['receipts'];
     if(receipts is! List || receipts.length>50) throw StateError('Reçus de transport invalides.');
-    return receipts.map((r)=>Map<String,dynamic>.from(r as Map)).toList();
+    return response;
+  }
+  Future<List<Map<String,dynamic>>> _signed(String purpose,Map<String,dynamic> data) async {
+    final response=await _signedResponse(purpose,data);
+    return (response['receipts'] as List).map((r)=>Map<String,dynamic>.from(r as Map)).toList();
+  }
+  Future<List<Map<String,dynamic>>> permissionStates() async {
+    final response=await _signedResponse('STATUS',{'operation_ids':<String>[]});
+    final profiles=response['profiles'];
+    if(profiles is! List || profiles.length>1000) throw StateError('État des profils indisponible.');
+    return profiles.map((p)=>Map<String,dynamic>.from(p as Map)).toList();
   }
 
   Future<List<Map<String,dynamic>>> receive(List<OutboxEntry> entries) {
@@ -123,10 +135,13 @@ class OutboxTransport {
     final entries=await store.leasePending();
     if(entries.isEmpty) return;
     final ids=entries.map((e)=>e.operationId).toList();
+    final confirmedIds=<String>{};
     try {
       final receipts=await api.receive(entries);
       _validateIds(receipts,ids,complete:true);
       await store.acceptReceipts(receipts);
+      confirmedIds.addAll(receipts.where((r)=>r['business_status']=='CONFIRMED')
+        .map((r)=>r['client_operation_id'] as String));
       lastRunContactedServer=true;
     } on DeviceTransportException catch(error) {
       final expired=error.reasonCode=='DEVICE_CHALLENGE_EXPIRED_OR_USED';
@@ -136,6 +151,16 @@ class OutboxTransport {
     } catch (_) {
       await store.transportFailure(ids,code:'NETWORK_OR_RECEIPT_FAILURE');
       throw const DeviceTransportException(0);
+    }
+    // A confirmed cancellation changes its original too. Fetch that receipt in
+    // this cycle, rather than leaving an apparently active sale until the timer.
+    final cancelledOriginals=entries.where((entry)=>entry.declaration['operation_type']=='REVERSE' && confirmedIds.contains(entry.operationId))
+      .map((entry)=>(entry.declaration['payload'] as Map)['original_operation_id'])
+      .whereType<String>().where(operationUuidPattern.hasMatch).toSet().toList();
+    if(cancelledOriginals.isNotEmpty) {
+      final related=await api.status(cancelledOriginals);
+      _validateIds(related,cancelledOriginals,complete:false);
+      await store.acceptReceipts(related);
     }
   }
 }

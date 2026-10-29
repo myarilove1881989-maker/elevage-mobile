@@ -2,7 +2,7 @@ name: app_elevage
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+103
+version: 1.0.0+113
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -39,6 +39,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter:
+  default-flavor: production
   uses-material-design: true
 
   assets:

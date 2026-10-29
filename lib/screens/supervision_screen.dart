@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/access_error.dart';
 import '../services/supervision_service.dart';
 
 const _states={
@@ -59,8 +60,9 @@ class _SupervisionScreenState extends State<SupervisionScreen> {
   void dispose() {if(widget.service==null) {service.api.close();}super.dispose();}
   String author(dynamic id)=>names[id]??'Utilisateur $id';
   Future<void> initialize() async {
-    try {await service.initialize();names=await service.memberNames();await load();}
-    catch (_) {if(mounted) {setState(() {rows=[];loading=false;error='Supervision indisponible. Vérifiez votre connexion et votre session.';});}}
+    var stage='Vérification du rôle';
+    try {await service.initialize();stage='Chargement des utilisateurs';names=await service.memberNames();await load();}
+    catch (failure) {if(mounted) {setState(() {rows=[];loading=false;error=safeAccessError(failure,stage);});}}
   }
   Future<void> load() async {
     if(mounted) {setState(() {loading=true;error=null;rows=[];});}
@@ -69,7 +71,7 @@ class _SupervisionScreenState extends State<SupervisionScreen> {
         action:actionFilter,since:dateFilter?.start,until:dateFilter?.end.add(const Duration(days:1)).subtract(const Duration(microseconds:1))):
         await service.declarations(state:state,page:page);
       if(mounted) {setState(() {rows=[for(final row in result['results'] as List)Map<String,dynamic>.from(row as Map)];hasMore=result['next']!=null;});}
-    } catch (_) {if(mounted) {setState(()=>error='Le serveur est indisponible. Aucune décision n’a été prise.');}}
+    } catch (failure) {if(mounted) {setState(()=>error=safeAccessError(failure,journal?'Chargement du journal':'Chargement de la supervision'));}}
     finally {if(mounted) {setState(()=>loading=false);}}
   }
   Future<void> open(Map<String,dynamic> row) async {
@@ -183,9 +185,14 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
         Text('Fait : ${_date(row!['business_occurred_at'])} • reçu : ${_date(row!['received_at'])}'),
         const SizedBox(height:12),const Text('Déclaration originale conservée',style:TextStyle(fontWeight:FontWeight.bold)),
         _facts(row!['original_payload'] as Map),
+        if(!SupervisionService.allowsLegacyDecisions(row!))
+          Text(row!['reconciliation_mode']=='READ_ONLY_V2'
+            ? 'Consultation uniquement : les opérations conformes sont appliquées automatiquement. Aucune approbation du propriétaire n’est requise.'
+            : 'Consultation uniquement : les actions de décision ne sont pas disponibles pour cette opération.'),
         if(recognized!=null) ...[const Divider(),_facts(recognized)],
         if((receipt['reason_text']?.toString()??'').isNotEmpty) Text('Dernier motif : ${receipt['reason_text']}'),
-        if(!loading && receipt['business_status']!='SUPERSEDED' && receipt['business_status']!='NOT_APPLIED' &&
+        if((receipt['reason_code']?.toString()??'').isNotEmpty) Text('Code du motif : ${receipt['reason_code']}'),
+        if(!loading && SupervisionService.allowsLegacyDecisions(row!) && receipt['business_status']!='SUPERSEDED' && receipt['business_status']!='NOT_APPLIED' &&
           (!applied || recognized!=null || {'CLIENT','TASK','VENTE_ANIMAUX','VENTE_OEUFS','MORTALITE','DON','VOL','DEPENSE','ALIMENTATION','PESEE','COLLECTE_OEUFS','ACHAT','NAISSANCE'}.contains(row!['entity_type'])))
           FilledButton(onPressed:decide,child:const Text('Prendre une décision avec motif')),
         const Divider(),const Text('Historique de cette opération',style:TextStyle(fontWeight:FontWeight.bold)),

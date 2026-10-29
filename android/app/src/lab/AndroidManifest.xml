@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+  <application android:allowBackup="false" android:fullBackupContent="@xml/lab_backup_rules"
+    android:dataExtractionRules="@xml/lab_data_extraction_rules" android:usesCleartextTraffic="false"
+    android:networkSecurityConfig="@xml/lab_network_security_config"
+    tools:replace="android:fullBackupContent,android:dataExtractionRules" />
+</manifest>

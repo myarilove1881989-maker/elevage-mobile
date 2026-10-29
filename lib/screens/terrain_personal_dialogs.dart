@@ -1,7 +1,8 @@
 part of 'offline_tablet_screen.dart';
 
 class _RecoveryReasonDialog extends StatefulWidget {
-  const _RecoveryReasonDialog();
+  const _RecoveryReasonDialog({this.cancellation=false});
+  final bool cancellation;
   @override
   State<_RecoveryReasonDialog> createState()=>_RecoveryReasonDialogState();
 }
@@ -11,16 +12,17 @@ class _RecoveryReasonDialogState extends State<_RecoveryReasonDialog> {
   @override
   void dispose() {reason.dispose();super.dispose();}
   @override
-  Widget build(BuildContext context)=>AlertDialog(title:const Text('Récupération explicite'),
+  Widget build(BuildContext context)=>AlertDialog(title:Text(widget.cancellation?'Annuler cette opération':'Récupération explicite'),
     content:SingleChildScrollView(child:Form(key:form,child:Column(mainAxisSize:MainAxisSize.min,children:[
-      const Text('Transmettre au maximum 50 déclarations conservées avec leurs auteurs d’origine. '
+      if(widget.cancellation) const Text('L’original sera conservé. Le serveur vérifiera les paiements et dépendances avant toute compensation.'),
+      if(!widget.cancellation) const Text('Transmettre au maximum 50 déclarations conservées avec leurs auteurs d’origine. '
         'Cette action ne réactive pas la tablette. Les nouvelles déclarations reçues devront être rapprochées séparément.'),
-      TextFormField(controller:reason,maxLength:10000,maxLines:4,
-        decoration:const InputDecoration(labelText:'Motif de récupération'),
+      TextFormField(controller:reason,maxLength:widget.cancellation?1000:10000,maxLines:4,
+        decoration:InputDecoration(labelText:widget.cancellation?'Motif d’annulation':'Motif de récupération'),
         validator:(value)=>(value?.trim().length??0)<3?'Indiquez un motif explicite.':null),
     ]))),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
       FilledButton(onPressed:(){if(form.currentState!.validate()) Navigator.pop(context,reason.text.trim());},
-        child:const Text('Transmettre pour rapprochement'))]);
+        child:Text(widget.cancellation?'Enregistrer l’annulation':'Transmettre pour rapprochement'))]);
 }
 
 String _taskStatus(dynamic status)=>const {'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée','CANCELLED':'Annulée'}[status]??'État inconnu';

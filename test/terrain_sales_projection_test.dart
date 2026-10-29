@@ -99,7 +99,7 @@ void main() {
 
   test('schema four upgrade adds recognition without deleting pending sale and literal client search is bounded',() async {
     final sale=await enqueue('VENTE_ANIMAUX',{'lot_ref':{'server_id':7},'client_ref':{'server_id':9},'quantite':1,'prix_unitaire':'1.00'});
-    await db.customStatement('DROP TABLE terrain_cash_recognition');await db.customStatement('PRAGMA user_version=4');
+    await db.customStatement('DROP TABLE terrain_cash_recognition');await db.customStatement('DROP TABLE screen_snapshots');await db.customStatement('PRAGMA user_version=4');
     await db.close();db=open();expect((await db.listOutbox()).single.operationId,sale.operationId);
     await db.replaceConfirmedCache('clients',[{'id':1,'nom':'100% exact'},{'id':2,'nom':'100 autre'}]);
     expect((await db.projectedPage('clients',search:'100%')).single['data'],containsPair('id',1));

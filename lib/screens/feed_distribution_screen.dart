@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
 import '../theme/terre_et_or_theme.dart';
+import '../widgets/terrain_entry_gate.dart';
 
 String _feedDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
@@ -114,12 +115,12 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> {
                   ),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
+                    child: BusinessCommand(api: widget.apiService, actions: const {'feed.create'}, child: ElevatedButton.icon(
                       key: const Key('addFeedDistribution'),
                       onPressed: _add,
                       icon: const Icon(Icons.add),
                       label: Text(context.tr('add_feed_distribution')),
-                    ),
+                    )),
                   ),
                   const SizedBox(height: 18),
                   if (loading)
@@ -184,24 +185,33 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> {
   }
 }
 
-class FeedDistributionFormScreen extends StatefulWidget {
+class FeedDistributionFormScreen extends StatelessWidget {
+  const FeedDistributionFormScreen({super.key,required this.apiService,required this.lotId,required this.lotName});
+  final ApiService apiService;
+  final int lotId;
+  final String lotName;
+  @override
+  Widget build(BuildContext context)=>TerrainEntryGate(api:apiService,actions:const {'feed.create'},
+    builder:(_)=>_ClassicFeedDistributionForm(apiService:apiService,lotId:lotId,lotName:lotName));
+}
+
+class _ClassicFeedDistributionForm extends StatefulWidget {
   final ApiService apiService;
   final int lotId;
   final String lotName;
 
-  const FeedDistributionFormScreen({
-    super.key,
+  const _ClassicFeedDistributionForm({
     required this.apiService,
     required this.lotId,
     required this.lotName,
   });
 
   @override
-  State<FeedDistributionFormScreen> createState() =>
+  State<_ClassicFeedDistributionForm> createState() =>
       _FeedDistributionFormScreenState();
 }
 
-class _FeedDistributionFormScreenState extends State<FeedDistributionFormScreen> {
+class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionForm> {
   final formKey = GlobalKey<FormState>();
   final feedName = TextEditingController();
   final quantity = TextEditingController();
@@ -237,31 +247,9 @@ class _FeedDistributionFormScreenState extends State<FeedDistributionFormScreen>
     super.dispose();
   }
 
-  Future<void> _selectDate() async {
-    final selected = await showDatePicker(
-      context: context,
-      initialDate: dateTime,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
-    );
-    if (selected == null || !mounted) return;
-    setState(() => dateTime = DateTime(
-          selected.year, selected.month, selected.day,
-          dateTime.hour, dateTime.minute,
-        ));
-  }
 
-  Future<void> _selectTime() async {
-    final selected = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(dateTime),
-    );
-    if (selected == null || !mounted) return;
-    setState(() => dateTime = DateTime(
-          dateTime.year, dateTime.month, dateTime.day,
-          selected.hour, selected.minute,
-        ));
-  }
+
+
 
   Future<void> _save() async {
     if (saving || !formKey.currentState!.validate()) return;
@@ -269,7 +257,7 @@ class _FeedDistributionFormScreenState extends State<FeedDistributionFormScreen>
     try {
       await widget.apiService.createFeedDistribution(
         lotId: widget.lotId,
-        distributedAt: dateTime,
+        distributedAt: DateTime.now(),
         feedName: feedName.text.trim(),
         quantityKg: double.parse(quantity.text.trim().replaceAll(',', '.')),
         pricePerKg: price.text.trim().isEmpty
@@ -311,14 +299,14 @@ class _FeedDistributionFormScreenState extends State<FeedDistributionFormScreen>
                   ),
                   OutlinedButton.icon(
                     key: const Key('feedDatePicker'),
-                    onPressed: _selectDate,
+                    onPressed: null,
                     icon: const Icon(Icons.calendar_today_outlined),
                     label: Text('${context.tr('feed_date')} : ${_feedDate(dateTime)}'),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     key: const Key('feedTimePicker'),
-                    onPressed: _selectTime,
+                    onPressed: null,
                     icon: const Icon(Icons.access_time),
                     label: Text('${context.tr('feed_time')} : ${_feedTime(dateTime)}'),
                   ),

@@ -29,6 +29,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   String? resetToken;
 
   Future<void> requestCode() async {
+    if (isLoading) return;
     final email = emailController.text.trim().toLowerCase();
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       setState(() => errorMessage = "Saisissez une adresse e-mail valide.");
@@ -48,6 +49,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> verifyCode() async {
+    if (isLoading) return;
     final code = codeController.text.trim();
     if (code.length != 6) {
       setState(() => errorMessage = "Saisissez le code à 6 chiffres.");
@@ -65,6 +67,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> changePassword() async {
+    if (isLoading) return;
     final password = passwordController.text;
     if (password.length < 8) {
       setState(() => errorMessage =
@@ -151,6 +154,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                   ),
                   const SizedBox(height: 8),
+                  const Text(
+                    'Une connexion Internet est nécessaire pour réinitialiser votre mot de passe.',
+                    textAlign: TextAlign.center,
+                  ),
                   Text(
                     step == 0
                         ? "Indiquez l'adresse e-mail associée à votre compte."
@@ -172,6 +179,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                     ),
                   if (step == 1) ...[
+                    TextButton(
+                      onPressed: isLoading ? null : () => setState(() {
+                        step = 0;
+                        resetToken = null;
+                        codeController.clear();
+                        errorMessage = '';
+                      }),
+                      child: const Text('Changer d’adresse e-mail'),
+                    ),
                     TextField(
                       controller: codeController,
                       keyboardType: TextInputType.number,
@@ -191,6 +207,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                   ],
                   if (step == 2) ...[
+                    TextButton(
+                      onPressed: isLoading ? null : () => setState(() {
+                        step = 0;
+                        resetToken = null;
+                        codeController.clear();
+                        passwordController.clear();
+                        confirmPasswordController.clear();
+                        errorMessage = '';
+                      }),
+                      child: const Text('Demander un nouveau code'),
+                    ),
                     TextField(
                       controller: passwordController,
                       obscureText: hidePassword,

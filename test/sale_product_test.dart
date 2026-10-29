@@ -5,6 +5,14 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class SaleApiFake extends ApiService {
+  @override
+  Future<dynamic> get(String endpoint) async {
+    if(endpoint!='/me/capabilities/') throw StateError('Unmocked request');
+    return {'user':2,'exploitation':1,'role':'OPERATEUR','offline_policy_enabled':false,
+      'membership':{'version':1},'permission_contract':{'version':1,'user':2,
+        'exploitation':1,'role':'OPERATEUR','rights_version':1,
+        'permissions':['finance.read','animal_sales.create','egg_sales.create','births.create','clients.create','mortality.create','donations.create','thefts.create']}};
+  }
   int? animalLot;
   String? movementType;
   int? animalQuantity;
@@ -379,7 +387,8 @@ void main() {
     api.birthFails = true;
     await tapSave();
     await tester.pump();
-    expect(find.textContaining('Échec naissance'), findsOneWidget);
+    expect(find.textContaining('Confirmation de l’opération indisponible'), findsOneWidget);
+    expect(find.textContaining('Échec naissance'), findsNothing);
     expect(api.birthLot, isNull);
     expect(tester.takeException(), isNull);
   });

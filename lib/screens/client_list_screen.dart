@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import 'client_detail_screen.dart';
 import '../theme/terre_et_or_theme.dart';
+import '../widgets/terrain_entry_gate.dart';
 
 class ClientListScreen extends StatefulWidget {
   final ApiService apiService;
@@ -56,6 +57,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
 
   // ================= CREATE CLIENT =================
   Future<void> addClient() async {
+    if(!await TerrainEntryGate.allowClassic(context,widget.apiService,{'clients.create'}) || !mounted) return;
     final nomController = TextEditingController();
     final telController = TextEditingController();
     final villeController = TextEditingController();
@@ -165,10 +167,10 @@ class _ClientListScreenState extends State<ClientListScreen> {
       data: terreEtOrTheme(context),
       child: Scaffold(
         appBar: AppBar(title: Text(context.tr('customers'))),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: BusinessCommand(api: widget.apiService, actions: const {'clients.create'}, child: FloatingActionButton(
           onPressed: addClient,
           child: const Icon(Icons.add),
-        ),
+        )),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : Column(
