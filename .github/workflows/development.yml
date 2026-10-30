@@ -25,3 +25,4 @@ jobs:
       - run: python3 tools/guard_push.py --check
       - run: flutter pub get --enforce-lockfile
       - run: flutter test --no-pub --concurrency=1 test/farm_name_test.dart test/laying_offline_preparation_test.dart test/production_tracking_test.dart test/egg_production_test.dart test/stock_checkpoint_test.dart test/terrain_stock_projection_test.dart test/password_reset_test.dart test/reset_password_link_test.dart test/auth_connection_test.dart test/permission_contract_test.dart test/financial_indicators_test.dart test/production_network_safety_test.dart
+      - run: flutter test --no-pub --platform chrome test/web_j1_qualification_test.dart test/day1_agenda_test.dart test/auth_connection_test.dart test/password_reset_test.dart

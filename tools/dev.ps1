@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('setup','start','test','build-web','save','push')][string]$Action = 'setup',
+  [ValidateSet('setup','start','test','test-web','build-web','save','push')][string]$Action = 'setup',
   [string]$Name,
   [string]$Message,
   [string[]]$Tests = @(),
@@ -55,6 +55,13 @@ switch($Action){
       & $python tools/test_local.py @opts @Tests
     }
     if($LASTEXITCODE){throw 'Targeted tests failed'}
+  }
+  'test-web' {
+    if(!$mobile){throw 'Use this action in mobile'}
+    if(!$Tests.Count){$Tests=@('test/web_j1_qualification_test.dart','test/day1_agenda_test.dart','test/auth_connection_test.dart','test/password_reset_test.dart')}
+    $env:ELEVAGE_FLUTTER_SDK=$sdk
+    & node (Join-Path $PSScriptRoot 'test_web.mjs') @Tests
+    if($LASTEXITCODE){throw 'Chrome qualification failed'}
   }
   'build-web' {
     if(!$mobile){throw 'Use this action in mobile'}
