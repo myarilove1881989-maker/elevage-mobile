@@ -25,6 +25,7 @@ import '../offline/screen_snapshot_store.dart';
 import 'api_service.dart';
 
 import 'classic_terrain_command.dart';
+import 'egg_collection_version.dart';
 
 import 'guarded_api_client.dart';
 
@@ -320,6 +321,8 @@ class FarmerRuntime extends ChangeNotifier {
 
           }
 
+          final weights = Uri.parse('${Config.apiUrl}/production/pesees/').replace(queryParameters:{'lot':'$id'});
+          await request(http.Request('GET', weights));
           // Prepare laying views as well as the lot sheet. Otherwise a first
           // visit after disconnecting has references but no laying snapshots.
           if ((row['data'] as Map)['type_production'] == 'OEUFS') {
@@ -601,6 +604,76 @@ class FarmerRuntime extends ChangeNotifier {
 
 
 
+  ClassicTerrainCommand _eggCorrection(String endpoint,Map<String,dynamic> body) {
+    final local=body['local_uuid'];
+    final id=int.tryParse(endpoint.split('/')[3]);
+    final payload=<String,dynamic>{...eggValues(body),
+      'lot_ref':ClassicTerrainCommand.reference(body['lot']),
+      'collection_ref':local is String ? {'local_uuid':local} : ClassicTerrainCommand.reference(id),
+      'previous_quantity':body['previous_quantity'],
+      if(body['dependency'] is String) '_dependency':body['dependency']};
+    return ClassicTerrainCommand('COLLECTE_OEUFS',payload,operation:'UPDATE',expectedVersion:body['expected_version'] as String);
+  }
+
+  Future<Object?> _projectRead(String path,Object? payload) async {
+    if(!prepared) return payload;
+    final uri=Uri.parse(path);
+    final lotMatch=RegExp(r'^/lots/(\d+)/$').firstMatch(uri.path);
+    if(lotMatch!=null) {
+      final id=int.parse(lotMatch[1]!);
+      for(var offset=0;offset<10000;offset+=50) {
+        final rows=await tablet.readPage('lots',offset:offset);
+        for(final row in rows) {
+          final data=row['data'] as Map;
+          if(data['id']==id) return <String,dynamic>{
+            if(payload is Map) ...Map<String,dynamic>.from(payload),
+            if(payload is! Map) ...Map<String,dynamic>.from(data),
+            if(payload is! Map) 'offline_summary_only':true,
+            'projected_stock':data['projected_stock'],'projected_egg_stock':data['projected_egg_stock']};
+        }
+        if(rows.length<50) break;
+      }
+    }
+    if(uri.path!='/oeufs/collectes/' || payload is! List) return payload;
+    final lot=int.tryParse(uri.queryParameters['lot']??'');
+    final result=payload.map((r)=>Map<String,dynamic>.from(r as Map)).toList();
+    final entries=<OutboxEntry>[];
+    for(var offset=0;offset<10000;offset+=50) {
+      final page=await (tablet.cache! as OutboxStore).listOutbox(authorId:grant!.userId,offset:offset,limit:50);
+      entries.addAll(page); if(page.length<50) break;
+    }
+    entries.sort((a,b)=>a.sequence.compareTo(b.sequence));
+    for(final entry in entries) {
+      final d=entry.declaration,p=d['payload'] as Map;
+      if(d['entity_type']!='COLLECTE_OEUFS' || p['lot_ref']?['server_id']!=lot ||
+        {'NOT_APPLIED','SUPERSEDED'}.contains(entry.businessStatus)) continue;
+      final update=d['operation_type']=='UPDATE';
+      final ref=p['collection_ref'] as Map?;
+      final local=update ? (ref?['local_uuid']) : d['local_entity_id'];
+      final server=update ? (ref?['server_id']) : int.tryParse(entry.serverEntityId);
+      final index=result.indexWhere((r)=>(local!=null && r['_local_uuid']==local) || (server!=null && r['id']==server));
+      if(!update && index>=0) { result[index]['_local_uuid']=local; continue; }
+      if(update && index<0) continue;
+      if(update && entry.businessStatus=='NEEDS_RECONCILIATION') {result[index]['_review_required']=true;continue;}
+      if(update && entry.businessStatus=='CONFIRMED' && (await eggVersion(result[index]))!=d['expected_server_version'] && (await eggVersion(result[index]))!=(await eggVersion(p))) continue;
+      final values=eggValues(p);
+      final item=<String,dynamic>{if(update) ...result[index], ...values,
+        'id':server??local,'lot':lot,'nombre_commercialisable':eggAvailable(values),
+        'collection_version':(await eggVersion(values)),
+        'collecte_at':update?result[index]['collecte_at']:d['business_occurred_at'],
+        if(local!=null) '_local_uuid':local,
+        '_dependency':entry.operationId,'local_only':entry.businessStatus!='CONFIRMED',
+        '_review_required':entry.businessStatus=='NEEDS_RECONCILIATION'};
+      if(update) {result[index]=item;} else {result.add(item);}
+    }
+    return result.where((r) {
+      final timestamp=DateTime.tryParse((r['collecte_at']??'').toString())?.toLocal();
+      final day=timestamp==null?'':timestamp.toIso8601String().split('T').first;
+      return day.isEmpty || (uri.queryParameters['date_debut']==null || day.compareTo(uri.queryParameters['date_debut']!)>=0) &&
+        (uri.queryParameters['date_fin']==null || day.compareTo(uri.queryParameters['date_fin']!)<=0);
+    }).toList();
+  }
+
   Future<http.Response> request(http.BaseRequest request) async {
 
     if(!signedIn) throw StateError('Reconnectez-vous pour continuer.');
@@ -619,7 +692,9 @@ class FarmerRuntime extends ChangeNotifier {
 
     if(prepared && request.method!='GET') {
 
-      final command=request is http.Request && request.method=='POST'
+      final command=request is http.Request && request.method=='PATCH' && RegExp(r'^/oeufs/collectes/[^/]+/$').hasMatch(endpoint)
+        ? _eggCorrection(endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map))
+        : request is http.Request && request.method=='POST'
 
         ?await _decodeCommand(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
 
@@ -646,6 +721,7 @@ class FarmerRuntime extends ChangeNotifier {
         payload:command.payload,businessOccurredAt:at,operationId:id,localEntityId:id,
 
         expectedServerVersion:command.expectedVersion,
+        dependencies:command.payload['_dependency'] is String ? [command.payload.remove('_dependency') as String] : const [],
 
         project:{'VENTE_ANIMAUX','VENTE_OEUFS'}.contains(command.kind)?() async {
 
@@ -732,6 +808,10 @@ class FarmerRuntime extends ChangeNotifier {
           await tablet.refreshCache(collections:const ['sales']);
           check();
         }
+        if(canCache && response.statusCode==200) {
+          final projected=await _projectRead(path,jsonDecode(response.body)); check();
+          return _localJson(projected,200);
+        }
         return response;
 
       } catch(error) {if(!isTransportFailure(error) || request.method!='GET') rethrow;}
@@ -746,7 +826,10 @@ class FarmerRuntime extends ChangeNotifier {
 
       check();
 
-      if(payload!=null) return _localJson(payload,200,headers:{'x-elevage-cached':'1'});
+      if(payload!=null) {final projected=await _projectRead(path,payload);check();return _localJson(projected,200,headers:{'x-elevage-cached':'1'});}
+      final projected=await _projectRead(path,Uri.parse(path).path=='/oeufs/collectes/'?const []:null);
+      check();
+      if(projected!=null && (projected is! List || projected.isNotEmpty)) return _localJson(projected,200,headers:{'x-elevage-cached':'1'});
 
     }
 

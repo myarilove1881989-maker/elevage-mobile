@@ -165,7 +165,7 @@ class UnifiedAccessHarness {
   Future<void> start() async {
     directory=await Directory.systemTemp.createTemp('elevage-seven-day-');
     db=openDatabase();
-    initial=await fineGrant(credentialVersion:1,codes:rights,now:now,duration:const Duration(days:7));
+    initial=await fineGrant(credentialVersion:1,codes:codes,now:now,duration:const Duration(days:7));
     await db.saveOperatorProfile(initial!,'synthetic');
     await enroll(initial!,'123456');
     secrets.values['tablet_context_${Uri.encodeComponent(base)}']=jsonEncode({
@@ -184,7 +184,7 @@ class UnifiedAccessHarness {
     await sessions.enroll(grant,pin);
     // Install only a verified synthetic response, as normal preparation would.
     late Map<String,dynamic> response;
-    final verified=await fineGrant(credentialVersion:1,user:grant.userId,expectedUser:grant.userId,codes:rights,
+    final verified=await fineGrant(credentialVersion:1,user:grant.userId,expectedUser:grant.userId,codes:codes,
       now:now,duration:const Duration(days:7),issued:(value)=>response=value);
     secrets.values['offline_grant_${Uri.encodeComponent(base)}_1_${grant.userId}']=jsonEncode({
       'token':verified.token,'public_key':response['public_key'],'key_id':response['key_id'],
@@ -239,6 +239,7 @@ class UnifiedAccessHarness {
       onlineClient:MockClient((request) async {
         if(down) throw http.ClientException('Synthetic read offline');
         preparedReads.add(request.url.toString());
+        if(request.url.path.endsWith('/production/pesees/')) return http.Response('{"effectif_actuel":10,"pesees":[{"id":17,"nombre_animaux_peses":10,"poids_total_kg":"18.000"}]}',200);
         if(layingFixture) {
           if(request.url.path.endsWith('/farm-profile/')) return http.Response('{"id":1,"nom":"Ferme partagée"}',200,headers:{'content-type':'application/json; charset=utf-8'});
           if(request.url.path.endsWith('/oeufs/collectes/')) return http.Response('[{"id":90,"nombre_collecte":40}]',200);

@@ -371,6 +371,7 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
         if(declaration['entity_type']=='COLLECTE_OEUFS') {
           final collected=payload['nombre_collecte']??(_quantity(payload['nombre_alveoles'])*30+_quantity(payload['oeufs_restants']));
           eggDelta+=_quantity(collected)-_quantity(payload['nombre_casses'])-_quantity(payload['nombre_declasses'])-_quantity(payload['nombre_consommes_donnes']);
+          if(declaration['operation_type']=='UPDATE') eggDelta-=_quantity(payload['previous_quantity']);
         }
         reconcile=reconcile || operation.read<String>('business_status')=='NEEDS_RECONCILIATION';
       }

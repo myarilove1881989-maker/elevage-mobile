@@ -108,6 +108,8 @@ class _LotDetailScreenState extends State<LotDetailScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               if (isLoading) const LinearProgressIndicator(),
+              if(lot!['offline_summary_only']==true) const Padding(padding:EdgeInsets.all(8),
+                child:Text('Résumé du lot conservé hors connexion. Le détail financier nécessite une préparation avec Internet.')),
               if (loadError != null) Padding(padding: const EdgeInsets.all(8),
                 child: Text(loadError!, style: TextStyle(color: Colors.orange.shade800))),
               Container(

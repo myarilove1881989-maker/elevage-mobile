@@ -141,15 +141,25 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
     await loadData();
   }
 
-  Future<void> showCollectionDialog() async {
-    if(!await TerrainEntryGate.allowClassic(context,widget.apiService,{'egg_collections.create'}) || !mounted) return;
+  Future<void> showCollectionDialog([Map<String,dynamic>? original]) async {
+    if(original?['_review_required']==true) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Cette collecte nécessite une vérification du propriétaire dans la supervision. L’historique est conservé.')));
+      return;
+    }
+    if(!await TerrainEntryGate.allowClassic(context,widget.apiService,{original==null?'egg_collections.create':'egg_collections.update'}) || !mounted) return;
     final trays = TextEditingController(text: '0');
     final remainder = TextEditingController(text: '0');
     final broken = TextEditingController(text: '0');
     final downgraded = TextEditingController(text: '0');
     final consumed = TextEditingController(text: '0');
     final note = TextEditingController();
-    final now = DateTime.now();
+    if(original!=null) {
+      final total=number(original['nombre_collecte']).toInt();
+      trays.text='${total~/30}'; remainder.text='${total%30}';
+      broken.text='${original['nombre_casses']??0}'; downgraded.text='${original['nombre_declasses']??0}';
+      consumed.text='${original['nombre_consommes_donnes']??0}'; note.text='${original['note']??''}';
+    }
+    final now = original==null?DateTime.now():DateTime.parse(original['collecte_at'].toString()).toLocal();
     DateTime selectedDate = now;
     TimeOfDay selectedTime = TimeOfDay.fromDateTime(now);
     bool submitting = false;
@@ -164,7 +174,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
               (int.tryParse(downgraded.text.trim()) ?? 0) +
               (int.tryParse(consumed.text.trim()) ?? 0);
           return AlertDialog(
-            title: Text(dialogContext.tr('egg_new_collection')),
+            title: Text(original==null?dialogContext.tr('egg_new_collection'):'Modifier la collecte'),
             content: SizedBox(
               width: 450,
               child: SingleChildScrollView(
@@ -252,6 +262,8 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                 onPressed: submitting ? null : () async {
                   final values = [trays, remainder, broken, downgraded, consumed]
                       .map((controller) => int.tryParse(controller.text.trim())).toList();
+                  final collected=(values[0]??0)*eggsPerTray+(values[1]??0);
+                  final losses=(values[2]??0)+(values[3]??0)+(values[4]??0);
                   if (values.any((value) => value == null || value < 0) ||
                       values[1]! >= eggsPerTray || collected == 0 || losses > collected) {
                     ScaffoldMessenger.of(dialogContext).showSnackBar(
@@ -261,6 +273,11 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                   }
                   setDialogState(() => submitting = true);
                   try {
+                    if(original!=null) {
+                      await widget.apiService.updateEggCollection(original,{
+                        'nombre_collecte':collected,'nombre_casses':values[2]!,
+                        'nombre_declasses':values[3]!, 'nombre_consommes_donnes':values[4]!, 'note':note.text.trim()});
+                    } else {
                     await widget.apiService.createEggCollection(
                       lotId: widget.lotId,
                       collectedAt: DateTime.now(),
@@ -271,6 +288,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                       consumedOrDonated: values[4]!,
                       note: note.text.trim(),
                     );
+                    }
                     if (dialogContext.mounted) Navigator.pop(dialogContext, true);
                   } catch (error) {
                     if (dialogContext.mounted) {
@@ -814,6 +832,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
+              if(collections.any((r)=>r['local_only']==true)) const Text('Collectes en attente de synchronisation. Les statistiques et le stock daté affichent les dernières données confirmées.'),
               if (!loading && collections.isEmpty)
                 const Card(
                   child: Padding(
@@ -835,7 +854,8 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                             backgroundColor: TerreEtOrColors.paleGold,
                             child: Icon(Icons.egg_outlined, color: TerreEtOrColors.gold),
                           ),
-                          title: Text(trayCount(item['nombre_collecte'])),
+                          onTap:()=>showCollectionDialog(item),
+                          title: Text('${trayCount(item['nombre_collecte'])}${item['_review_required']==true?' · À vérifier':item['local_only']==true?' · En attente de synchronisation':''}'),
                           subtitle: Text(
                             '${context.tr('egg_collected_total')}: ${item['nombre_collecte']} · '
                             '${context.tr('egg_commercializable')}: ${item['nombre_commercialisable']}\n'
@@ -843,8 +863,12 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                             '${context.tr('egg_downgraded')}: ${item['nombre_declasses']} · '
                             '${context.tr('egg_consumed')}: ${item['nombre_consommes_donnes']}',
                           ),
-                          trailing: Text(MaterialLocalizations.of(context)
-                              .formatTimeOfDay(TimeOfDay.fromDateTime(at))),
+                          trailing: Row(mainAxisSize:MainAxisSize.min,children:[
+                            Text(MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at))),
+                            BusinessCommand(api:widget.apiService,actions:const {'egg_collections.update'},child:IconButton(
+                              key:ValueKey('edit-egg-${item['id']}'),tooltip:'Modifier la collecte',
+                              onPressed:()=>showCollectionDialog(item),icon:const Icon(Icons.edit_outlined))),
+                          ]),
                         ),
                       );
                     }),

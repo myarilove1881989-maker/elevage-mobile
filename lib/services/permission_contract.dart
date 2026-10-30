@@ -53,6 +53,7 @@ class PermissionContract {
       final domain=cancelDomains[kind];
       return domain==null?null:'$domain.cancel';
     }
+    if (kind == 'COLLECTE_OEUFS' && operation == 'UPDATE') return 'egg_collections.update';
     if (kind == 'TASK' && operation == 'UPDATE') return 'agenda.progress';
     if (operation != 'CREATE') return null;
     const mapping = {'ACHAT':'purchases','VENTE':'animal_sales','VENTE_ANIMAUX':'animal_sales','VENTE_OEUFS':'egg_sales',

@@ -540,43 +540,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool get _mayPlanTasks => commonSessionToken == (ApiService.sessionIdentity) &&
       commonSession?.role == 'OWNER' && commonSession?.permissions?.allows('agenda.plan') == true;
 
+  void _showAgenda() {
+    showModalBottomSheet<void>(context:context,builder:(sheet)=>SafeArea(child:Column(
+      mainAxisSize:MainAxisSize.min,children:[
+        const ListTile(title:Text('Agenda')),
+        ListTile(leading:const Icon(Icons.event),title:const Text('Voir les tâches du jour'),
+          onTap:(){Navigator.pop(sheet);_showTasksForDay(_selectedDay??_focusedDay);}),
+        if(_mayPlanTasks) ListTile(leading:const Icon(Icons.add_task),title:const Text('Attribuer une tâche'),
+          onTap:(){Navigator.pop(sheet);_addTask();}),
+      ])));
+  }
+
   void _addTask() async {
     await _loadCommonSession();
     if(!mounted || !_mayPlanTasks) return;
-    String newTask = "";
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(context.tr('new_task')),
-        content: TextField(onChanged: (value) => newTask = value),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(context.tr('cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final day = _selectedDay ?? DateTime.now();
-
-              await _loadCommonSession();
-              if(!mounted || !_mayPlanTasks) return;
-              await apiService.createTask(newTask, day);
-
-              try {
-                await scheduleNotification(newTask, day);
-              } catch (_) {
-                // Un rappel facultatif ne doit pas bloquer la tâche enregistrée.
-              }
-
-              Navigator.pop(context);
-              await loadTasks();
-            },
-            child: Text(context.tr('add')),
-          ),
-        ],
-      ),
-    );
+    final captured=ApiService.sessionIdentity;
+    List<Map<String,dynamic>> operators;
+    try {
+      final raw=await apiService.get('/memberships/');
+      if(!mounted || captured!=ApiService.sessionIdentity || !_mayPlanTasks) return;
+      operators=(raw as List).map((r)=>Map<String,dynamic>.from(r as Map))
+        .where((r)=>r['role']=='OPERATEUR' && r['is_active']==true && r['exploitation']==commonSession!.farmId).toList();
+    } catch (_) {
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Impossible de charger les opérateurs. Reconnectez-vous pour attribuer une tâche.')));
+      return;
+    }
+    if(!mounted) return;
+    final title=TextEditingController();
+    var day=_selectedDay??DateTime.now(); int? assignee; bool busy=false; String? error;
+    final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>AlertDialog(
+      title:Text(context.tr('new_task')),
+      content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const InputDecoration(labelText:'Tâche')),
+        DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const InputDecoration(labelText:'Opérateur'),
+          items:operators.map((r)=>DropdownMenuItem<int>(value:r['user'] as int,child:Text(r['username'].toString()))).toList(),
+          onChanged:busy?null:(v)=>change(()=>assignee=v)),
+        TextButton(onPressed:busy?null:() async {
+          final selected=await showDatePicker(context:dialog,initialDate:day,firstDate:DateTime(2020),lastDate:DateTime(2100));
+          if(selected!=null && dialog.mounted) change(()=>day=selected);
+        },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(day))),
+        if(error!=null) Text(error!),
+      ])),
+      actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(dialog,false),child:Text(context.tr('cancel'))),
+        FilledButton(onPressed:busy?null:() async {
+          if(title.text.trim().isEmpty || assignee==null) {change(()=>error='Renseignez la tâche et son opérateur.');return;}
+          change((){busy=true;error=null;});
+          try {
+            await _loadCommonSession();
+            if(captured!=ApiService.sessionIdentity || !_mayPlanTasks) throw StateError('Session modifiée');
+            await apiService.createTask(title.text.trim(),day,assignedTo:assignee);
+            if(dialog.mounted) Navigator.pop(dialog,true);
+          } catch (_) {if(dialog.mounted) change((){busy=false;error='Enregistrement non confirmé. Vérifiez l’agenda avant de recommencer.';});}
+        },child:Text(context.tr('add')))])));
+    final saved=await Navigator.of(context).push(route);await route.completed;title.dispose();
+    if(saved==true && mounted) await loadTasks();
   }
 
   Future<void> _refreshAll() async {
@@ -843,7 +860,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               FarmDestination.expenses:() {Navigator.pop(context);_openDepense();},
               FarmDestination.movements:() {Navigator.pop(context);_openMouvement();},
               FarmDestination.history:() {Navigator.pop(context);_openHistory();},
-              FarmDestination.agenda:() {Navigator.pop(context);_showTasksForDay(_selectedDay??_focusedDay);},
+              FarmDestination.agenda:() {Navigator.pop(context);_showAgenda();},
               FarmDestination.production:() {Navigator.pop(context);_openProductionTracking();},
               FarmDestination.settings:() {Navigator.pop(context);_openSettings();},
               FarmDestination.users:() {Navigator.pop(context);Navigator.push(context,MaterialPageRoute(builder:(_)=>UserManagementScreen(service:UserAdministrationService(apiService))));},

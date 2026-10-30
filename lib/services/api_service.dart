@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'token_service.dart';
 import 'initial_password.dart';
+import 'egg_collection_version.dart';
 import '../offline/outbox.dart';
 import 'guarded_api_client.dart';
 import 'package:http/http.dart' as http;
@@ -545,6 +546,17 @@ class ApiService {
     return await _handleResponse(response);
   }
 
+  Future<Map<String,dynamic>> updateEggCollection(Map<String,dynamic> original, Map<String,dynamic> values) async {
+    final id=original['id'];
+    final response=await _client.patch(Uri.parse('$baseUrl/oeufs/collectes/$id/'),headers:_headers(),
+      body:jsonEncode({'lot':original['lot'], ...eggValues(values),
+        'expected_version':original['collection_version'] ?? (await eggVersion(original)),
+        if(original['_local_uuid']!=null) 'local_uuid':original['_local_uuid'],
+        if(original['_dependency']!=null) 'dependency':original['_dependency'],
+        'previous_quantity':eggAvailable(original)}));
+    return Map<String,dynamic>.from(await _handleResponse(response) as Map);
+  }
+
   Future<Map<String, dynamic>> createEggCollection({
     required int lotId,
     required DateTime collectedAt,
@@ -977,16 +989,14 @@ class ApiService {
     }
   }
 
-  Future<void> createTask(String title, DateTime date) async {
+  Future<void> createTask(String title, DateTime date, {int? assignedTo}) async {
     final response = await _client.post(
       Uri.parse("$baseUrl/tasks/"),
-      headers: {
-        "Authorization": "Bearer $globalToken",
-        "Content-Type": "application/json",
-      },
+      headers: _headers(),
       body: jsonEncode({
         "title": title,
         "date": date.toIso8601String().split("T")[0],
+        if(assignedTo!=null) "assigned_to": assignedTo,
       }),
     );
 
