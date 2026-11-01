@@ -45,7 +45,7 @@ class FarmNavigation extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       for (final destination in FarmDestination.values)
-        if (actions.containsKey(destination) &&
+        if (destination != FarmDestination.users && actions.containsKey(destination) &&
             (destination != FarmDestination.agenda || session?.permissions?.allows('agenda.read') == true || session?.permissions?.allows('agenda.plan') == true) &&
             (destination != FarmDestination.users ||
                 session?.canManageUsers == true))

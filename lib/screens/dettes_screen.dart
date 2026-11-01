@@ -18,6 +18,7 @@ class DettesScreen extends StatefulWidget {
 class _DettesScreenState extends State<DettesScreen> {
   List<DetteClient> clients = [];
   bool isLoading = true;
+  String? loadError;
   String selectedFilter = 'ALL';
   String searchQuery = '';
   @override
@@ -27,6 +28,7 @@ class _DettesScreenState extends State<DettesScreen> {
   }
 
   Future<void> loadData() async {
+    setState(() { isLoading = true; loadError = null; });
     try {
       final result = await widget.apiService.getDettesClients();
       result.sort((a, b) => b.reste.compareTo(a.reste));
@@ -37,12 +39,10 @@ class _DettesScreenState extends State<DettesScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erreur de chargement des soldes clients'),
-        ),
-      );
+      setState(() {
+        isLoading = false;
+        loadError = 'Impossible de charger les soldes clients. Vérifiez la connexion ou reconnectez-vous.';
+      });
     }
   }
 
@@ -79,6 +79,13 @@ class _DettesScreenState extends State<DettesScreen> {
       appBar: AppBar(title: Text(context.tr('customer_debts'))),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadError != null
+          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(
+              mainAxisSize: MainAxisSize.min, children: [
+                Text(loadError!, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                FilledButton(onPressed: loadData, child: const Text('Réessayer')),
+              ])))
           : RefreshIndicator(
               onRefresh: loadData,
               child: LayoutBuilder(

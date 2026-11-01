@@ -124,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if(checkingOwner) const LinearProgressIndicator(),
           if(ownerError!=null) ListTile(title:Text(ownerError!),trailing:TextButton(onPressed:checkingOwner?null:loadOwner,child:const Text('Réessayer'))),
           if(owner && ownerSession==(ApiService.sessionIdentity)) ListTile(
-            leading:const Icon(Icons.manage_accounts),title:const Text('Création des utilisateurs'),
+            leading:const Icon(Icons.manage_accounts),title:const Text('Gestion des utilisateurs'),
             onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const UserManagementScreen()))),
           if(owner && ownerSession==(ApiService.sessionIdentity)) ListTile(leading:const Icon(Icons.fact_check),title:const Text('Supervision et journal d’activité'),
             onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const SupervisionScreen()))),

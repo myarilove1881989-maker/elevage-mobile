@@ -568,6 +568,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if(!mounted) return;
     final title=TextEditingController();
     var day=_selectedDay??DateTime.now(); int? assignee; bool busy=false; String? error;
+    var repeat=false; var end=day; final weekdays=<int>{1,2,3,4,5,6,7};
     final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>AlertDialog(
       title:Text(context.tr('new_task')),
       content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
@@ -579,16 +580,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final selected=await showDatePicker(context:dialog,initialDate:day,firstDate:DateTime(2020),lastDate:DateTime(2100));
           if(selected!=null && dialog.mounted) change(()=>day=selected);
         },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(day))),
+        SwitchListTile(title:const Text('Répéter sur plusieurs jours'), value:repeat,
+          onChanged:busy?null:(v)=>change(()=>repeat=v)),
+        if(repeat) ...[
+          const Text('Date de fin (incluse)'),
+          TextButton(onPressed:busy?null:() async {
+            final selected=await showDatePicker(context:dialog,initialDate:end,
+              firstDate:DateTime(2020),lastDate:DateTime(2100));
+            if(selected!=null && dialog.mounted) change(()=>end=selected);
+          },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(end))),
+          const Text('Tous les jours, ou sélectionnez les jours souhaités'),
+          Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(
+            label:Text(['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]),
+            selected:weekdays.contains(i+1),onSelected:busy?null:(v)=>change((){
+              if(v){weekdays.add(i+1);}else{weekdays.remove(i+1);}
+            })))),
+        ],
         if(error!=null) Text(error!),
       ])),
       actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(dialog,false),child:Text(context.tr('cancel'))),
         FilledButton(onPressed:busy?null:() async {
           if(title.text.trim().isEmpty || assignee==null) {change(()=>error='Renseignez la tâche et son opérateur.');return;}
+          final startDate=DateTime.utc(day.year,day.month,day.day);
+          final endDate=DateTime.utc(end.year,end.month,end.day);
+          if(repeat && (endDate.isBefore(startDate) || endDate.difference(startDate).inDays>365 || weekdays.isEmpty)) {
+            change(()=>error='Choisissez une fin après le début (un an maximum) et au moins un jour.');return;
+          }
+          if(repeat && !List.generate(endDate.difference(startDate).inDays+1,
+            (i)=>DateTime(startDate.year,startDate.month,startDate.day+i)).any((d)=>weekdays.contains(d.weekday))) {
+            change(()=>error='Aucun jour choisi dans cette période.');return;
+          }
           change((){busy=true;error=null;});
           try {
             await _loadCommonSession();
             if(captured!=ApiService.sessionIdentity || !_mayPlanTasks) throw StateError('Session modifiée');
-            await apiService.createTask(title.text.trim(),day,assignedTo:assignee);
+            if(repeat) {
+              final result=await apiService.createRepeatedTasks(title.text.trim(),startDate,endDate,
+                assignedTo:assignee!,weekdays:weekdays.toList()..sort());
+              if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content:Text('${result['created']} tâche(s) créée(s), ${result['skipped']} déjà présente(s).')));
+            } else {
+              await apiService.createTask(title.text.trim(),day,assignedTo:assignee);
+            }
             if(dialog.mounted) Navigator.pop(dialog,true);
           } catch (_) {if(dialog.mounted) change((){busy=false;error='Enregistrement non confirmé. Vérifiez l’agenda avant de recommencer.';});}
         },child:Text(context.tr('add')))])));
