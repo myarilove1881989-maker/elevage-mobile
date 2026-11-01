@@ -480,7 +480,7 @@ class ApiService {
   // ================= DETTES CLIENTS =================
 
   Future<List<DetteClient>> getDettesClients() async {
-    final res = await get("/dettes-clients"); // ⚠️ slash important
+    final res = await get("/dettes-clients/");
 
     return (res as List).map((e) => DetteClient.fromJson(e)).toList();
   }
@@ -1003,6 +1003,16 @@ class ApiService {
     if (response.statusCode != 201) {
       throw Exception("Erreur création task");
     }
+  }
+
+  Future<Map<String, dynamic>> createRepeatedTasks(String title, DateTime start,
+      DateTime end, {required int assignedTo, required List<int> weekdays}) async {
+    final result = await post('/tasks/repeat/', {
+      'title': title, 'start_date': start.toIso8601String().split('T')[0],
+      'end_date': end.toIso8601String().split('T')[0],
+      'assigned_to': assignedTo, 'weekdays': weekdays,
+    });
+    return Map<String, dynamic>.from(result as Map);
   }
 
   Future<void> deleteTask(int id) async {
