@@ -294,13 +294,12 @@ void main() {
     final api = AdminApi()..role = 'OPERATEUR';
     await tester.pumpWidget(MaterialApp(home: SettingsScreen(apiService: api)));
     await tester.pumpAndSettle();
-    expect(find.text('Création des utilisateurs'), findsNothing);
+    expect(find.text('Gestion des utilisateurs'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     api.role = 'OWNER';
     await tester.pumpWidget(MaterialApp(home: SettingsScreen(apiService: api)));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Création des utilisateurs'), 200);
-    expect(find.text('Création des utilisateurs'), findsOneWidget);
+    expect(find.text('Gestion des utilisateurs'), findsOneWidget);
     api.close();
   });
   testWidgets('responsive phone and landscape tablet with synthetic preview', (
