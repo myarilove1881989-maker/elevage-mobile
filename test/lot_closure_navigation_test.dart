@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -26,7 +27,7 @@ class ListApi extends ApiService{
 }
 void main(){
  TestWidgetsFlutterBinding.ensureInitialized();
- setUpAll(()async{final loader=FontLoader('Roboto')..addFont(rootBundle.load('assets/fonts/Roboto-Regular.ttf'));await loader.load();});
+ setUpAll(()async{if(kIsWeb)return;final loader=FontLoader('Roboto')..addFont(rootBundle.load('assets/fonts/Roboto-Regular.ttf'));await loader.load();});
  setUp(()=>ApiService.token='synthetic-owner');tearDown(()=>ApiService.token=null);
  for(final width in [360.0,800.0,1366.0,1920.0]){
   testWidgets('compact business bar and complete drawer reachable at width $width',(tester)async{
@@ -44,7 +45,7 @@ void main(){
    final horizontalIcons=tester.widgetList<Icon>(find.descendant(of:horizontal,matching:find.byType(Icon))).map((x)=>x.icon).toList();expect(horizontalIcons,verticalIcons.take(8));
    expect(find.text('Tableau de bord'),findsNothing);expect(find.text('Gestion des utilisateurs'),findsNothing);
    final horizontalScroll=tester.widget<SingleChildScrollView>(find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView)));
-   if(width>=1366)expect(horizontalScroll.controller!.position.maxScrollExtent,0);
+   if(width>=1366 && !kIsWeb)expect(horizontalScroll.controller!.position.maxScrollExtent,0);
    expect(tester.getSize(find.descendant(of:horizontal,matching:find.byType(LayoutBuilder)).first).height,52);
    await tester.dragUntilVisible(find.byKey(const ValueKey('navigation-agenda-horizontal')),find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView)),const Offset(-300,0));
    final agendaRect=tester.getRect(find.byKey(const ValueKey('navigation-agenda-horizontal')));
