@@ -42,6 +42,22 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   @override
   int get schemaVersion => 9;
   @override
+  Future<void> guardNewLotOperation(Map<String,dynamic> declaration) async {
+    if(!{'CREATE','UPDATE'}.contains(declaration['operation_type']) || declaration['entity_type']=='ENCAISSEMENT')return;
+    final reference=(declaration['payload'] as Map)['lot_ref'];
+    if(reference is! Map)return;
+    int? id=reference['server_id'] is int?reference['server_id'] as int:null;
+    if(id==null && reference['local_uuid'] is String){
+      final mapping=await customSelect("SELECT server_entity_id FROM terrain_entity_mapping WHERE entity_type='LOT' AND local_entity_id=?",variables:[Variable(reference['local_uuid'] as String)]).getSingleOrNull();
+      id=mapping?.read<int>('server_entity_id');
+    }
+    if(id==null)return;
+    final row=await customSelect(r"SELECT payload FROM confirmed_cache WHERE collection='lots' AND json_extract(payload,'$.id')=?",variables:[Variable(id)]).getSingleOrNull();
+    if(row==null)return;
+    final lot=jsonDecode(row.read<String>('payload')) as Map;
+    if(lot['date_fin']!=null || lot['statut_production']=='TERMINE')throw StateError('Lot clôturé : nouvelle opération refusée. Les données existantes sont conservées.');
+  }
+  @override
   Future<void> applyProjectionReceipt(Map<String,dynamic> receipt)=>projectReceipt(receipt);
   @override
   Future<void> finishProjectionReceipts()=>finishStockCheckpoint();

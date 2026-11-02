@@ -13,12 +13,14 @@ class EggProductionScreen extends StatefulWidget {
   final ApiService apiService;
   final int lotId;
   final String lotName;
+  final bool readOnly;
 
   const EggProductionScreen({
     super.key,
     required this.apiService,
     required this.lotId,
     required this.lotName,
+    this.readOnly=false,
   });
 
   @override
@@ -789,7 +791,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                   ),
                 ),
               const SizedBox(height: 14),
-              LayoutBuilder(
+              if(!widget.readOnly) LayoutBuilder(
                 builder: (context, constraints) {
                   const spacing = 10.0;
                   final columns = constraints.maxWidth >= 760
@@ -860,7 +862,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                             backgroundColor: TerreEtOrColors.paleGold,
                             child: Icon(Icons.egg_outlined, color: TerreEtOrColors.gold),
                           ),
-                          onTap:()=>showCollectionDialog(item),
+                          onTap:widget.readOnly?null:()=>showCollectionDialog(item),
                           title: Text('${trayCount(item['nombre_collecte'])}${item['_review_required']==true?' · À vérifier':item['local_only']==true?' · En attente de synchronisation':''}'),
                           subtitle: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(
                             '${context.tr('egg_collected_total')}: ${item['nombre_collecte']} · '
@@ -869,11 +871,11 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                             '${context.tr('egg_downgraded')}: ${item['nombre_declasses']} · '
                             '${context.tr('egg_consumed')}: ${item['nombre_consommes_donnes']}',
                           ),
-                            if(item['local_only']!=true && item['_review_required']!=true) OwnerMaintenanceActions(api:widget.apiService,kind:'collections',id:int.tryParse('${item['id']}'),label:'la collecte',access:_ownerMaintenance,edit:false,onChanged:loadData),
+                            if(item['local_only']!=true && item['_review_required']!=true) OwnerMaintenanceActions(api:widget.apiService,kind:'collections',id:int.tryParse('${item['id']}'),label:'la collecte',access:_ownerMaintenance,edit:widget.readOnly,onChanged:loadData),
                           ]),
                           trailing: Row(mainAxisSize:MainAxisSize.min,children:[
                             Text(MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at))),
-                            BusinessCommand(api:widget.apiService,actions:const {'egg_collections.update'},child:IconButton(
+                            if(!widget.readOnly) BusinessCommand(api:widget.apiService,actions:const {'egg_collections.update'},child:IconButton(
                               key:ValueKey('edit-egg-${item['id']}'),tooltip:'Modifier la collecte',
                               onPressed:()=>showCollectionDialog(item),icon:const Icon(Icons.edit_outlined))),
                           ]),

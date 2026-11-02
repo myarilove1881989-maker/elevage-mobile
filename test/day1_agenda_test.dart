@@ -1,3 +1,4 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -17,10 +18,10 @@ void main() {
       userId:1,farmId:1,role:'OWNER',rightsVersion:1);
     final session=FarmSession(userId:1,farmId:1,role:'OWNER',origin:SessionOrigin.personalHttp,
       network:NetworkState.available,sync:const SyncSummary(),permissions:rights);
-    await tester.pumpWidget(MaterialApp(home:Scaffold(body:FarmNavigation(session:session,
+    await tester.pumpWidget(MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],home:Scaffold(body:FarmNavigation(session:session,
       actions:{FarmDestination.agenda:()=>opened=true}))));
     expect(find.text('Agenda'),findsOneWidget);await tester.tap(find.text('Agenda'));expect(opened,true);
-    await tester.pumpWidget(MaterialApp(home:Scaffold(body:FarmNavigation(actions:{FarmDestination.agenda:(){}}))));
+    await tester.pumpWidget(MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],home:Scaffold(body:FarmNavigation(actions:{FarmDestination.agenda:(){}}))));
     expect(find.text('Agenda'),findsNothing);
   });
   test('task creation sends selected operator and date',() async {

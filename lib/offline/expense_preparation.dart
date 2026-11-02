@@ -113,7 +113,7 @@ class ExpenseLotSelection {
         ExpensePreparationError.invalidReference,
       );
     }
-    final finished = raw['statut'] == 'TERMINE' || raw['date_fin'] != null;
+    final finished = (raw['statut_production'] == 'TERMINE' || raw['statut'] == 'TERMINE') || raw['date_fin'] != null;
     if (raw['id'] is int && (raw['id'] as int) > 0) {
       if (!{
             'CONFIRMED',

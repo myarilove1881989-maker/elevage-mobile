@@ -265,7 +265,9 @@ void main() {
           expect(buttonRect.left, greaterThanOrEqualTo(0));
           expect(buttonRect.right, lessThanOrEqualTo(width));
         } else {
-          expect(top, findsNothing);
+          expect(top, findsOneWidget);
+          await tester.ensureVisible(top);
+          expect(top.hitTestable(), findsOneWidget);
         }
         expect(tester.takeException(), isNull,
             reason: 'Dashboard $language à ${width.toInt()} px');

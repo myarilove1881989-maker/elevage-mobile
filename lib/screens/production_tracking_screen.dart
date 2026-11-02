@@ -45,7 +45,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
     try {
       final results = await Future.wait([
         widget.apiService.getEspeces(),
-        widget.apiService.getLots(),
+        widget.apiService.getActiveLots(),
       ]);
       if (!mounted) return;
       setState(() {

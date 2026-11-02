@@ -8,6 +8,8 @@ import '../services/app_settings.dart';
 import '../theme/terre_et_or_theme.dart';
 import '../widgets/detail_widgets.dart';
 import 'egg_production_screen.dart';
+import 'growth_tracking_screen.dart';
+import '../widgets/lot_lifecycle_actions.dart';
 
 class LotDetailScreen extends StatefulWidget {
   final ApiService apiService;
@@ -114,6 +116,9 @@ class _LotDetailScreenState extends State<LotDetailScreen> with MutationRefresh<
             padding: const EdgeInsets.all(16),
             children: [
               if (isLoading) const LinearProgressIndicator(),
+              LotLifecycleActions(api:widget.apiService,lot:lot!,access:_ownerMaintenance,onChanged:fetchLot),
+              if(lot!['type_production']=='CHAIR') TextButton.icon(icon:const Icon(Icons.monitor_weight_outlined),label:const Text('Consulter le suivi de croissance'),
+                onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>GrowthTrackingScreen(apiService:widget.apiService,lotId:widget.lotId,lotName:lot!['nom']?.toString()??'Lot',readOnly:ApiService.isLotClosed(lot!))))),
               OwnerMaintenanceActions(api:widget.apiService,kind:'lots',id:widget.lotId,
                 label:'le lot',access:_ownerMaintenance,onChanged:fetchLot,
                 onDeleted:()=>Navigator.pop(context,true)),
@@ -210,6 +215,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> with MutationRefresh<
                             apiService: widget.apiService,
                             lotId: widget.lotId,
                             lotName: lot!['nom']?.toString() ?? 'Lot',
+                            readOnly:ApiService.isLotClosed(lot!),
                           ),
                         ),
                       );

@@ -9,6 +9,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
   DateTime Function() get outboxClock;
   Future<void> applyProjectionReceipt(Map<String,dynamic> receipt) async {}
   Future<void> finishProjectionReceipts() async {}
+  Future<void> guardNewLotOperation(Map<String,dynamic> declaration) async {}
 
   Future<void> createSyncState() async {
     await customStatement('CREATE TABLE IF NOT EXISTS tablet_sync_state '
@@ -115,6 +116,7 @@ mixin OutboxDatabaseMethods on GeneratedDatabase implements OutboxStore, SyncSta
         if(canonicalDeclaration(original)!=canonicalDeclaration(declaration)) throw StateError('UUID déjà utilisé pour une autre déclaration.');
         return _entry(previous);
       }
+      await guardNewLotOperation(declaration);
       final counter=await customSelect('SELECT next_sequence FROM local_sequence_counter WHERE singleton=1').getSingle();
       final sequence=counter.read<int>('next_sequence');
       await customStatement('UPDATE local_sequence_counter SET next_sequence=next_sequence+1 WHERE singleton=1');

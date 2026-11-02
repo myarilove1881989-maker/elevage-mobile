@@ -117,7 +117,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
         if(types.isNotEmpty && !types.contains(selectedType)) selectedType=types.first;
         if(!rights.allows('animal_sales.create') && rights.allows('egg_sales.create')) selectedProduct='OEUFS';
       }
-      final lotsResult = await widget.apiService.getLots();
+      final lotsResult = await widget.apiService.getActiveLots();
       final clientsResult = await widget.apiService.getClients();
 
       final parsedLots = lotsResult.map((json) => Lot.fromJson(json)).toList();
