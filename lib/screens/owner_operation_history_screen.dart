@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/operation_history.dart';
@@ -12,7 +13,9 @@ class OwnerOperationHistoryScreen extends StatefulWidget {
   @override
   State<OwnerOperationHistoryScreen> createState()=>_OwnerOperationHistoryScreenState();
 }
-class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScreen> {
+class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScreen> with MutationRefresh<OwnerOperationHistoryScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await load(); }
   final author=TextEditingController(),lot=TextEditingController();
   List<Map<String,dynamic>> rows=[];
   final names=HistoryNames();
@@ -26,6 +29,7 @@ class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScree
   @override
   void dispose() {author.dispose();lot.dispose();super.dispose();}
   Future<void> load({bool next=false}) async {
+    markDataFresh();
     if(busy) return;
     final token=ApiService.sessionIdentity;
     setState(()=>busy=true);

@@ -39,14 +39,20 @@ class _ApiClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final identity=ApiService.sessionIdentity;
     try {
       final response = await inner.send(request).timeout(requestTimeout);
       final bytes = await response.stream.toBytes().timeout(requestTimeout);
+      if (response.statusCode >= 200 && response.statusCode < 300 &&
+          identity == ApiService.sessionIdentity && {'POST', 'PUT', 'PATCH', 'DELETE'}.contains(request.method) &&
+          !RegExp(r'/(token|login|password|register|auth)(/|$)').hasMatch(request.url.path)) {
+        ApiService.businessChanges.value++;
+      }
       return http.StreamedResponse(
         Stream.value(bytes),
         response.statusCode,
         headers: response.headers,
-        request: response.request,
+        request: response.request ?? request,
         reasonPhrase: response.reasonPhrase,
         isRedirect: response.isRedirect,
       );
@@ -72,6 +78,7 @@ class ApiService {
   final http.Client _client;
   final TokenStore _tokenStore;
   static final sessionExpired = ValueNotifier<int>(0);
+  static final businessChanges = ValueNotifier<int>(0);
 
   void close() => _client.close();
   // ✅ URL API centralisée (compatible local + Render)
@@ -115,12 +122,12 @@ class ApiService {
     final currentToken = token ?? globalToken;
 
     if (currentToken == null) {
-      return {"Content-Type": "application/json"};
+      return {"Content-Type": "application/json", "Accept": "application/json; elevage-contract=2"};
     }
 
     return {
       "Authorization": "Bearer $currentToken",
-      "Content-Type": "application/json",
+      "Content-Type": "application/json", "Accept": "application/json; elevage-contract=2",
     };
   }
 
@@ -317,6 +324,11 @@ class ApiService {
       headers: {'Content-Type':'application/json'},
       body: jsonEncode({'change_token':changeToken,'new_password':newPassword}));
     await _handleResponse(response,clearSessionOnUnauthorized:false);
+  }
+
+  Future<dynamic> deleteForMaintenance(String endpoint, Map<String,dynamic> data) async {
+    final response=await _client.delete(Uri.parse('$baseUrl$endpoint'),headers:_headers(),body:jsonEncode(data));
+    return _handleResponse(response);
   }
 
   Future<dynamic> patch(String endpoint, Map<String,dynamic> data) async {

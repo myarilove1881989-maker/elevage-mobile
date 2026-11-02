@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -35,7 +36,9 @@ class FeedDistributionScreen extends StatefulWidget {
   State<FeedDistributionScreen> createState() => _FeedDistributionScreenState();
 }
 
-class _FeedDistributionScreenState extends State<FeedDistributionScreen> {
+class _FeedDistributionScreenState extends State<FeedDistributionScreen> with MutationRefresh<FeedDistributionScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await _load(); }
   List<dynamic> distributions = [];
   bool loading = true;
   String? error;
@@ -47,6 +50,7 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> {
   }
 
   Future<void> _load() async {
+    markDataFresh();
     setState(() {
       loading = true;
       error = null;

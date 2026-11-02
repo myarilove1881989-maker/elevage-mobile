@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -56,7 +57,9 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<DashboardScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await _reload(includeTasks: true); }
   late ApiService apiService;
   String _receiptState='';
   Timer? _receiptTimer;
@@ -91,7 +94,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final result=await apiService.get('/me/capabilities/');
       final rights=PermissionContract.decode(Map<String,dynamic>.from(result['permission_contract'] as Map),
         userId:result['user'] as int,farmId:result['exploitation'] as int,
-        role:result['role'] as String,rightsVersion:result['membership']['version'] as int);
+        role:result['role'] as String,rightsVersion:result['membership']['version'] as int,allowHttpV2:true);
       if(!mounted || token!=(ApiService.sessionIdentity)) return;
       setState(() {commonSessionToken=token;commonSession=FarmSession(userId:rights.userId,farmId:rights.farmId,
         role:rights.role,permissions:rights,origin:apiService.hasUnifiedOfflineSession?SessionOrigin.tabletProfile:SessionOrigin.personalHttp,
@@ -268,6 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> initData() async { await _reload(includeTasks: true); }
 
   Future<bool> _reload({bool includeTasks = false}) async {
+    markDataFresh();
     unawaited(loadFarmName());
     final lotId = selectedLotId;
     final speciesId = selectedEspeceId;
@@ -875,6 +879,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             FarmNavigation(session:commonSessionToken==(ApiService.sessionIdentity)?commonSession:null,labels:{
               FarmDestination.dashboard:context.tr('dashboard'),
+              FarmDestination.billing:context.tr('billing'),
               FarmDestination.lots:AppLocalizations.of(context).languageCode=='en'?'Batches':'Lots',
               FarmDestination.purchases:context.tr('purchases'),
               FarmDestination.sales:context.tr('sale'),
@@ -887,6 +892,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               FarmDestination.users:AppLocalizations.of(context).languageCode=='en'?'User management':'Gestion des utilisateurs',
             },actions:{
               FarmDestination.dashboard:()=>Navigator.pop(context),
+              FarmDestination.billing:() {Navigator.pop(context);_openClients();},
               FarmDestination.lots:() {Navigator.pop(context);_openLots();},
               FarmDestination.purchases:() {Navigator.pop(context);_openAchat();},
               FarmDestination.sales:() {Navigator.pop(context);_openMouvement();},

@@ -1,3 +1,5 @@
+import '../widgets/owner_maintenance_actions.dart';
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
@@ -14,7 +16,10 @@ class LotListScreen extends StatefulWidget {
   State<LotListScreen> createState() => _LotListScreenState();
 }
 
-class _LotListScreenState extends State<LotListScreen> {
+class _LotListScreenState extends State<LotListScreen> with MutationRefresh<LotListScreen> {
+  late final Future<bool> _ownerMaintenance = ownerMaintenanceAllowed(widget.apiService);
+  @override
+  Future<void> refreshAfterMutation() async { await fetchLots(); }
   List<dynamic> lots = [];
   bool isLoading = true;
   bool hasLoaded = false;
@@ -27,6 +32,7 @@ class _LotListScreenState extends State<LotListScreen> {
   }
 
   Future<void> fetchLots() async {
+    markDataFresh();
     if (mounted) {
       setState(() { isLoading = true; loadError = null; });
     }
@@ -65,6 +71,8 @@ class _LotListScreenState extends State<LotListScreen> {
         body: Column(
           children: [
             if (isLoading) const LinearProgressIndicator(),
+            OwnerMaintenanceActions(api:widget.apiService,kind:'lots',label:'un lot',access:_ownerMaintenance,
+              remove:false,onChanged:fetchLots),
             if (loadError != null) Padding(
               padding: const EdgeInsets.all(16),
               child: Column(children: [
@@ -140,10 +148,7 @@ class _LotListScreenState extends State<LotListScreen> {
                             // refresh liste locale
                             await fetchLots();
 
-                            // 🔥 remonter jusqu'au dashboard
-                            if (mounted) {
-                              Navigator.pop(context, true);
-                            }
+                            // Stay on the refreshed list; the dashboard refreshes on return.
                           }
                         },
                       ),

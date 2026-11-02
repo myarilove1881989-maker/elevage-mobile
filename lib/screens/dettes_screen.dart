@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -15,7 +16,9 @@ class DettesScreen extends StatefulWidget {
   State<DettesScreen> createState() => _DettesScreenState();
 }
 
-class _DettesScreenState extends State<DettesScreen> {
+class _DettesScreenState extends State<DettesScreen> with MutationRefresh<DettesScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await loadData(); }
   List<DetteClient> clients = [];
   bool isLoading = true;
   String? loadError;
@@ -28,6 +31,7 @@ class _DettesScreenState extends State<DettesScreen> {
   }
 
   Future<void> loadData() async {
+    markDataFresh();
     setState(() { isLoading = true; loadError = null; });
     try {
       final result = await widget.apiService.getDettesClients();

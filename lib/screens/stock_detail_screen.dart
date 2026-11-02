@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -14,7 +15,9 @@ class StockDetailScreen extends StatefulWidget {
   State<StockDetailScreen> createState() => _StockDetailScreenState();
 }
 
-class _StockDetailScreenState extends State<StockDetailScreen> {
+class _StockDetailScreenState extends State<StockDetailScreen> with MutationRefresh<StockDetailScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await load(); }
   Map<String, dynamic> data = {};
   bool isLoading = true;
   String? error;
@@ -25,6 +28,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
   }
 
   Future<void> load() async {
+    markDataFresh();
     try {
       final result = await widget.apiService.getStockDetail(widget.lotId);
       if (!mounted) return;
