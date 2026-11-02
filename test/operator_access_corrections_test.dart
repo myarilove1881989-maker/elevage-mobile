@@ -51,9 +51,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('HTTP 404'),findsOneWidget);
     expect(find.textContaining('sensitive response'),findsNothing);
-    expect(find.text('Création des utilisateurs'),findsNothing);
+    expect(find.text('Gestion des utilisateurs'),findsNothing);
     api.fail=false;await tester.tap(find.text('Réessayer'));await tester.pumpAndSettle();
-    expect(find.text('Création des utilisateurs'),findsOneWidget);
+    expect(find.text('Gestion des utilisateurs'),findsOneWidget);
     await tester.pumpWidget(const SizedBox());api.close();
   });
   testWidgets('supervision identifies failed membership request',(tester) async {
