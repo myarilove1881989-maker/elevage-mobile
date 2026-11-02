@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "com.elevage.app",
+  "versionCode": 117,
+  "versionName": "1.0.4",
+  "published": true,
+  "publishedAt": "2026-11-01T13:29:00Z",
+  "downloadUrl": "https://elevage-mobile.onrender.com/telecharger",
+  "sha256": "4e8e25acf45c2b6bf49f092c1a95c78f02e720c6a58f523c40718209e608cd5d"
+}

@@ -187,7 +187,7 @@ void main() {
           await tester.pumpAndSettle();
           final drawerEntry = find.descendant(
             of: find.byType(Drawer),
-            matching: find.text('Suivi de production'),
+            matching: find.text('Production'),
           );
           expect(drawerEntry, findsOneWidget);
           await tester.tap(drawerEntry);
@@ -248,7 +248,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final label = language == 'fr'
-          ? 'Suivi de production' : 'Production tracking';
+          ? 'Production' : 'Production';
       final menuLabel = language == 'fr' ? 'Ouvrir le menu' : 'Open menu';
 
       for (final width in [1920.0, 1100.0, 1000.0, 800.0]) {

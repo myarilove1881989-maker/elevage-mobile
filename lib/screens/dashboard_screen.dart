@@ -889,11 +889,12 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     return Scaffold(
       drawer: _navigationDrawer(),
       appBar: AppBar(backgroundColor:const Color(0xFF063B63),foregroundColor:Colors.white,
-        title:const Text('Élev’Age'),toolbarHeight:64,
+        title:const Text('Élev’Age'),centerTitle:false,toolbarHeight:56,
         leading:Builder(builder:(menuContext)=>IconButton(tooltip:context.tr('open_menu'),icon:const Icon(Icons.menu),onPressed:()=>Scaffold.of(menuContext).openDrawer())),
         actions:[_connectionIndicator(),IconButton(tooltip:context.tr('refresh'),
-          onPressed:isLoading?null:_refreshAll,icon:const Icon(Icons.refresh))],
-        bottom:PreferredSize(preferredSize:const Size.fromHeight(64),child:Theme(
+          onPressed:isLoading?null:_refreshAll,icon:const Icon(Icons.refresh)),
+          IconButton(key:const Key('topLogoutButton'),tooltip:'Quitter',onPressed:_logout,icon:const Icon(Icons.logout))],
+        bottom:PreferredSize(preferredSize:const Size.fromHeight(52),child:Theme(
           data:Theme.of(context).copyWith(textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:Colors.white))),
           child:FarmNavigation(horizontal:true,session:_navigationSession,actions:_navigationActions)))),
       body: LayoutBuilder(builder: (context, constraints) => Column(children: [

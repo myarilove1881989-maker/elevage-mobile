@@ -2,6 +2,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -24,24 +26,31 @@ class ListApi extends ApiService{
  @override Future<dynamic> get(String path)async=>throw StateError('No mutation access in this synthetic read fixture');
 }
 void main(){
+ TestWidgetsFlutterBinding.ensureInitialized();
+ setUpAll(()async{if(kIsWeb)return;final loader=FontLoader('Roboto')..addFont(rootBundle.load('assets/fonts/Roboto-Regular.ttf'));await loader.load();});
  setUp(()=>ApiService.token='synthetic-owner');tearDown(()=>ApiService.token=null);
- for(final width in [360.0,800.0,1600.0]){
-  testWidgets('menus identical and fully reachable at width $width',(tester)async{
+ for(final width in [360.0,800.0,1366.0,1920.0]){
+  testWidgets('compact business bar and complete drawer reachable at width $width',(tester)async{
    await tester.binding.setSurfaceSize(Size(width,900));var exits=0;
    final actions={for(final d in farmNavigationOrder)d:(){if(d==FarmDestination.logout)exits++;}};
    await tester.pumpWidget(MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],home:Scaffold(body:Column(children:[
-    SizedBox(height:80,child:FarmNavigation(key:const Key('horizontal'),horizontal:true,session:session(),actions:actions)),
+    SizedBox(height:52,child:FarmNavigation(key:const Key('horizontal'),horizontal:true,session:session(),actions:actions)),
     Expanded(child:SingleChildScrollView(child:FarmNavigation(key:const Key('vertical'),session:session(),actions:actions)))
    ]))));await tester.pumpAndSettle();
    final horizontal=find.byKey(const Key('horizontal'));final vertical=find.byKey(const Key('vertical'));
-   final expected=['Lots','Achats','Dépenses','Suivi de production','Mouvements','Facturation','Historique','Agenda','Paramètres','Tuto','Quitter'];
+   final expected=['Lots','Achats','Dépenses','Production','Mouvements','Facturation','Historique','Agenda','Paramètres','Tuto','Quitter'];
    expect(tester.widgetList<ListTile>(find.descendant(of:vertical,matching:find.byType(ListTile))).map((x)=>(x.title as Text).data),expected);
-   expect(tester.widgetList<Text>(find.descendant(of:horizontal,matching:find.byType(Text))).map((x)=>x.data),expected);
+   expect(tester.widgetList<Text>(find.descendant(of:horizontal,matching:find.byType(Text))).map((x)=>x.data),expected.take(8));
    final verticalIcons=tester.widgetList<Icon>(find.descendant(of:vertical,matching:find.byType(Icon))).map((x)=>x.icon).toList();
-   final horizontalIcons=tester.widgetList<Icon>(find.descendant(of:horizontal,matching:find.byType(Icon))).map((x)=>x.icon).toList();expect(horizontalIcons,verticalIcons);
+   final horizontalIcons=tester.widgetList<Icon>(find.descendant(of:horizontal,matching:find.byType(Icon))).map((x)=>x.icon).toList();expect(horizontalIcons,verticalIcons.take(8));
    expect(find.text('Tableau de bord'),findsNothing);expect(find.text('Gestion des utilisateurs'),findsNothing);
-   await tester.dragUntilVisible(find.byKey(const ValueKey('navigation-logout-horizontal')),find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView)),const Offset(-300,0));
-   await tester.tap(find.byKey(const ValueKey('navigation-logout-horizontal')));expect(exits,1);
+   final horizontalScroll=tester.widget<SingleChildScrollView>(find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView)));
+   if(width>=1366 && !kIsWeb)expect(horizontalScroll.controller!.position.maxScrollExtent,0);
+   expect(tester.getSize(find.descendant(of:horizontal,matching:find.byType(LayoutBuilder)).first).height,52);
+   await tester.dragUntilVisible(find.byKey(const ValueKey('navigation-agenda-horizontal')),find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView)),const Offset(-300,0));
+   final agendaRect=tester.getRect(find.byKey(const ValueKey('navigation-agenda-horizontal')));
+   expect(agendaRect.right,lessThanOrEqualTo(width));
+   await tester.tap(find.descendant(of:vertical,matching:find.text('Quitter')));expect(exits,1);
    expect(tester.takeException(),isNull);await tester.pumpWidget(const SizedBox());await tester.binding.setSurfaceSize(null);
   });
  }

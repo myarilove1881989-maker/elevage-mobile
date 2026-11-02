@@ -7,7 +7,7 @@ const farmNavigationOrder=[FarmDestination.lots,FarmDestination.purchases,FarmDe
   FarmDestination.production,FarmDestination.movements,FarmDestination.billing,FarmDestination.history,
   FarmDestination.agenda,FarmDestination.settings,FarmDestination.tutorial,FarmDestination.logout];
 const farmDestinationLabels={FarmDestination.dashboard:'Tableau de bord',FarmDestination.lots:'Lots',
-  FarmDestination.purchases:'Achats',FarmDestination.expenses:'Dépenses',FarmDestination.production:'Suivi de production',
+  FarmDestination.purchases:'Achats',FarmDestination.expenses:'Dépenses',FarmDestination.production:'Production',
   FarmDestination.movements:'Mouvements',FarmDestination.billing:'Facturation',FarmDestination.history:'Historique',
   FarmDestination.agenda:'Agenda',FarmDestination.settings:'Paramètres',FarmDestination.tutorial:'Tuto',
   FarmDestination.logout:'Quitter',FarmDestination.sales:'Ventes',FarmDestination.users:'Gestion des utilisateurs'};
@@ -19,12 +19,15 @@ const farmDestinationIcons={FarmDestination.lots:Icons.inventory_2_outlined,Farm
 String navigationLabel(BuildContext context,FarmDestination destination){
   if(AppLocalizations.of(context).languageCode!='en')return farmDestinationLabels[destination]!;
   return {FarmDestination.lots:'Batches',FarmDestination.purchases:'Purchases',FarmDestination.expenses:'Expenses',
-    FarmDestination.production:'Production tracking',FarmDestination.movements:'Movements',FarmDestination.billing:'Billing',
+    FarmDestination.production:'Production',FarmDestination.movements:'Movements',FarmDestination.billing:'Billing',
     FarmDestination.history:'History',FarmDestination.agenda:'Tasks',FarmDestination.settings:'Settings',
     FarmDestination.tutorial:'Tutorial',FarmDestination.logout:'Log out'}[destination]!;
 }
 
-/// Both menus use this exact ordered catalogue, icons, access rules and callbacks.
+const farmHorizontalNavigationOrder=[FarmDestination.lots,FarmDestination.purchases,FarmDestination.expenses,
+  FarmDestination.production,FarmDestination.movements,FarmDestination.billing,FarmDestination.history,FarmDestination.agenda];
+
+/// Both menus share icons, access rules and callbacks; utilities stay in the drawer.
 class FarmNavigation extends StatefulWidget {
   const FarmNavigation({super.key,required this.actions,this.session,this.labels=const {},this.horizontal=false,this.beforeNavigate});
   final Map<FarmDestination,VoidCallback> actions;
@@ -49,16 +52,26 @@ class _FarmNavigationState extends State<FarmNavigation>{
     }
   }
   @override Widget build(BuildContext context){
-    final items=[for(final d in farmNavigationOrder)if(visible(d))d];
+    final order=widget.horizontal?farmHorizontalNavigationOrder:farmNavigationOrder;
+    final items=[for(final d in order)if(visible(d))d];
     void open(FarmDestination d){widget.beforeNavigate?.call();widget.actions[d]!();}
     if(!widget.horizontal)return Column(mainAxisSize:MainAxisSize.min,children:[for(final d in items)ListTile(
       key:ValueKey('navigation-${d.name}'),leading:Icon(farmDestinationIcons[d]),
       title:Text(widget.labels[d]??navigationLabel(context,d)),onTap:()=>open(d))]);
-    return Scrollbar(controller:scroll,thumbVisibility:true,child:SingleChildScrollView(
-      controller:scroll,scrollDirection:Axis.horizontal,padding:const EdgeInsets.fromLTRB(8,4,8,12),
-      child:Row(children:[for(final d in items)Padding(padding:const EdgeInsets.symmetric(horizontal:4),child:TextButton.icon(
-        key:d==FarmDestination.production?const Key('topProductionTrackingButton'):ValueKey('navigation-${d.name}-horizontal'),
-        onPressed:()=>open(d),icon:Icon(farmDestinationIcons[d]),label:Text(widget.labels[d]??navigationLabel(context,d)),
-        style:TextButton.styleFrom(minimumSize:const Size(0,44))))])));
+    return SizedBox(height:52,child:LayoutBuilder(builder:(context,constraints){
+      final padding=constraints.maxWidth>=1200?12.0:constraints.maxWidth>=800?8.0:6.0;
+      return SingleChildScrollView(controller:scroll,scrollDirection:Axis.horizontal,
+        child:ConstrainedBox(constraints:BoxConstraints(minWidth:constraints.maxWidth),
+          child:Row(mainAxisAlignment:MainAxisAlignment.center,children:[for(final d in items)
+            Padding(padding:const EdgeInsets.symmetric(horizontal:2),child:TextButton.icon(
+              key:d==FarmDestination.production?const Key('topProductionTrackingButton'):ValueKey('navigation-${d.name}-horizontal'),
+              onPressed:()=>open(d),icon:Icon(farmDestinationIcons[d],size:18),
+              label:Text(widget.labels[d]??navigationLabel(context,d),maxLines:1,softWrap:false),
+              style:TextButton.styleFrom(foregroundColor:Colors.white,
+                textStyle:const TextStyle(fontFamily:'Roboto',fontSize:15.5,fontWeight:FontWeight.w500),
+                minimumSize:const Size(0,48),padding:EdgeInsets.symmetric(horizontal:padding),
+                visualDensity:VisualDensity.compact)))
+          ])));
+    }));
   }
 }
