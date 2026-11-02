@@ -13,6 +13,9 @@ if($LASTEXITCODE -or $revision -ne (Get-Content (Join-Path $PSScriptRoot 'flutte
 foreach($name in @('ELEVAGE_KEYSTORE_PATH','ELEVAGE_KEYSTORE_PASSWORD','ELEVAGE_KEY_ALIAS','ELEVAGE_KEY_PASSWORD')){if(![Environment]::GetEnvironmentVariable($name)){throw "Signing environment variable required: $name"}}
 # Existing Gradle checks verify the permanent certificate. Never echo secret values.
 Set-Location $repo
-& (Join-Path $sdk 'bin/flutter.bat') build apk --release --no-pub --flavor production --target-platform android-arm64 --build-number=$VersionCode --build-name=$VersionName --dart-define=APP_ENV=production --dart-define=API_URL=https://backend-elevage.onrender.com/api
+# Regenerate release-only plugin registration after running tests.
+$lockBefore=(Get-FileHash (Join-Path $repo 'pubspec.lock') -Algorithm SHA256).Hash
+& (Join-Path $sdk 'bin/flutter.bat') build apk --release --pub --flavor production --target-platform android-arm64 --build-number=$VersionCode --build-name=$VersionName --dart-define=APP_ENV=production --dart-define=API_URL=https://backend-elevage.onrender.com/api
 if($LASTEXITCODE){throw 'Android build failed'}
+if((Get-FileHash (Join-Path $repo 'pubspec.lock') -Algorithm SHA256).Hash -ne $lockBefore){throw 'Dependency lock changed during release build'};
 Write-Output 'Build produced locally. No distribution or tablet installation performed. Verify APK signature/version before release.'
