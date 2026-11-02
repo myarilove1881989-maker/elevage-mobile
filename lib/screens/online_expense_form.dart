@@ -12,6 +12,56 @@ class _OnlineExpenseForm extends StatefulWidget {
 
 class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   final amount = TextEditingController(), note = TextEditingController();
+  final feed = FeedSupplyDraft();
+  final feedOperationId = newOperationUuid();
+  final feedCategories = <int>{};
+  Map<String,dynamic>? feedCatalog, pendingFeed;
+  bool loadingFeed = false;
+  bool get wantsFeed => feedCategories.contains(categoryId) && !widget.api.hasUnifiedOfflineSession;
+
+  Future<void> selectCategory(int? value) async {
+    setState(() {categoryId=value; error=null;});
+    if(!wantsFeed || feedCatalog!=null)return;
+    setState(()=>loadingFeed=true);
+    try {
+      final data=await widget.api.get('/feed-supplies/');
+      if(!mounted || !sameToken)return;
+      if(data is! Map<String,dynamic> || data['confirmed']!=true ||
+          data['products'] is! List || data['species'] is! List || data['lots'] is! List || widget.api.lastReadWasCached) {
+        throw StateError('Catalogue non confirmé');
+      }
+      setState(()=>feedCatalog=data);
+    } catch(_) {if(mounted)setState(()=>error='Catalogue d’aliments indisponible. Rechargez les références avant de poursuivre.');}
+    finally {if(mounted)setState(()=>loadingFeed=false);}
+  }
+
+  Future<void> sendFeed(Map<String,dynamic> body) async {
+    if(widget.api.hasUnifiedOfflineSession)throw StateError('Approvisionnement connecté requis');
+    final result=await widget.api.post('/depenses/create/',body);
+    if(!mounted || !sameToken)throw StateError('Session changed');
+    if(result is! Map || result['id'] is! int || result['stock_confirmed']!=true || result['operation_uuid']!=feedOperationId) {
+      throw StateError('Stock non confirmé');
+    }
+    setState(() {confirmed=true;error=null;});
+    try {
+      final fresh=await widget.api.get('/feed-supplies/');
+      if(mounted && sameToken && fresh is Map<String,dynamic> && fresh['confirmed']==true && !widget.api.lastReadWasCached) {
+        setState(()=>feedCatalog=fresh);
+      }
+    } catch(_) {if(mounted && sameToken)setState(()=>feedCatalog=null);}
+
+  }
+
+  Future<void> retryFeed() async {
+    if(busy || pendingFeed==null || !sameToken || confirmed)return;
+    setState(()=>busy=true);
+    try {
+      final value=await access();
+      if(value.message!=null)throw StateError('Accès refusé');
+      await sendFeed(pendingFeed!);
+    } catch(_) {if(mounted)setState(()=>error='Résultat non confirmé. La même opération est conservée pour vérification ; ne créez pas une autre dépense.');}
+    finally {if(mounted)setState(()=>busy=false);}
+  }
   late final dates = ExpenseBusinessDate(tz.getLocation('Europe/Paris'));
   late ExpenseBusinessDay day = dates.businessDayOf(DateTime.now().toUtc());
   late final token = ApiService.sessionIdentity;
@@ -37,6 +87,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
 
   @override
   void dispose() {
+    feed.dispose();
     amount.dispose();
     note.dispose();
     super.dispose();
@@ -92,6 +143,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
           }, origin: selection),
       ];
       final nextCategories = <(int, String)>[];
+      feedCategories.clear();
       for (final row in values[1]) {
         if (row is! Map ||
             row['id'] is! int ||
@@ -101,6 +153,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
           throw StateError('Invalid category');
         }
         nextCategories.add((row['id'] as int, row['nom'] as String));
+        if(row['stock_purpose']=='FEED')feedCategories.add(row['id'] as int);
       }
       setState(() {
         lots = nextLots;
@@ -125,7 +178,14 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   Future<void> chooseDate() async {}
 
   Future<void> submit() async {
-    if (!editable) return;
+    if (!editable || loadingFeed) return;
+    Map<String,dynamic>? supply;
+    if(wantsFeed) {
+      try {
+        if(feedCatalog==null)throw const FormatException('Catalogue d’aliments requis.');
+        supply=feed.payload();
+      } on FormatException catch(e) {setState(()=>error=e.message.toString());return;}
+    }
     day=dates.businessDayOf(DateTime.now().toUtc());
     final input = ExpenseInputContract.validate(
       lotRef: lot?.reference,
@@ -157,14 +217,17 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
       }
       if (!sameToken) throw StateError('Session changed');
       attempted = true;
-      final result = await widget.api.post('/depenses/create/', {
+      final body = <String,dynamic>{
         'lot': lot!.reference['server_id'],
         'categorie': categoryId,
         'montant': input.payload!['montant'],
         'note': input.payload!['note'],
         'date':
             '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
-      });
+        if(supply!=null) ...{'operation_uuid':feedOperationId,'feed_supply':supply},
+      };
+      if(supply!=null) {pendingFeed=body;await sendFeed(body);return;}
+      final result = await widget.api.post('/depenses/create/',body);
       if (!mounted) return;
       if (!sameToken) {
         blocked = true;
@@ -198,7 +261,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         if (busy) const LinearProgressIndicator(),
         if (error != null) Text(error!, key: const Key('expense-error')),
         if (confirmed)
-          Text(widget.api.operationFeedback('Dépense confirmée par le serveur.'),key:const Key('expense-status')),
+          Text(widget.api.operationFeedback(pendingFeed!=null?'Dépense et approvisionnement confirmés par le serveur.':'Dépense confirmée par le serveur.'),key:const Key('expense-status')),
         if (!blocked && sameToken) ...[
           ExpenseFields(
             lots: lots,
@@ -212,12 +275,18 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
             editable: editable,
             fieldError: (key) => expenseFieldError(errors[key]),
             onLot: (value) => setState(() => lot = value),
-            onCategory: (value) => setState(() => categoryId = value),
+            onCategory: selectCategory,
             chooseDate: chooseDate,
           ),
+          if(feedCategories.contains(categoryId) && widget.api.hasUnifiedOfflineSession)
+            const Text('La dépense locale ne confirme aucun approvisionnement de stock dans cette phase.'),
+          if(wantsFeed && loadingFeed) const LinearProgressIndicator(),
+          if(wantsFeed && feedCatalog!=null) FeedSupplyFields(draft:feed,catalog:feedCatalog!,editable:editable),
+          if(pendingFeed!=null && attempted && !confirmed && sameToken)
+            TextButton(key:const Key('feed-retry'),onPressed:busy?null:retryFeed,child:const Text('Vérifier / renvoyer la même opération')),
           if (!widget.readOnly) FilledButton(
             key: const Key('expense-submit'),
-            onPressed: editable ? submit : null,
+            onPressed: editable && !loadingFeed && (!wantsFeed || feedCatalog!=null) ? submit : null,
             child: const Text('Enregistrer'),
           ),
           if (!attempted)

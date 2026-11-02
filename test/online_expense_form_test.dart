@@ -25,6 +25,7 @@ class OnlineExpenseServer {
       down = false,
       lost = false,
       refusePost = false;
+  bool feed = false;
   String role = 'OPERATEUR';
   int posts = 0, reads = 0;
   Map<String, dynamic>? saved;
@@ -69,10 +70,15 @@ class OnlineExpenseServer {
       if (path.endsWith('/categories-depense/')) {
         return http.Response(
           jsonEncode([
-            {'id': 3, 'nom': 'Frais fictifs', 'exploitation': 1},
+            {'id': 3, 'nom': 'Frais fictifs', 'exploitation': 1, if(feed) 'stock_purpose':'FEED'},
           ]),
           200,
         );
+      }
+      if (path.endsWith('/feed-supplies/')) {
+        return http.Response(jsonEncode({'confirmed':true,
+          'products':[{'id':'11111111-1111-4111-8111-111111111111','name':'Croissance test','positions':<dynamic>[]}],
+          'species':[{'id':4,'nom':'Poulet'}], 'lots':[{'id':7,'nom':'Lot fictif','espece_id':4}]}),200);
       }
       if (path.endsWith('/depenses/create/')) {
         expect(request.method, 'POST');
@@ -82,7 +88,7 @@ class OnlineExpenseServer {
         if (refusePost) {
           return http.Response('{"detail":"DEVICE_PROOF_REQUIRED"}', 403);
         }
-        return http.Response(jsonEncode({'id': 40, ...saved!}), 201);
+        return http.Response(jsonEncode({'id': 40, ...saved!, if(feed) 'stock_confirmed':true}), 201);
       }
       throw StateError('Unexpected synthetic route $path');
     }),

@@ -1,4 +1,6 @@
 import 'dart:async';
+import '../widgets/feed_supply_fields.dart';
+import '../offline/outbox.dart' show newOperationUuid;
 import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../offline/expense_business_date.dart';
@@ -183,6 +185,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                 if (m.suspended) Text(widget.simple
                   ?'Reconnectez-vous pour consulter cette opération. La saisie déjà enregistrée sera conservée.'
                   :'Rouvrez manuellement le même profil et le grant original pour consulter. Le brouillon ne sera pas réactivé.'),
+                const Text('Cette saisie conserve uniquement la dépense. Aucun stock physique d’aliment n’est confirmé. Ne ressaisissez pas cet achat.'),
                 const Text(
                   'Le brouillon n’est pas récupérable après fermeture complète de l’application.',
                 ),
