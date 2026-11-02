@@ -75,7 +75,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
       }
       origin = value;
       final values = await Future.wait([
-        widget.api.getLots(),
+        widget.api.getActiveLots(),
         widget.api.getCategoriesDepense(),
       ]);
       if (!mounted) return;

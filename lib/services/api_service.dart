@@ -372,6 +372,9 @@ class ApiService {
   }
 
   // ================= LOTS =================
+  static bool isLotClosed(Map lot)=>lot['date_fin']!=null || lot['statut_production']=='TERMINE';
+  Future<List<dynamic>> getActiveLots() async=>(await getLots()).where((lot)=>!isLotClosed(lot as Map)).toList();
+
   Future<List<dynamic>> getLots() async {
     final response = await _client.get(
       Uri.parse("$baseUrl/lots/"),

@@ -1,3 +1,4 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,7 +46,7 @@ void main() {
   });
   testWidgets('sidebar retains billing and removes only dashboard entry',(tester) async {
     var billing=0;
-    await tester.pumpWidget(MaterialApp(home:Scaffold(body:FarmNavigation(actions:{
+    await tester.pumpWidget(MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],home:Scaffold(body:FarmNavigation(actions:{
       FarmDestination.dashboard:(){},FarmDestination.billing:()=>billing++,FarmDestination.lots:(){}}))));
     expect(find.text('Tableau de bord'),findsNothing);
     expect(find.text('Lots'),findsOneWidget);
@@ -53,7 +54,7 @@ void main() {
   });
   testWidgets('writes coalesce and hidden views refresh only after returning',(tester) async {
     var reads=0;
-    await tester.pumpWidget(MaterialApp(navigatorObservers:[businessRouteObserver],home:RefreshProbe(read:()=>reads++)));
+    await tester.pumpWidget(MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],navigatorObservers:[businessRouteObserver],home:RefreshProbe(read:()=>reads++)));
     ApiService.businessChanges.value++;ApiService.businessChanges.value++;
     await tester.pump(const Duration(milliseconds:150));expect(reads,1);
     await tester.tap(find.text('Ouvrir'));await tester.pumpAndSettle();

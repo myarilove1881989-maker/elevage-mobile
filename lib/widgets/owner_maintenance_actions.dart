@@ -68,6 +68,7 @@ class _MaintenanceDialogState extends State<_MaintenanceDialog> {
   final controllers=<String,TextEditingController>{};
   final choices=<String,String>{};
   bool submitting=false;
+  bool allowClosed=false;
   String? error;
   List<Map<String,dynamic>> get fields=>(widget.schema['fields'] as List).map((x)=>Map<String,dynamic>.from(x as Map)).toList();
   @override void initState(){
@@ -85,6 +86,7 @@ class _MaintenanceDialogState extends State<_MaintenanceDialog> {
   Future<void> save() async {
     if(submitting || !form.currentState!.validate())return;
     if(widget.identity!=ApiService.sessionIdentity){setState(()=>error='La session a changé. Fermez ce formulaire et reconnectez-vous.');return;}
+    if(widget.schema['closed']==true && !allowClosed){setState(()=>error='Confirmez la correction exceptionnelle du lot clôturé.');return;}
     setState((){submitting=true;error=null;});
     final values=<String,dynamic>{};
     for(final field in fields){
@@ -92,7 +94,7 @@ class _MaintenanceDialogState extends State<_MaintenanceDialog> {
       final text=controllers[name]?.text.trim()??choices[name]??'';
       values[name]=field['type']=='integer' || name=='espece'?int.tryParse(text):field['type']=='decimal'?text.replaceAll(',','.'):text;
     }
-    final payload={'confirm':true,'reason':reason.text.trim(),'farm':widget.schema['farm'],'expected_revision':widget.schema['revision'],
+    final payload={'allow_closed':allowClosed,'confirm':true,'reason':reason.text.trim(),'farm':widget.schema['farm'],'expected_revision':widget.schema['revision'],
       'values':widget.deleting?<String,dynamic>{}:values};
     try {
       if(widget.deleting){await widget.api.deleteForMaintenance(widget.endpoint,payload);}
@@ -104,6 +106,7 @@ class _MaintenanceDialogState extends State<_MaintenanceDialog> {
   @override Widget build(BuildContext context)=>PopScope(canPop:!submitting,child:AlertDialog(
     title:Text('${widget.deleting?'Supprimer':widget.creating?'Créer':'Modifier'} ${widget.label}'),
     content:SizedBox(width:480,child:Form(key:form,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+      if(widget.schema['closed']==true) CheckboxListTile(value:allowClosed,onChanged:submitting?null:(v)=>setState(()=>allowClosed=v??false),title:const Text('J’autorise cette correction exceptionnelle sur le lot clôturé.')),
       if(widget.deleting)Text('${widget.schema['consequences']}'),
       if(!widget.deleting)for(final field in fields)Padding(padding:const EdgeInsets.only(bottom:12),child:
         field['type']=='choice'?DropdownButtonFormField<String>(initialValue:choices[field['name']]!.isEmpty?null:choices[field['name']],

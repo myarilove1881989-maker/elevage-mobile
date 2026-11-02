@@ -286,7 +286,15 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
         if (includeTasks) _requiredRead('liste des tâches',apiService.getTasks()),
       ]);
       final nextData = Map<String, dynamic>.from(results[0] as Map);
-      final nextLots = results[1] as List;
+      final allLots=results[1] as List;
+      final nextLots=allLots.where((lot)=>!ApiService.isLotClosed(lot as Map)).toList();
+      final closedSelection=lotId!=null && allLots.any((lot)=>_intValue(lot['id'])==lotId && ApiService.isLotClosed(lot as Map));
+      final closedSpecies=speciesId!=null && allLots.any((lot)=>_intValue(lot['espece'])==speciesId) && !nextLots.any((lot)=>_intValue(lot['espece'])==speciesId);
+      if(closedSelection || closedSpecies){
+        if(!mounted)return false;
+        selectedLotId=null;selectedEspeceId=null;
+        return await _reload(includeTasks:includeTasks);
+      }
       final nextSpecies = _createdSpecies(results[2] as List, nextLots);
       if ((speciesId != null && !nextSpecies.any((item) => _intValue(item['id']) == speciesId)) ||
           (lotId != null && !nextLots.any((item) => _intValue(item['id']) == lotId))) {
@@ -854,68 +862,16 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
               );
   }
 
-  Widget _navigationDrawer() {
-    Widget item(String label, IconData icon, VoidCallback action) {
-      return ListTile(
-        leading: Icon(icon, color: const Color(0xFF063B63)),
-        title: Text(label),
-        onTap: () {
-          Navigator.pop(context);
-          action();
-        },
-      );
-    }
-
-    return Drawer(
-      child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            Container(
-              width: double.infinity,
-              color: const Color(0xFF063B63),
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-              child: _brandTitle(),
-            ),
-            FarmNavigation(session:commonSessionToken==(ApiService.sessionIdentity)?commonSession:null,labels:{
-              FarmDestination.dashboard:context.tr('dashboard'),
-              FarmDestination.billing:context.tr('billing'),
-              FarmDestination.lots:AppLocalizations.of(context).languageCode=='en'?'Batches':'Lots',
-              FarmDestination.purchases:context.tr('purchases'),
-              FarmDestination.sales:context.tr('sale'),
-              FarmDestination.expenses:context.tr('expenses'),
-              FarmDestination.movements:context.tr('movements'),
-              FarmDestination.history:context.tr('history'),
-              FarmDestination.agenda:AppLocalizations.of(context).languageCode=='en'?'Tasks':'Agenda',
-              FarmDestination.production:context.tr('production_tracking'),
-              FarmDestination.settings:context.tr('settings'),
-              FarmDestination.users:AppLocalizations.of(context).languageCode=='en'?'User management':'Gestion des utilisateurs',
-            },actions:{
-              FarmDestination.dashboard:()=>Navigator.pop(context),
-              FarmDestination.billing:() {Navigator.pop(context);_openClients();},
-              FarmDestination.lots:() {Navigator.pop(context);_openLots();},
-              FarmDestination.purchases:() {Navigator.pop(context);_openAchat();},
-              FarmDestination.sales:() {Navigator.pop(context);_openMouvement();},
-              FarmDestination.expenses:() {Navigator.pop(context);_openDepense();},
-              FarmDestination.movements:() {Navigator.pop(context);_openMouvement();},
-              FarmDestination.history:() {Navigator.pop(context);_openHistory();},
-              FarmDestination.agenda:() {Navigator.pop(context);_showAgenda();},
-              FarmDestination.production:() {Navigator.pop(context);_openProductionTracking();},
-              FarmDestination.settings:() {Navigator.pop(context);_openSettings();},
-              FarmDestination.users:() {Navigator.pop(context);Navigator.push(context,MaterialPageRoute(builder:(_)=>UserManagementScreen(service:UserAdministrationService(apiService))));},
-            }),
-            item(
-              context.tr('tutorial'),
-              Icons.menu_book_outlined,
-              _chooseTutorialLanguage,
-            ),
-            const Divider(height: 1),
-            item(context.tr('logout'), Icons.logout, _logout),
-          ],
-        ),
-      ),
-    );
-  }
+  Map<FarmDestination,VoidCallback> get _navigationActions=>{
+    FarmDestination.lots:_openLots,FarmDestination.purchases:_openAchat,FarmDestination.expenses:_openDepense,
+    FarmDestination.production:_openProductionTracking,FarmDestination.movements:_openMouvement,
+    FarmDestination.billing:_openClients,FarmDestination.history:_openHistory,FarmDestination.agenda:_showAgenda,
+    FarmDestination.settings:_openSettings,FarmDestination.tutorial:_chooseTutorialLanguage,FarmDestination.logout:_logout};
+  FarmSession? get _navigationSession=>commonSessionToken==ApiService.sessionIdentity?commonSession:null;
+  Widget _navigationDrawer()=>Drawer(child:SafeArea(child:ListView(children:[
+    Container(color:const Color(0xFF063B63),padding:const EdgeInsets.all(20),child:_brandTitle()),
+    FarmNavigation(session:_navigationSession,actions:_navigationActions,beforeNavigate:()=>Navigator.pop(context)),
+  ])));
 
   @override
   void dispose() {
@@ -929,356 +885,17 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   Widget build(BuildContext context) {
     final kpis = data?["kpis"] ?? {};
     final filteredLots = getFilteredLots();
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final showNavActions = screenWidth >= 1100 && MediaQuery.textScalerOf(context).scale(13) <= 16;
-    final navSpacing = screenWidth < 1200 ? 4.0 : 18.0;
 
     return Scaffold(
       drawer: _navigationDrawer(),
-      appBar: screenWidth < 700
-          ? AppBar(
-              backgroundColor: const Color(0xFF063B63),
-              foregroundColor: Colors.white,
-              toolbarHeight: 64,
-              leading: Builder(
-                builder: (menuContext) => IconButton(
-                  tooltip: context.tr('open_menu'),
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(menuContext).openDrawer(),
-                ),
-              ),
-              title: const Text('Élev’Age'),
-              actions: [
-                _connectionIndicator(),
-                IconButton(
-                  tooltip: context.tr('refresh'),
-                  onPressed: isLoading ? null : _refreshAll,
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            )
-          : AppBar(
-              automaticallyImplyLeading: false,
-              backgroundColor: const Color(0xFF063B63),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              toolbarHeight: 76,
-              title: Row(
-                children: [
-                  // =========================
-                  // LOGO ELEV'AGE
-                  // =========================
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Builder(
-                        builder: (menuContext) => IconButton(
-                          tooltip: context.tr('open_menu'),
-                          icon: const Icon(Icons.menu, size: 30),
-                          onPressed: () =>
-                              Scaffold.of(menuContext).openDrawer(),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      RichText(
-                        text: const TextSpan(
-                          style:TextStyle(fontFamily:'Roboto'),
-                          children: [
-                            TextSpan(
-                              text: "Elev'",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 24,
-                              ),
-                            ),
-                            TextSpan(
-                              text: "Age",
-                              style: TextStyle(
-                                color: Color(0xFF4CAF50),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 24,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Espace entre le logo et les boutons
-                  const SizedBox(width: 8),
-
-                  // =========================
-                  // NAVIGATION
-                  // =========================
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        _connectionIndicator(),
-                        // ACTUALISER
-                        InkWell(
-                          onTap: isLoading ? null : _refreshAll,
-                          child: SizedBox(
-                            width: screenWidth < 700 ? 44 : 76,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.refresh,
-                                  color: Colors.white,
-                                  size: 27,
-                                ),
-                                if (screenWidth >= 700) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    context.tr('refresh'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        if (showNavActions) ...[
-                          const SizedBox(width: 8),
-
-                          // ACHATS
-                          InkWell(
-                            onTap: _openAchat,
-                            child: SizedBox(
-                              width: 80,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.shopping_bag_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('purchases'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // DÉPENSES
-                          InkWell(
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      _expenseScreen(),
-                                ),
-                              );
-
-                              if (result == true) {
-                                await refreshDashboard();
-                              }
-                            },
-                            child: SizedBox(
-                              width: 90,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.shopping_cart_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('expenses'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // SUIVI DE PRODUCTION
-                          InkWell(
-                            key: const Key('topProductionTrackingButton'),
-                            onTap: _openProductionTracking,
-                            child: SizedBox(
-                              width: 140,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.monitor_heart_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    context.tr('production_tracking'),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // MOUVEMENTS
-                          InkWell(
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AddMouvementScreen(
-                                    apiService: apiService,
-                                  ),
-                                ),
-                              );
-
-                              if (result == true) {
-                                await refreshDashboard();
-                              }
-                            },
-                            child: SizedBox(
-                              width: 105,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.swap_horiz,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('movements'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // FACTURATION
-                          InkWell(
-                            onTap: _openClients,
-                            child: SizedBox(
-                              width: 92,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.receipt_long_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('billing'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // HISTORIQUE
-                          InkWell(
-                            onTap: _openHistory,
-                            child: SizedBox(
-                              width: 80,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.history,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('history'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(width: 4),
-
-                        // DÉCONNEXION
-                        InkWell(
-                          onTap: _logout,
-                          child: SizedBox(
-                            width: screenWidth < 700 ? 44 : 64,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.logout,
-                                  color: Colors.white70,
-                                  size: 25,
-                                ),
-                                if (screenWidth >= 700) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    context.tr('logout'),
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      appBar: AppBar(backgroundColor:const Color(0xFF063B63),foregroundColor:Colors.white,
+        title:const Text('Élev’Age'),toolbarHeight:64,
+        leading:Builder(builder:(menuContext)=>IconButton(tooltip:context.tr('open_menu'),icon:const Icon(Icons.menu),onPressed:()=>Scaffold.of(menuContext).openDrawer())),
+        actions:[_connectionIndicator(),IconButton(tooltip:context.tr('refresh'),
+          onPressed:isLoading?null:_refreshAll,icon:const Icon(Icons.refresh))],
+        bottom:PreferredSize(preferredSize:const Size.fromHeight(64),child:Theme(
+          data:Theme.of(context).copyWith(textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:Colors.white))),
+          child:FarmNavigation(horizontal:true,session:_navigationSession,actions:_navigationActions)))),
       body: LayoutBuilder(builder: (context, constraints) => Column(children: [
         if(apiService is FarmerApiService && (apiService as FarmerApiService).runtime.warning!=null)
           Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),
@@ -1286,6 +903,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
               key:const Key('farmer-online-only-notice'),style:const TextStyle(color:Color(0xFF694A17)))),
         if(apiService.lastOperationMessage!=null) Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),
           child:Text(apiService.lastOperationMessage!,key:const Key('last-operation-receipt'))),
+        if((kpis['lots_clotures']??0)>0) Padding(padding:const EdgeInsets.all(8),child:Text('Lots clôturés : ${kpis['lots_clotures']} · Stock restant conservé : ${kpis['stock_lots_clotures']??0}. Les finances incluent les lots clôturés.')),
         _dashboardHeading(constraints.maxHeight),
         Expanded(child: data == null
           ? Center(child: isLoading

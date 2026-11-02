@@ -23,6 +23,7 @@ class _LotListScreenState extends State<LotListScreen> with MutationRefresh<LotL
   List<dynamic> lots = [];
   bool isLoading = true;
   bool hasLoaded = false;
+  bool showClosed=false;
   String? loadError;
 
   @override
@@ -64,6 +65,7 @@ class _LotListScreenState extends State<LotListScreen> with MutationRefresh<LotL
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final visibleLots=lots.where((lot)=>ApiService.isLotClosed(lot as Map)==showClosed).toList();
     return Theme(
       data: terreEtOrTheme(context),
       child: Scaffold(
@@ -71,6 +73,8 @@ class _LotListScreenState extends State<LotListScreen> with MutationRefresh<LotL
         body: Column(
           children: [
             if (isLoading) const LinearProgressIndicator(),
+            Wrap(spacing:8,children:[ChoiceChip(label:const Text('Lots actifs'),selected:!showClosed,onSelected:(_)=>setState(()=>showClosed=false)),
+              ChoiceChip(label:const Text('Lots clôturés'),selected:showClosed,onSelected:(_)=>setState(()=>showClosed=true))]),
             OwnerMaintenanceActions(api:widget.apiService,kind:'lots',label:'un lot',access:_ownerMaintenance,
               remove:false,onChanged:fetchLots),
             if (loadError != null) Padding(
@@ -95,15 +99,15 @@ class _LotListScreenState extends State<LotListScreen> with MutationRefresh<LotL
                 onRefresh: fetchLots,
                 child: ListView.builder(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: lots.isEmpty ? 1 : lots.length,
+                  itemCount: visibleLots.isEmpty ? 1 : visibleLots.length,
                   itemBuilder: (context, index) {
-                    if (lots.isEmpty) {
+                    if (visibleLots.isEmpty) {
                       return Padding(padding: const EdgeInsets.all(24),
-                        child: Text(hasLoaded ? 'Aucun lot enregistré.'
+                        child: Text(hasLoaded ? (showClosed?'Aucun lot clôturé.':'Aucun lot actif.')
                             : 'Les données ne sont pas disponibles.',
                           textAlign: TextAlign.center));
                     }
-                    final lot = lots[index];
+                    final lot = visibleLots[index];
 
                     return Card(
                       margin: const EdgeInsets.symmetric(

@@ -31,12 +31,14 @@ class GrowthTrackingScreen extends StatefulWidget {
   final ApiService apiService;
   final int lotId;
   final String lotName;
+  final bool readOnly;
 
   const GrowthTrackingScreen({
     super.key,
     required this.apiService,
     required this.lotId,
     required this.lotName,
+    this.readOnly=false,
   });
 
   @override
@@ -325,7 +327,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                         ),
                       SizedBox(
                         width: double.infinity,
-                        child: BusinessCommand(api: widget.apiService, actions: const {'weights.create'}, child: FilledButton.icon(
+                        child: widget.readOnly?const SizedBox.shrink():BusinessCommand(api: widget.apiService, actions: const {'weights.create'}, child: FilledButton.icon(
                           onPressed: saving ? null : _addWeighing,
                           icon: saving
                               ? const SizedBox(
