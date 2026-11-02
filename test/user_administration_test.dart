@@ -112,9 +112,12 @@ void main() {
       'Roboto': 'roboto-regular.ttf',
       'MaterialIcons': 'materialicons-regular.otf',
     }.entries) {
-      final bytes = await File(
+      final file = File(
         '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts/${font.value}',
-      ).readAsBytes();
+      );
+      // Recent SDK caches omit Roboto; it is only for the optional preview.
+      if(font.key=='Roboto' && !await file.exists()) continue;
+      final bytes = await file.readAsBytes();
       final loader = FontLoader(font.key)
         ..addFont(Future.value(ByteData.sublistView(bytes)));
       await loader.load();

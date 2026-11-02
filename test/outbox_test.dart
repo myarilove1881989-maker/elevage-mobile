@@ -18,7 +18,7 @@ Future<VerifiedOfflineGrant> testOutboxGrant(int user,DateTime now,{int farm=1,b
     'grant_id':'00000000-0000-4000-8000-${user.toString().padLeft(12,'0')}',
     'user':user,'membership_id':user,'exploitation':farm,'role':'OPERATEUR',
     'device_id':7,'rights_version':1,'write_generation':1,'iat':iat,'exp':exp,
-    'permissions':PermissionContract.catalogue.where((code)=>!{'users.manage','devices.manage'}.contains(code)).toList()};
+    'permissions':PermissionContract.catalogue.where((code)=>!{'users.manage','devices.manage',...PermissionContract.ownerHttpActions}.contains(code)).toList()};
   final claims=encoded({'iss':'elevage-offline','aud':'elevage-device','typ':'offline-authorization',
     'jti':'00000000-0000-4000-8000-${user.toString().padLeft(12,'0')}','sub':'$user',
     'membership_id':user,'exploitation_id':farm,'device_id':7,'rights_version':1,'write_generation':1,
