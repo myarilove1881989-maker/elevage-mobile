@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -16,7 +17,9 @@ class CADetailScreen extends StatefulWidget {
   State<CADetailScreen> createState() => _CADetailScreenState();
 }
 
-class _CADetailScreenState extends State<CADetailScreen> {
+class _CADetailScreenState extends State<CADetailScreen> with MutationRefresh<CADetailScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await load(); }
   List<dynamic> data = [];
   bool isLoading = true;
   String? error;
@@ -27,6 +30,7 @@ class _CADetailScreenState extends State<CADetailScreen> {
   }
 
   Future<void> load() async {
+    markDataFresh();
     try {
       final result = await widget.apiService.getCA(widget.especeId);
       if (!mounted) return;

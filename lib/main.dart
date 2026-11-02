@@ -1,3 +1,4 @@
+import 'widgets/mutation_refresh.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -153,6 +154,7 @@ class _ElevageAppState extends State<ElevageApp> {
     return AnimatedBuilder(
       animation: AppSettings.instance,
       builder: (context, _) => MaterialApp(
+        navigatorObservers: [businessRouteObserver],
         title: Config.current.isLab
             ? 'Élev’Age LABORATOIRE'
             : Config.isPilot

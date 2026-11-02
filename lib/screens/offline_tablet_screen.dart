@@ -354,6 +354,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
       )) : null,drawer: session==null?null:Drawer(child:SafeArea(child:ListView(children:[
       FarmNavigation(session:FarmSession.fromTablet(tablet),actions:{
         FarmDestination.dashboard:()=>_selectPage('lots'),
+        FarmDestination.billing:()=>_selectPage('clients'),
         FarmDestination.lots:()=>_selectPage('lots'),
         FarmDestination.purchases:()=>_openOperation('ACHAT'),
         FarmDestination.sales:() {Navigator.pop(context);_terrainSale();},

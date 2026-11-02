@@ -41,7 +41,7 @@ class UserAdministrationService {
       userId: data['user'] as int,
       farmId: data['exploitation'] as int,
       role: 'OWNER',
-      rightsVersion: data['membership']['version'] as int,
+      rightsVersion: data['membership']['version'] as int,allowHttpV2:true,
     );
     if (!rights.allows('users.manage')) {
       throw StateError('Gestion des utilisateurs refusée.');

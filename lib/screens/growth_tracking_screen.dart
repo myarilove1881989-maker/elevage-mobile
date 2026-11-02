@@ -1,3 +1,5 @@
+import '../widgets/owner_maintenance_actions.dart';
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -41,7 +43,10 @@ class GrowthTrackingScreen extends StatefulWidget {
   State<GrowthTrackingScreen> createState() => _GrowthTrackingScreenState();
 }
 
-class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
+class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with MutationRefresh<GrowthTrackingScreen> {
+  late final Future<bool> _ownerMaintenance = ownerMaintenanceAllowed(widget.apiService);
+  @override
+  Future<void> refreshAfterMutation() async { await _load(); }
   final _countController = TextEditingController();
   final _weightController = TextEditingController();
   final _noteController = TextEditingController();
@@ -65,6 +70,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
   }
 
   Future<void> _load() async {
+    markDataFresh();
     if (mounted) {
       setState(() {
         loading = true;
@@ -359,6 +365,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
+                                  OwnerMaintenanceActions(api:widget.apiService,kind:'weights',id:(item['id'] as num).toInt(),label:'la pesée',access:_ownerMaintenance,onChanged:_load),
                                   Text('${item['nombre_animaux_peses']} ${context.tr('animals_weighed').toLowerCase()}'),
                                   Text('${context.tr('sample_total_weight')}: ${_kg(item['poids_total_kg'])}'),
                                   Text('${context.tr('average_weight')}: ${_kg(item['poids_moyen_kg'])}'),

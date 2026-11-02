@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
@@ -15,7 +16,9 @@ class ClientListScreen extends StatefulWidget {
   State<ClientListScreen> createState() => _ClientListScreenState();
 }
 
-class _ClientListScreenState extends State<ClientListScreen> {
+class _ClientListScreenState extends State<ClientListScreen> with MutationRefresh<ClientListScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await loadClients(); }
   List clients = [];
   bool loading = true;
 
@@ -38,6 +41,7 @@ class _ClientListScreenState extends State<ClientListScreen> {
   }
 
   Future<void> loadClients() async {
+    markDataFresh();
     try {
       final res = await widget.apiService.getClients();
 

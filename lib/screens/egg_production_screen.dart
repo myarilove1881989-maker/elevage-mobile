@@ -1,3 +1,5 @@
+import '../widgets/owner_maintenance_actions.dart';
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -23,7 +25,10 @@ class EggProductionScreen extends StatefulWidget {
   State<EggProductionScreen> createState() => _EggProductionScreenState();
 }
 
-class _EggProductionScreenState extends State<EggProductionScreen> {
+class _EggProductionScreenState extends State<EggProductionScreen> with MutationRefresh<EggProductionScreen> {
+  late final Future<bool> _ownerMaintenance = ownerMaintenanceAllowed(widget.apiService);
+  @override
+  Future<void> refreshAfterMutation() async { await loadData(); }
   static const int eggsPerTray = 30;
 
   String trayCount(dynamic value) {
@@ -81,6 +86,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
   }
 
   Future<void> loadData() async {
+    markDataFresh();
     if (!mounted) return;
     setState(() {
       loading = true;
@@ -856,13 +862,15 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                           ),
                           onTap:()=>showCollectionDialog(item),
                           title: Text('${trayCount(item['nombre_collecte'])}${item['_review_required']==true?' · À vérifier':item['local_only']==true?' · En attente de synchronisation':''}'),
-                          subtitle: Text(
+                          subtitle: Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(
                             '${context.tr('egg_collected_total')}: ${item['nombre_collecte']} · '
                             '${context.tr('egg_commercializable')}: ${item['nombre_commercialisable']}\n'
                             '${context.tr('egg_broken')}: ${item['nombre_casses']} · '
                             '${context.tr('egg_downgraded')}: ${item['nombre_declasses']} · '
                             '${context.tr('egg_consumed')}: ${item['nombre_consommes_donnes']}',
                           ),
+                            if(item['local_only']!=true && item['_review_required']!=true) OwnerMaintenanceActions(api:widget.apiService,kind:'collections',id:int.tryParse('${item['id']}'),label:'la collecte',access:_ownerMaintenance,edit:false,onChanged:loadData),
+                          ]),
                           trailing: Row(mainAxisSize:MainAxisSize.min,children:[
                             Text(MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at))),
                             BusinessCommand(api:widget.apiService,actions:const {'egg_collections.update'},child:IconButton(
@@ -901,6 +909,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> {
                 if (stats != null) ...[
                   const SizedBox(height: 14),
                   _periodResults(),
+                  OwnerMaintenanceList(api:widget.apiService,kind:'egg_sales',title:'Ventes d’œufs',lotId:widget.lotId,access:_ownerMaintenance),
                 ],
               ],
             ],

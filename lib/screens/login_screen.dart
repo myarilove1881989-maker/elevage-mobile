@@ -35,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String errorMessage = '';
 
   Future<void> handleLogin() async {
+    if (isLoading) return;
     FocusScope.of(context).unfocus();
     setState(() {
       isLoading = true;
@@ -48,10 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!mounted) return;
-
-      setState(() {
-        isLoading = false;
-      });
 
       if (success) {
         final caps=await widget.apiService.get('/me/capabilities/');
@@ -109,6 +106,8 @@ class _LoginScreenState extends State<LoginScreen> {
         isLoading = false;
         errorMessage = context.tr('invalid_credentials');
       });
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -154,6 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 40),
                   TextField(
                     controller: usernameController,
+                    textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: context.tr('username'),
                       prefixIcon: const Icon(Icons.person_outline),
@@ -165,6 +165,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: passwordController,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => handleLogin(),
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       labelText: context.tr('password'),

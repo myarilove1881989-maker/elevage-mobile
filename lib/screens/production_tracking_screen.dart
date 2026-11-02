@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -17,7 +18,9 @@ class ProductionTrackingScreen extends StatefulWidget {
       _ProductionTrackingScreenState();
 }
 
-class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> {
+class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> with MutationRefresh<ProductionTrackingScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await _loadOptions(); }
   List<dynamic> species = [];
   List<dynamic> lots = [];
   int? selectedSpeciesId;
@@ -38,6 +41,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> {
   }
 
   Future<void> _loadOptions() async {
+    markDataFresh();
     try {
       final results = await Future.wait([
         widget.apiService.getEspeces(),

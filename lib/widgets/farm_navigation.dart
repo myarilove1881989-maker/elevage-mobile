@@ -3,6 +3,7 @@ import '../services/farm_session.dart';
 
 enum FarmDestination {
   dashboard,
+  billing,
   lots,
   purchases,
   sales,
@@ -17,6 +18,7 @@ enum FarmDestination {
 
 const farmDestinationLabels = {
   FarmDestination.dashboard: 'Tableau de bord',
+  FarmDestination.billing: 'Facturation',
   FarmDestination.lots: 'Lots',
   FarmDestination.purchases: 'Achats',
   FarmDestination.sales: 'Ventes',
@@ -45,7 +47,7 @@ class FarmNavigation extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       for (final destination in FarmDestination.values)
-        if (destination != FarmDestination.users && actions.containsKey(destination) &&
+        if (destination != FarmDestination.dashboard && destination != FarmDestination.users && actions.containsKey(destination) &&
             (destination != FarmDestination.agenda || session?.permissions?.allows('agenda.read') == true || session?.permissions?.allows('agenda.plan') == true) &&
             (destination != FarmDestination.users ||
                 session?.canManageUsers == true))

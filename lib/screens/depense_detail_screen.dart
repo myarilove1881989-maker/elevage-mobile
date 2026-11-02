@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -22,7 +23,9 @@ class DepenseDetailScreenX extends StatefulWidget {
   State<DepenseDetailScreenX> createState() => _DepenseDetailScreenXState();
 }
 
-class _DepenseDetailScreenXState extends State<DepenseDetailScreenX> {
+class _DepenseDetailScreenXState extends State<DepenseDetailScreenX> with MutationRefresh<DepenseDetailScreenX> {
+  @override
+  Future<void> refreshAfterMutation() async { await load(); }
   List<dynamic> data = [];
   bool isLoading = true;
   String? error;
@@ -43,6 +46,7 @@ class _DepenseDetailScreenXState extends State<DepenseDetailScreenX> {
   }
 
   Future<void> load() async {
+    markDataFresh();
     try {
       final results = await Future.wait([
         widget.apiService.getDepenses(widget.lotId),

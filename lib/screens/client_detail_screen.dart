@@ -1,3 +1,5 @@
+import '../widgets/owner_maintenance_actions.dart';
+import '../widgets/mutation_refresh.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../config.dart';
@@ -29,7 +31,10 @@ class ClientDetailScreen extends StatefulWidget {
   State<ClientDetailScreen> createState() => _ClientDetailScreenState();
 }
 
-class _ClientDetailScreenState extends State<ClientDetailScreen> {
+class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRefresh<ClientDetailScreen> {
+  late final Future<bool> _ownerMaintenance = ownerMaintenanceAllowed(api);
+  @override
+  Future<void> refreshAfterMutation() async { await load(); }
   late final ApiService api = widget.apiService ?? ApiService();
 
   double balance = 0;
@@ -69,6 +74,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   }
 
   Future<void> load() async {
+    markDataFresh();
     if(_loading) {_reloadRequested=true;return;}
     if(!mounted) return;
     _loading=true;
@@ -782,6 +788,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 ),
               ],
             ),
+            OwnerMaintenanceActions(api:api,kind:'sales',id:(venteId as num).toInt(),label:'la vente',access:_ownerMaintenance,onChanged:load),
             if (montantPaye > 0) ...[
               const SizedBox(height: 12),
               SizedBox(

@@ -299,6 +299,7 @@ void main() {
     api.role = 'OWNER';
     await tester.pumpWidget(MaterialApp(home: SettingsScreen(apiService: api)));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Création des utilisateurs'), 200);
     expect(find.text('Création des utilisateurs'), findsOneWidget);
     api.close();
   });
@@ -329,9 +330,9 @@ void main() {
                       as RenderRepaintBoundary)
                   .toImage();
           final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-          await File(
-            '../reports/9a2b-interface-utilisateurs.png',
-          ).writeAsBytes(bytes!.buffer.asUint8List());
+          final preview=File('.local/test-previews/9a2b-interface-utilisateurs.png');
+          await preview.parent.create(recursive:true);
+          await preview.writeAsBytes(bytes!.buffer.asUint8List());
           image.dispose();
         });
       }
