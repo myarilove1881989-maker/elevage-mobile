@@ -1,5 +1,6 @@
 import 'expense_business_date.dart';
 import 'expense_input_contract.dart';
+import 'outbox.dart' show freezeJson;
 
 enum ExpensePreparationError {
   invalidReference,
@@ -211,7 +212,8 @@ class ExpenseCategorySelection {
   final ExpenseSelectionContext origin;
   final int id;
   final String name;
-  ExpenseCategorySelection._(this.origin, this.id, this.name);
+  final String? stockPurpose;
+  ExpenseCategorySelection._(this.origin, this.id, this.name,[this.stockPurpose]);
 }
 
 typedef ExpenseCachedPageReader =
@@ -295,6 +297,7 @@ class ExpenseCategoryCatalog {
             origin,
             data['id'] as int,
             data['nom'] as String,
+            data['stock_purpose'] as String?,
           ),
         );
       }
@@ -334,6 +337,7 @@ class ExpensePreparation {
     required ExpenseBusinessDay day,
     required ExpenseBusinessDate dates,
     required DateTime nowUtc,
+    Map<String,dynamic>? feedSupply, List<String> feedDependencies=const [],
   }) {
     _sameContext(lot.origin, currentContext);
     _sameContext(categories.origin, currentContext);
@@ -354,9 +358,9 @@ class ExpensePreparation {
     final occurred = nowUtc;
     return PreparedExpense._(
       lot.origin,
-      validated.payload!,
+      Map<String,Object>.unmodifiable(Map<String,Object>.from(freezeJson({...validated.payload!,if(feedSupply!=null) ...{'stock_version':1,'feed_supply':feedSupply}}) as Map)),
       occurred,
-      lot.dependencies,
+      {...lot.dependencies,...feedDependencies}.toList(),
       lot,
       category,
       categories.freshness,

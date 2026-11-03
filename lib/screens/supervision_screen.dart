@@ -166,6 +166,23 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
     } catch (_) {if(mounted) {setState(() {row=null;error='Impossible de charger cette déclaration. Rouvrez la supervision.';});}}
     finally {if(mounted) {setState(()=>loading=false);}}
   }
+  Future<void> closeFeedConflict() async {
+    final reason=TextEditingController();
+    PendingReconciliationDecision? pending;
+    await showDialog<void>(context:context,builder:(dialog)=>StatefulBuilder(builder:(context,update){
+      return AlertDialog(title:const Text('Classer sans application'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+        const Text('Aucun stock ni montant ne sera modifié. L’original restera conservé. Une nouvelle saisie nécessitera un accès valide.'),
+        TextField(controller:reason,enabled:pending==null,decoration:const InputDecoration(labelText:'Motif obligatoire'))]),
+        actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),
+          TextButton(onPressed:()async{
+            if(reason.text.trim().length<3)return;
+            pending??=PendingReconciliationDecision(operationId:widget.operationId,version:row!['decision_version'] as int,action:'CANCEL',reason:reason.text);
+            try {await widget.service.closeFeedConflict(pending!);if(dialog.mounted)Navigator.pop(dialog);if(mounted)await load();}
+            catch(_){if(dialog.mounted)update((){});if(mounted)ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content:Text('Résultat à vérifier dans l’historique. Le même identifiant sera conservé pour le renvoi.')));}
+          },child:const Text('Confirmer le classement'))]);
+    }));
+    reason.dispose();
+  }
   Future<void> decide() async {
     final saved=await showDialog<bool>(context:context,builder:(_)=>_DecisionDialog(service:widget.service,row:row!));
     if(saved==true && mounted) {await load();}
@@ -189,6 +206,8 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
           Text(row!['reconciliation_mode']=='READ_ONLY_V2'
             ? 'Consultation uniquement : les opérations conformes sont appliquées automatiquement. Aucune approbation du propriétaire n’est requise.'
             : 'Consultation uniquement : les actions de décision ne sont pas disponibles pour cette opération.'),
+        if(row!['reconciliation_mode']=='FEED_CANCEL_ONLY' && widget.service.owner)
+          FilledButton(onPressed:loading?null:closeFeedConflict,child:const Text('Classer sans application, avec motif')),
         if(recognized!=null) ...[const Divider(),_facts(recognized)],
         if((receipt['reason_text']?.toString()??'').isNotEmpty) Text('Dernier motif : ${receipt['reason_text']}'),
         if((receipt['reason_code']?.toString()??'').isNotEmpty) Text('Code du motif : ${receipt['reason_code']}'),

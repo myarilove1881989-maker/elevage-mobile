@@ -1,10 +1,11 @@
 /// Translates only existing, reviewed terrain contracts. It does not invent a
 /// new offline endpoint, drop unknown fields, or infer unsupported deletions.
 class ClassicTerrainCommand {
-  ClassicTerrainCommand(this.kind,this.payload,{this.operation='CREATE',this.expectedVersion='',this.at});
+  ClassicTerrainCommand(this.kind,this.payload,{this.operation='CREATE',this.expectedVersion='',this.at,this.operationId,this.dependencies=const []});
   final String kind,operation,expectedVersion;
   final Map<String,dynamic> payload;
-  final String? at;
+  final String? at,operationId;
+  final List<String> dependencies;
   static Map<String,dynamic> reference(dynamic id) {
     if(id is! int || id<1) throw ArgumentError('Choisissez une référence déjà disponible.');
     return {'server_id':id};
@@ -16,6 +17,31 @@ class ClassicTerrainCommand {
     return '${match[1]}.${(match[2]??'').padRight(scale,'0')}';
   }
   static ClassicTerrainCommand? decode(String method,String path,Map<String,dynamic> source) {
+    if((method=='PATCH' || method=='DELETE') && RegExp(r'^/alimentation/distributions/[^/]+/$').hasMatch(path) && source.containsKey('expected_version')) {
+      final id=path.split('/')[3];
+      final parsed=int.tryParse(id);
+      final data=Map<String,dynamic>.from(source);
+      if(method=='DELETE') {data.remove('confirm');}
+      final operationId=data.remove('operation_uuid') as String?,version=data.remove('expected_version') as String;
+      return ClassicTerrainCommand('ALIMENTATION',{'stock_version':1,'distribution_ref':parsed!=null?reference(parsed):{'local_uuid':id},...data},
+        operation:method=='DELETE'?'REVERSE':'UPDATE',expectedVersion:version,operationId:operationId);
+    }
+    if(source['stock_version']==1 || source.containsKey('feed_supply')) {
+      if(method=='POST' && path=='/depenses/create/') {
+        final data=Map<String,dynamic>.from(source);
+        final id=data.remove('operation_uuid') as String?;
+        final at=data.remove('date')?.toString();
+        data['lot_ref']=reference(data.remove('lot'));data['categorie_id']=data.remove('categorie');data['stock_version']=1;
+        return ClassicTerrainCommand('DEPENSE',data,operationId:id,at:at);
+      }
+      if(method=='POST' && path=='/alimentation/distributions/') {
+        final data=Map<String,dynamic>.from(source);
+        final id=data.remove('operation_uuid') as String?,at=data.remove('distribution_at')?.toString();
+        final dependencies=List<String>.from(data.remove('_feed_dependencies') as List? ?? const []);
+        data['lot_ref']=reference(data.remove('lot'));
+        return ClassicTerrainCommand('ALIMENTATION',data,operationId:id,dependencies:dependencies,at:at);
+      }
+    }
     if(method!='POST') return null;
     var data=Map<String,dynamic>.from(source);
     final at=(data.remove('date')??data.remove('collecte_at')??data.remove('distribution_at')??data.remove('pesee_at'))?.toString();

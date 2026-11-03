@@ -16,7 +16,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   final feedOperationId = newOperationUuid();
   final feedCategories = <int>{};
   Map<String,dynamic>? feedCatalog, pendingFeed;
-  bool loadingFeed = false;
+  bool loadingFeed = false, feedLocalRecorded=false;
   bool get wantsFeed => feedCategories.contains(categoryId) && !widget.api.hasUnifiedOfflineSession;
 
   Future<void> selectCategory(int? value) async {
@@ -27,7 +27,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
       final data=await widget.api.get('/feed-supplies/');
       if(!mounted || !sameToken)return;
       if(data is! Map<String,dynamic> || data['confirmed']!=true ||
-          data['products'] is! List || data['species'] is! List || data['lots'] is! List || widget.api.lastReadWasCached) {
+          data['products'] is! List || data['species'] is! List || data['lots'] is! List || (widget.api.lastReadWasCached && data['local_estimate']!=true)) {
         throw StateError('Catalogue non confirmé');
       }
       setState(()=>feedCatalog=data);
@@ -36,16 +36,21 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   }
 
   Future<void> sendFeed(Map<String,dynamic> body) async {
-    if(widget.api.hasUnifiedOfflineSession)throw StateError('Approvisionnement connecté requis');
+    // Prepared sessions use the existing durable outbox, connected sessions use HTTP.
     final result=await widget.api.post('/depenses/create/',body);
     if(!mounted || !sameToken)throw StateError('Session changed');
+    if(widget.api.hasUnifiedOfflineSession && result is Map && result['local_only']==true && result['operation_id']==feedOperationId) {
+      setState(() {confirmed=true;feedLocalRecorded=true;error=null;});
+      try {final fresh=await widget.api.get('/feed-supplies/');if(mounted && sameToken && fresh is Map<String,dynamic>)setState(()=>feedCatalog=fresh);} catch(_) {}
+      return;
+    }
     if(result is! Map || result['id'] is! int || result['stock_confirmed']!=true || result['operation_uuid']!=feedOperationId) {
       throw StateError('Stock non confirmé');
     }
     setState(() {confirmed=true;error=null;});
     try {
       final fresh=await widget.api.get('/feed-supplies/');
-      if(mounted && sameToken && fresh is Map<String,dynamic> && fresh['confirmed']==true && !widget.api.lastReadWasCached) {
+      if(mounted && sameToken && fresh is Map<String,dynamic> && fresh['confirmed']==true && !(widget.api.lastReadWasCached && fresh['local_estimate']!=true)) {
         setState(()=>feedCatalog=fresh);
       }
     } catch(_) {if(mounted && sameToken)setState(()=>feedCatalog=null);}
@@ -261,7 +266,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         if (busy) const LinearProgressIndicator(),
         if (error != null) Text(error!, key: const Key('expense-error')),
         if (confirmed)
-          Text(widget.api.operationFeedback(pendingFeed!=null?'Dépense et approvisionnement confirmés par le serveur.':'Dépense confirmée par le serveur.'),key:const Key('expense-status')),
+          Text(widget.api.operationFeedback(feedLocalRecorded?'Enregistré sur cet appareil. Stock estimé ; confirmation serveur en attente.':pendingFeed!=null?'Dépense et approvisionnement confirmés par le serveur.':'Dépense confirmée par le serveur.'),key:const Key('expense-status')),
         if (!blocked && sameToken) ...[
           ExpenseFields(
             lots: lots,
@@ -279,7 +284,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
             chooseDate: chooseDate,
           ),
           if(feedCategories.contains(categoryId) && widget.api.hasUnifiedOfflineSession)
-            const Text('La dépense locale ne confirme aucun approvisionnement de stock dans cette phase.'),
+            const Text('Les opérations locales restent en attente de validation du serveur.'),
           if(wantsFeed && loadingFeed) const LinearProgressIndicator(),
           if(wantsFeed && feedCatalog!=null) FeedSupplyFields(draft:feed,catalog:feedCatalog!,editable:editable),
           if(pendingFeed!=null && attempted && !confirmed && sameToken)

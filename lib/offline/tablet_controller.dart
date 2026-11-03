@@ -656,6 +656,11 @@ class TabletController extends ChangeNotifier {
         businessRevision:businessRevision);
     }
     check();
+    final extra=personal.capabilities['capabilities'];
+    if(collections.length==6 && extra is Map && extra['feed_stock_contract']==1) {
+      await _refreshCollections(const ['feed_stock']);
+      check();
+    }
     if(collections.length==6) lastCompleteCacheRefresh=clock();
     _notify();
   }

@@ -50,6 +50,7 @@ class PermissionContract {
     permissions.contains(action) && !(role == 'OWNER' && httpVersion == 1 && isBusinessWrite(action));
 
   static String? operationAction(String kind, String operation) {
+    if(kind=='ALIMENTATION' && {'UPDATE','REVERSE'}.contains(operation)) return operation=='UPDATE'?'feed.update':'feed.delete';
     if(operation=='REVERSE') {
       const cancelDomains={'VENTE_ANIMAUX':'animal_sales','VENTE_OEUFS':'egg_sales',
         'DEPENSE':'expenses','MORTALITE':'mortality','DON':'donations','VOL':'thefts'};

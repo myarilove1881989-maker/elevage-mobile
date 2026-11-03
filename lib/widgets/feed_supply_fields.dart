@@ -85,7 +85,7 @@ class _FeedSupplyFieldsState extends State<FeedSupplyFields> {
         const Text('Stocks confirmés par position (kg) :'),
         for(final row in widget.catalog['products'] as List) if(row['id']==d.product)
           for(final position in row['positions'] as List)
-            Text('${position['kg']} kg - ${label('species',position['species_id'])}, ${position['lot_id']==null?'partagé':label('lots',position['lot_id'])}'),
+            Text('${label('species',position['species_id'])}, ${position['lot_id']==null?'partagé':label('lots',position['lot_id'])} : confirmé ${position['kg']} kg ; local ${position['pending_kg']??'0.000'} kg ; estimé ${position['estimated_kg']??position['kg']} kg'),
       ],
     ]);
   }

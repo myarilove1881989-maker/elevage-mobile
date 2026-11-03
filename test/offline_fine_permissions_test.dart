@@ -20,7 +20,7 @@ final syntheticNow=DateTime.utc(2026,10,12,12);
 Future<VerifiedOfflineGrant> fineGrant({int user=2, int farm=1, String role='OPERATEUR',
   List<String> codes=const ['clients.create','finance.read'],
   Map<String,dynamic>? changed, bool tamper=false, DateTime? now,
-  int? credentialVersion,
+  int? credentialVersion, bool feedStock=false,
   int expectedUser=2,int expectedFarm=1,int expectedGeneration=1, bool legacy=false,
   DateTime? issuedAt,int rightsVersion=1,
   Duration duration=const Duration(hours:24), String? grantId,
@@ -38,7 +38,7 @@ Future<VerifiedOfflineGrant> fineGrant({int user=2, int farm=1, String role='OPE
     'jti':id,'sub':'$user','membership_id':user,'exploitation_id':farm,'device_id':7,
     'rights_version':rightsVersion,'write_generation':1,'iat':iat,'exp':exp,
     if(credentialVersion!=null) 'credential_version':credentialVersion,
-    'capabilities':{'can_create_terrain_operation':true,if(!legacy)'permission_contract':contract}});
+    'capabilities':{'can_create_terrain_operation':true,if(feedStock)'feed_stock_contract':1,if(!legacy)'permission_contract':contract}});
   final signature=await Ed25519().sign(utf8.encode('$header.$claims'),keyPair:key);
   if(tamper) signature.bytes[0]^=1;
   final token='$header.$claims.${base64Url.encode(signature.bytes).replaceAll('=','')}';
