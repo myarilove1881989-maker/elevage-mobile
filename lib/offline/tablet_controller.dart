@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../config.dart';
 import '../services/lab_network_gate.dart';
 import 'dart:async';
+import '../services/health_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'farm_cache.dart';
 import 'foundation_api.dart';
@@ -196,7 +197,7 @@ class TabletController extends ChangeNotifier {
     _notify();
   }
 
-  void lock() {_inactivityTimer?.cancel();_inactivityTimer=null;_lastActivityAt=null;_inactivityDeadline=null;outboxOffset=0;_lockEpoch++;api.invalidatePendingPersonalWork();operators?.lock();selectedName=null;outboxRows=[];_notify();}
+  void lock() {unawaited(HealthReminderCoordinator.current?.suspend().catchError((Object _) {})??Future<void>.value());_inactivityTimer?.cancel();_inactivityTimer=null;_lastActivityAt=null;_inactivityDeadline=null;outboxOffset=0;_lockEpoch++;api.invalidatePendingPersonalWork();operators?.lock();selectedName=null;outboxRows=[];_notify();}
 
   Future<void> _refreshPreparedRights(DeviceOutboxApi deviceApi) async {
     final states=await deviceApi.permissionStates();
@@ -589,6 +590,7 @@ class TabletController extends ChangeNotifier {
     final current=operators?.session;
     if(current==null || cache is! OutboxStore) throw StateError('Profil personnel ouvert requis.');
     if(entityType=='VACCINATION' || payload['vaccine_version']==1) {
+      if(entityType=='VACCINATION' && payload['task_id']!=null && ((current.grant.claims['capabilities'] as Map)['health_agenda_contract']!=1 || current.grant.finePermissions?.allows('agenda.read')!=true || current.grant.finePermissions?.allows('agenda.progress')!=true))throw StateError('Renouvelez votre accès et vos droits d’agenda avant ce rattachement.');
       if((current.grant.claims['capabilities'] as Map)['vaccine_stock_contract']!=1)throw StateError('Renouvelez votre accès hors ligne pour les vaccins.');
       if(entityType=='VACCINATION' && (payload['allocations'] as List? ?? const []).any((line)=>(line['lost'] as int? ?? 0)>0) && current.grant.finePermissions?.allows('vaccinations.loss')!=true)throw StateError('Déclaration de perte non autorisée.');
     }

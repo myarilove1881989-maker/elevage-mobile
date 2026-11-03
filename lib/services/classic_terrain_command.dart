@@ -17,6 +17,12 @@ class ClassicTerrainCommand {
     return '${match[1]}.${(match[2]??'').padRight(scale,'0')}';
   }
   static ClassicTerrainCommand? decode(String method,String path,Map<String,dynamic> source) {
+    if(method=='PATCH' && RegExp(r'^/tasks/\d+/$').hasMatch(path) && source.keys.every((k)=>{'status','report','expected_version','operation_uuid','reported_at'}.contains(k)) && {'TODO','IN_PROGRESS','DONE'}.contains(source['status'])) {
+      final data=Map<String,dynamic>.from(source),id=int.parse(path.split('/')[2]);
+      final uuid=data.remove('operation_uuid') as String?,at=data.remove('reported_at') as String?,version=data.remove('expected_version');
+      if(version is! int || version<1)throw StateError('Actualisez la tâche avant de rendre compte.');
+      return ClassicTerrainCommand('TASK',{'task_id':id,...data},operation:'UPDATE',operationId:uuid,at:at,expectedVersion:'$version');
+    }
     if(path=='/depenses/create/' && method=='POST' && source.containsKey('vaccine_supply')) {
       final data=Map<String,dynamic>.from(source);final id=data.remove('operation_uuid') as String?,at=data.remove('date')?.toString();
       data['lot_ref']=reference(data.remove('lot'));data['categorie_id']=data.remove('categorie');data['vaccine_version']=1;

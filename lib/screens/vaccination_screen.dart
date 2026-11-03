@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'health_agenda_screen.dart';
 import '../services/api_service.dart';
 import '../offline/outbox.dart' show newOperationUuid;
 import '../widgets/terrain_entry_gate.dart';
@@ -13,8 +14,9 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
   List<dynamic>? rows;String? error;
   @override void initState(){super.initState();load();}
   Future<void> load() async {
-    try {final value=await widget.api.get('/vaccine-supplies/');if(mounted && value is Map<String,dynamic>)setState(()=>stock=value);}catch(_){}
-    try {final result=await widget.api.get('/vaccinations/?lot=${widget.lotId}');if(mounted)setState(() {rows=result as List;error=null;});}
+    final captured=ApiService.sessionIdentity;
+    try {final value=await widget.api.get('/vaccine-supplies/');if(mounted && captured==ApiService.sessionIdentity && value is Map<String,dynamic>)setState(()=>stock=value);}catch(_){}
+    try {final result=await widget.api.get('/vaccinations/?lot=${widget.lotId}');if(mounted && captured==ApiService.sessionIdentity)setState(() {rows=result as List;error=null;});}
     catch(e){if(mounted)setState(()=>error='Historique indisponible : $e');}
   }
   Future<void> form([Map<String,dynamic>? item]) async {
@@ -43,6 +45,7 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
   }
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text('Suivi de vaccination — ${widget.lotName}')),
     body:RefreshIndicator(onRefresh:load,child:ListView(padding:const EdgeInsets.all(16),children:[
+      BusinessCommand(api:widget.api,actions:const {'agenda.plan'},child:ElevatedButton(key:const Key('plan-vaccination'),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>HealthAgendaScreen(api:widget.api,lotId:widget.lotId,startPlanning:true))),child:const Text('Programmer une vaccination dans l’agenda'))),
       BusinessCommand(api:widget.api,actions:const {'vaccinations.create'},child:ElevatedButton(key:const Key('add-vaccination'),onPressed:()=>form(),child:const Text('Enregistrer une vaccination / perte'))),
       if(stock!=null)ExpansionTile(title:const Text('Consulter les flacons et les péremptions'),children:[for(final vial in stock!['vials'] as List)ListTile(title:Text('${vial['label']}'),subtitle:Text('Physique : ${vial['physical']} — utilisable : ${vial['estimated_usable']??vial['usable']} doses\nPéremption : ${vial['expires_on']} — ouverture : ${vial['opened_at']??'non ouvert'}'))]),
       if(error!=null)Text(error!),if(rows==null && error==null)const LinearProgressIndicator(),
@@ -55,25 +58,31 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
 }
 
 class VaccinationForm extends StatefulWidget {
-  const VaccinationForm({super.key,required this.api,required this.lotId,this.initial});
-  final ApiService api;final int lotId;final Map<String,dynamic>? initial;
+  const VaccinationForm({super.key,required this.api,required this.lotId,this.initial,this.plannedTask});
+  final ApiService api;final int lotId;final Map<String,dynamic>? initial,plannedTask;
   @override State<VaccinationForm> createState()=>_VaccinationFormState();
 }
 class _VaccinationFormState extends State<VaccinationForm> {
+  List<Map<String,dynamic>> plannedTasks=[];Map<String,dynamic>? selectedTask;
   Map<String,dynamic>? catalog,pending;String? product,error;bool busy=false;
   final operation=newOperationUuid();
+  final originIdentity=ApiService.sessionIdentity;
+  bool get sameIdentity=>originIdentity==ApiService.sessionIdentity;
   final animals=TextEditingController(),date=TextEditingController(text:DateTime.now().toUtc().toIso8601String()),observations=TextEditingController(),reason=TextEditingController();
   final opened=<String,TextEditingController>{},used=<String,TextEditingController>{},lost=<String,TextEditingController>{},duration=<String,TextEditingController>{};
-  @override void initState(){super.initState();final item=widget.initial;if(item!=null){product=item['product'] as String;animals.text='${item['animals']}';date.text='${item['vaccinated_at']}';observations.text='${item['observations']??''}';}load();}
+  @override void initState(){super.initState();selectedTask=widget.plannedTask;if(selectedTask!=null)product=selectedTask!['health']['product'] as String;final item=widget.initial;if(item!=null){product=item['product'] as String;animals.text='${item['animals']}';date.text='${item['vaccinated_at']}';observations.text='${item['observations']??''}';}load();}
   Future<void> load() async {
     try {
       final result=Map<String,dynamic>.from(await widget.api.get('/vaccine-supplies/') as Map);
+      if(!mounted || !sameIdentity)return;
       if(result['vaccine_contract']!=1)throw StateError('Contrat indisponible.');
       for(final vial in result['vials'] as List) {
         final id=vial['id'] as String;opened[id]=TextEditingController();used[id]=TextEditingController();lost[id]=TextEditingController();duration[id]=TextEditingController();
         for(final line in widget.initial?['allocations'] as List? ?? const [])if(line['vial']==id){used[id]!.text='${line['doses']}';lost[id]!.text='${line['lost']??0}';}
       }
-      if(mounted)setState(()=>catalog=result);
+      try{final tasks=await widget.api.get('/tasks/?active=true');plannedTasks=[for(final task in tasks as List)if(task['health'] is Map && task['health']['lot']==widget.lotId && task['status']!='CANCELLED' && task['health']['fulfilled']!=true && task['_health_vaccination_pending']!=true)Map<String,dynamic>.from(task as Map)];}catch(_){}
+      if(selectedTask!=null && !plannedTasks.any((r)=>r['id']==selectedTask!['id']))plannedTasks.add(selectedTask!);
+      if(mounted && sameIdentity)setState(()=>catalog=result);
     }catch(e){if(mounted)setState(()=>error='$e');}
   }
   bool eligible(Map vial) {
@@ -82,6 +91,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
   }
   int count(String text) {if(text.isEmpty)return 0;if(!RegExp(r'^\d+$').hasMatch(text))throw StateError('Nombre entier requis.');return int.parse(text);}
   Future<void> save() async {
+    if(!sameIdentity){setState(()=>error='Profil modifié. Rouvrez le formulaire avec l’identité d’origine.');return;}
     if(busy)return;setState(()=>busy=true);
     try {
       if(pending==null) {
@@ -100,11 +110,11 @@ class _VaccinationFormState extends State<VaccinationForm> {
         }
         if(lines.isEmpty || DateTime.tryParse(date.text)==null || (widget.initial!=null && reason.text.trim().length<3))throw StateError('Complétez les flacons, la date et le motif de correction.');
         pending={'operation_uuid':operation,'vaccinated_at':DateTime.parse(date.text).toUtc().toIso8601String(),'animals':count(animals.text),'allocations':lines,'observations':observations.text,
-          if(widget.initial==null) ...{'lot':widget.lotId,'product':product} else ...{'expected_version':widget.initial!['version'],'reason':reason.text.trim()}};
+          if(widget.initial==null) ...{'lot':widget.lotId,'product':product,if(selectedTask!=null)...{'task_id':selectedTask!['id'],'task_version':selectedTask!['version']}} else ...{'expected_version':widget.initial!['version'],'reason':reason.text.trim()}};
       }
       final result=widget.initial==null?await widget.api.post('/vaccinations/',pending!):await widget.api.patch('/vaccinations/${widget.initial!['id']}/',pending!);
       if(result is! Map || (result['id']==null && result['local_only']!=true))throw StateError('Enregistrement non confirmé.');
-      if(mounted)Navigator.pop(context,true);
+      if(mounted && sameIdentity)Navigator.pop(context,true);
     }catch(e){if(mounted)setState(()=>error=pending==null?'$e':'Résultat à vérifier. La même opération sera renvoyée. $e');}
     finally{if(mounted)setState(()=>busy=false);}
   }
@@ -118,7 +128,8 @@ class _VaccinationFormState extends State<VaccinationForm> {
         const Text('Opérateur responsable : votre identité connectée, conservée avec la déclaration.'),
         DropdownButtonFormField<String>(key:const Key('vaccination-product'),initialValue:product,isExpanded:true,decoration:const InputDecoration(labelText:'Vaccin'),
           items:[for(final p in catalog!['products'] as List)if(p['archived']!=true || p['id']==product)DropdownMenuItem(value:p['id'] as String,child:Text('${p['name']}'))],
-          onChanged:editable && widget.initial==null?(v)=>setState(()=>product=v):null),
+          onChanged:editable && widget.initial==null && widget.plannedTask==null?(v)=>setState(() {product=v;selectedTask=null;}):null),
+        if(widget.initial==null && plannedTasks.any((r)=>r['health']['product']==product))DropdownButtonFormField<int>(key:ValueKey('vaccination-planned-task-$product'),initialValue:selectedTask?['id'] as int? ?? 0,isExpanded:true,decoration:const InputDecoration(labelText:'Rendez-vous sanitaire facultatif'),items:[const DropdownMenuItem(value:0,child:Text('Sans rattachement')),for(final task in plannedTasks)if(task['health']['product']==product)DropdownMenuItem(value:task['id'] as int,child:Text('${task['date']} — ${task['title']}'))],onChanged:editable?(id)=>setState(()=>selectedTask=id==0?null:plannedTasks.singleWhere((r)=>r['id']==id)):null),
         text('vaccination-date','Date et heure (ex. 2026-11-03 08:30)',date),text('vaccination-animals','Nombre d’animaux vaccinés (0 pour perte seule)',animals),
         for(final vial in catalog!['vials'] as List)if(eligible(vial as Map))...[
           Text('Flacon ${vial['label']} — péremption ${vial['expires_on']}\nPhysique confirmé : ${vial['physical']} ; attente : ${vial['pending_doses']??0} ; utilisable estimé : ${vial['estimated_usable']??vial['usable']}\nOuverture : ${vial['opened_at']??'non ouvert'}'),

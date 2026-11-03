@@ -2,8 +2,9 @@ import '../widgets/mutation_refresh.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'health_agenda_screen.dart';
+import '../services/health_notifications.dart';
 import '../services/financial_indicators.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app_elevage/screens/add_achat_screen.dart';
@@ -12,7 +13,6 @@ import 'package:app_elevage/screens/add_depense_screen.dart';
 import 'package:app_elevage/screens/lot_list_screen.dart';
 import 'package:app_elevage/screens/production_tracking_screen.dart';
 
-import '../main.dart';
 import '../config.dart';
 import '../widgets/connection_indicator.dart';
 import '../widgets/farm_navigation.dart';
@@ -21,13 +21,10 @@ import '../services/farm_session.dart';
 import '../services/farmer_runtime.dart';
 import '../services/server_connection.dart';
 import '../services/permission_contract.dart';
-import '../services/user_administration_service.dart';
 import '../offline/sync_state.dart';
 import 'operation_history_screen.dart';
 
 import 'owner_operation_history_screen.dart';
-import 'user_management_screen.dart';
-import 'package:timezone/timezone.dart' as tz;
 
 import 'package:app_elevage/screens/stock_detail_screen.dart';
 import 'package:app_elevage/screens/ca_detail_screen.dart';
@@ -221,8 +218,20 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     initData();
   }
 
+  Future<void> _syncHealthReminders(List tasks) async {
+    final coordinator=HealthReminderCoordinator.current;if(coordinator==null)return;
+    final captured=ApiService.sessionIdentity;
+    try {
+      await _loadCommonSession();final session=commonSession;
+      if(captured==null || captured!=ApiService.sessionIdentity || commonSessionToken!=captured || session?.permissions?.allows('agenda.read')!=true){await coordinator.suspend();return;}
+      final until=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.grant?.expiresAt:null;
+      await coordinator.sync(farm:session!.farmId,user:session.userId,tasks:tasks,isCurrent:()=>captured==ApiService.sessionIdentity && commonSessionToken==captured && commonSession?.permissions?.allows('agenda.read')==true,validUntil:until);
+    }catch(_){try{await coordinator.suspend();}catch(_){}}
+  }
+
   Future<void> loadTasks() async {
     final res = await apiService.getTasks();
+    unawaited(_syncHealthReminders(res));
 
     Map<String, List<Map<String, dynamic>>> temp = {};
 
@@ -302,6 +311,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
       }
       final nextDebt = results[3] as double;
       final nextEvents = includeTasks ? _taskEvents(results[4] as List) : events;
+      if(includeTasks)unawaited(_syncHealthReminders(results[4] as List));
       if (!mounted) { return false; }
       // Commit the view snapshot only when every requested read succeeded.
       setState(() {
@@ -339,32 +349,6 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   Future<void> fetchDashboard() => _loadScope();
   Future<void> fetchDashboardByEspece(int? especeId) => _loadScope(speciesId: especeId);
   Future<void> fetchLotDetail(int lotId) => _loadScope(lotId: lotId, speciesId: selectedEspeceId);
-
-  Future<void> scheduleNotification(String title, DateTime date) async {
-    final scheduledDate = tz.TZDateTime.from(
-      DateTime(date.year, date.month, date.day, 8),
-      tz.local,
-    );
-
-    await notificationsPlugin.zonedSchedule(
-      0,
-      "Tâche du jour",
-      title,
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'tasks',
-          'Tasks',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.dateAndTime,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-  }
 
   Widget buildCard(
     String title,
@@ -556,6 +540,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     showModalBottomSheet<void>(context:context,builder:(sheet)=>SafeArea(child:Column(
       mainAxisSize:MainAxisSize.min,children:[
         const ListTile(title:Text('Agenda')),
+        ListTile(leading:const Icon(Icons.vaccines_outlined),title:const Text('Agenda sanitaire'),onTap:(){Navigator.pop(sheet);Navigator.push(context,MaterialPageRoute(builder:(_)=>HealthAgendaScreen(api:apiService)));}),
         ListTile(leading:const Icon(Icons.event),title:const Text('Voir les tâches du jour'),
           onTap:(){Navigator.pop(sheet);_showTasksForDay(_selectedDay??_focusedDay);}),
         if(_mayPlanTasks) ListTile(leading:const Icon(Icons.add_task),title:const Text('Attribuer une tâche'),

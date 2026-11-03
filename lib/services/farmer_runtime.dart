@@ -21,6 +21,7 @@ import '../offline/offline_grant.dart';
 import '../offline/outbox.dart';
 import '../offline/feed_local_catalog.dart';
 import '../offline/vaccine_local.dart';
+import '../offline/health_task_state.dart';
 
 import '../offline/screen_snapshot_store.dart';
 
@@ -498,7 +499,7 @@ class FarmerRuntime extends ChangeNotifier {
 
         // lots remain in the encrypted ledger and the typed expense selector.
 
-        if(data['id'] is int && (collection!='tasks' || data['status']!='CANCELLED')) result.add(data);
+        if(data['id'] is int && (collection!='tasks' || uri.queryParameters['active']!='true' || data['status']!='CANCELLED')) result.add(data);
 
       }
 
@@ -620,6 +621,10 @@ class FarmerRuntime extends ChangeNotifier {
   Future<Object?> _projectRead(String path,Object? payload) async {
     if(!prepared) return payload;
     final uri=Uri.parse(path);
+    if(uri.path=='/tasks/' && payload is List) {
+      final originals=await vaccineOriginals(tablet);
+      return projectHealthTasks(payload,originals,grant!.farmId,grant!.userId);
+    }
     if(uri.path=='/vaccinations/' && supportsVaccines(tablet))return localVaccinationHistory(tablet,uri.queryParameters['lot'],payload);
     if(uri.path=='/alimentation/distributions/' && supportsFeedStock(tablet))return localFeedHistory(tablet,uri,payload);
     final lotMatch=RegExp(r'^/lots/(\d+)/$').firstMatch(uri.path);
@@ -711,10 +716,11 @@ class FarmerRuntime extends ChangeNotifier {
 
     if(prepared && request.method!='GET') {
 
+      final taskEdit=request is http.Request && request.method=='PATCH' && endpoint.startsWith('/tasks/')?ClassicTerrainCommand.decode(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
       final vaccineEdit=request is http.Request && {'PATCH','DELETE'}.contains(request.method) && endpoint.startsWith('/vaccinations/')?ClassicTerrainCommand.decode(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
       final stockEdit=request is http.Request && {'PATCH','DELETE'}.contains(request.method) && RegExp(r'^/alimentation/distributions/[^/]+/$').hasMatch(endpoint)
         ? ClassicTerrainCommand.decode(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
-      final command=vaccineEdit ?? stockEdit ?? (request is http.Request && request.method=='PATCH' && RegExp(r'^/oeufs/collectes/[^/]+/$').hasMatch(endpoint)
+      final command=taskEdit ?? vaccineEdit ?? stockEdit ?? (request is http.Request && request.method=='PATCH' && RegExp(r'^/oeufs/collectes/[^/]+/$').hasMatch(endpoint)
         ? _eggCorrection(endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map))
         : request is http.Request && request.method=='POST'
 
@@ -861,7 +867,7 @@ class FarmerRuntime extends ChangeNotifier {
 
     check();
 
-    if(bootstrap!=null) return _localJson(bootstrap,200,headers:{'x-elevage-cached':'1'});
+    if(bootstrap!=null) return _localJson(endpoint=='/tasks/'?await _projectRead(path,bootstrap):bootstrap,200,headers:{'x-elevage-cached':'1'});
 
     return _localJson({'message':'Ces données ne sont pas encore disponibles sur cet appareil. Reconnectez-vous pour les charger.'},503);
 

@@ -203,7 +203,7 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
         const SizedBox(height:12),const Text('Déclaration originale conservée',style:TextStyle(fontWeight:FontWeight.bold)),
         _facts(row!['original_payload'] as Map),
         if(!SupervisionService.allowsLegacyDecisions(row!))
-          Text(row!['reconciliation_mode']=='READ_ONLY_V2'
+          Text(row!['reconciliation_mode']=='FEED_CANCEL_ONLY'?'Déclaration conservée sans application. Le propriétaire peut la classer avec un motif, sans réappliquer ses effets.':row!['reconciliation_mode']=='READ_ONLY_V2'
             ? 'Consultation uniquement : les opérations conformes sont appliquées automatiquement. Aucune approbation du propriétaire n’est requise.'
             : 'Consultation uniquement : les actions de décision ne sont pas disponibles pour cette opération.'),
         if(row!['reconciliation_mode']=='FEED_CANCEL_ONLY' && widget.service.owner)
