@@ -17,7 +17,7 @@ const _actions={
 const _entities={'CLIENT':'Client','TASK':'Compte rendu de tâche','VENTE_ANIMAUX':'Vente animaux',
   'VENTE_OEUFS':'Vente d’œufs','ENCAISSEMENT':'Encaissement','ACHAT':'Achat','NAISSANCE':'Naissance',
   'MORTALITE':'Mortalité','DON':'Don','VOL':'Vol','COLLECTE_OEUFS':'Collecte d’œufs',
-  'DEPENSE':'Dépense','ALIMENTATION':'Alimentation','PESEE':'Pesée'};
+  'VACCINATION':'Vaccination','DEPENSE':'Dépense','ALIMENTATION':'Alimentation','PESEE':'Pesée'};
 const _fields={'nom':'Nom','telephone':'Téléphone','pays':'Pays','ville':'Ville','quantite':'Quantité',
   'prix_unitaire':'Prix unitaire','montant':'Montant','prix_total':'Prix total','note':'Constat',
   'nombre_conditionnements':'Conditionnements','prix_unitaire_conditionnement':'Prix par conditionnement',

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'feed_local_catalog.dart';
+import 'vaccine_local.dart';
 import 'expense_business_date.dart';
 import 'expense_consistent_catalog.dart';
 import 'expense_input_contract.dart';
@@ -196,7 +197,7 @@ class ExpenseFormController extends ChangeNotifier {
     required String amount,
     String? note,
     required ExpenseBusinessDay day,
-    Map<String,dynamic>? feedSupply, List<String> feedDependencies=const [],
+    Map<String,dynamic>? feedSupply, Map<String,dynamic>? vaccineSupply, List<String> feedDependencies=const [],
   }) async {
     if (!editable || _disposed) return;
     // Synchronous exclusion before ANY asynchronous boundary.
@@ -222,9 +223,10 @@ class ExpenseFormController extends ChangeNotifier {
         return;
       }
       if (!lots.contains(lot)) throw StateError('Référence de lot ambiguë.');
+      if(vaccineSupply!=null && (feedSupply!=null || !supportsVaccines(tablet) || categories!.catalog.select(categoryId!).stockPurpose!='VACCINE'))throw StateError('Accès vaccins non préparé.');
       if(feedSupply!=null && (!supportsFeedStock(tablet) || categories!.catalog.select(categoryId!).stockPurpose!='FEED'))throw StateError('Accès au stock non préparé.');
       final prepared = ExpensePreparation.compose(
-        feedSupply:feedSupply,feedDependencies:feedDependencies,
+        feedSupply:feedSupply,vaccineSupply:vaccineSupply,feedDependencies:feedDependencies,
         currentContext: ExpenseSelectionContext(
           farmId: _captured!.farmId,
           authorId: _captured!.authorId,

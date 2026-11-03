@@ -1,5 +1,7 @@
 import 'dart:async';
 import '../widgets/feed_supply_fields.dart';
+import '../widgets/vaccine_supply_fields.dart';
+import '../offline/vaccine_local.dart';
 import '../offline/outbox.dart' show newOperationUuid;
 import '../offline/feed_local_catalog.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +31,13 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
   final formScroll=ScrollController();
   bool resultShown=false;
   ExpenseFormController? model;
+  final localVaccine=VaccineSupplyDraft();
+  Map<String,dynamic>? localVaccineData;
+  bool get localVaccineCategory=>model?.categories?.catalog.categories.any((c)=>c.id==categoryId && c.stockPurpose=='VACCINE')==true;
+  Future<void> loadLocalVaccine() async {
+    try{final data=await localVaccineCatalog(widget.tablet!);if(mounted)setState(()=>localVaccineData=data);}
+    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
+  }
   final localFeed=FeedSupplyDraft();
   Map<String,dynamic>? localFeedData;
   bool feedLoading=false;
@@ -41,7 +50,11 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     finally {if(mounted)setState(()=>feedLoading=false);}
   }
   Future<void> submitLocalExpense() async {
-    Map<String,dynamic>? supply;
+    Map<String,dynamic>? supply,vaccineSupply;
+    if(localVaccineCategory) {
+      try{if(localVaccineData==null || !supportsVaccines(widget.tablet!))throw StateError('Référentiel vaccins et accès hors ligne à charger.');vaccineSupply=localVaccine.payload();}
+      catch(e){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));return;}
+    }
     if(localFeedCategory && !supportsFeedStock(widget.tablet!)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Renouvelez votre accès hors ligne avant un approvisionnement suivi.')));return;
     }
@@ -56,7 +69,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
       } catch(e) {ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));return;}
     }
     await model!.submit(lot:lot,categoryId:categoryId,amount:amount.text,note:note.text,
-      day:model!.dates.businessDayOf(model!.tablet.clock().toUtc()),feedSupply:supply,feedDependencies:dependencies);
+      day:model!.dates.businessDayOf(model!.tablet.clock().toUtc()),feedSupply:supply,vaccineSupply:vaccineSupply,feedDependencies:dependencies);
   }
   final amount = TextEditingController(), note = TextEditingController();
   ExpenseLotSelection? lot;
@@ -107,7 +120,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     checkTimer?.cancel();
     model?.removeListener(_changed);
     model?.dispose();
-    localFeed.dispose();
+    localFeed.dispose();localVaccine.dispose();
     amount.dispose();
     note.dispose();
     super.dispose();
@@ -169,9 +182,13 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                   ExpenseFields(
                     lots:m.lots,categories:[for(final c in m.categories?.catalog.categories ?? <ExpenseCategorySelection>[]) (c.id,c.name)],
                     categoryKey:m.categories,lot:lot,categoryId:categoryId,amount:amount,note:note,day:day,editable:m.editable,
-                    fieldError:fieldError,onLot:(value)=>setState(()=>lot=value),onCategory:(value){setState(()=>categoryId=value);if(localFeedCategory && localFeedData==null)loadLocalFeed();},
+                    fieldError:fieldError,onLot:(value)=>setState(()=>lot=value),onCategory:(value){setState(()=>categoryId=value);if(localFeedCategory && localFeedData==null)loadLocalFeed();if(localVaccineCategory && localVaccineData==null)loadLocalVaccine();},
                     chooseDate:chooseDate,
                   ),
+                  if(localVaccineCategory)...[
+                    if(localVaccineData!=null)VaccineSupplyFields(draft:localVaccine,catalog:localVaccineData!,editable:m.editable),
+                    TextButton(onPressed:loadLocalVaccine,child:const Text('Charger le référentiel vaccins local')),
+                  ],
                   if(localFeedCategory && supportsFeedStock(widget.tablet!)) ...[
                     if(feedLoading)const LinearProgressIndicator(),
                     if(localFeedData!=null)FeedSupplyFields(draft:localFeed,catalog:localFeedData!,editable:m.editable),

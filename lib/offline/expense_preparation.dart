@@ -337,7 +337,7 @@ class ExpensePreparation {
     required ExpenseBusinessDay day,
     required ExpenseBusinessDate dates,
     required DateTime nowUtc,
-    Map<String,dynamic>? feedSupply, List<String> feedDependencies=const [],
+    Map<String,dynamic>? feedSupply, Map<String,dynamic>? vaccineSupply, List<String> feedDependencies=const [],
   }) {
     _sameContext(lot.origin, currentContext);
     _sameContext(categories.origin, currentContext);
@@ -358,7 +358,7 @@ class ExpensePreparation {
     final occurred = nowUtc;
     return PreparedExpense._(
       lot.origin,
-      Map<String,Object>.unmodifiable(Map<String,Object>.from(freezeJson({...validated.payload!,if(feedSupply!=null) ...{'stock_version':1,'feed_supply':feedSupply}}) as Map)),
+      Map<String,Object>.unmodifiable(Map<String,Object>.from(freezeJson({...validated.payload!,if(feedSupply!=null) ...{'stock_version':1,'feed_supply':feedSupply},if(vaccineSupply!=null) ...{'vaccine_version':1,'vaccine_supply':vaccineSupply}}) as Map)),
       occurred,
       {...lot.dependencies,...feedDependencies}.toList(),
       lot,

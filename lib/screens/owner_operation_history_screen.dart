@@ -97,7 +97,7 @@ class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScree
       TextField(controller:author,enabled:!busy,decoration:const InputDecoration(labelText:'Éleveur — nom')),
       TextField(controller:lot,enabled:!busy,decoration:const InputDecoration(labelText:'Lot — nom')),
       DropdownButtonFormField<String>(initialValue:kind,decoration:const InputDecoration(labelText:'Type d’opération'),
-        items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['VENTE_ANIMAUX','VENTE_OEUFS','DEPENSE','ACHAT','NAISSANCE','MORTALITE','DON','VOL','CLIENT','COLLECTE_OEUFS','ENCAISSEMENT','ALIMENTATION','PESEE','TASK'])
+        items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['VENTE_ANIMAUX','VENTE_OEUFS','DEPENSE','ACHAT','NAISSANCE','MORTALITE','DON','VOL','CLIENT','COLLECTE_OEUFS','ENCAISSEMENT','VACCINATION','ALIMENTATION','PESEE','TASK'])
           DropdownMenuItem(value:code,child:Text(historyTypeLabel(code)))],onChanged:busy?null:(v)=>setState(()=>kind=v!)),
       DropdownButtonFormField<String>(initialValue:status,decoration:const InputDecoration(labelText:'Statut'),
         items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['En attente','Synchronisée','Échec'])

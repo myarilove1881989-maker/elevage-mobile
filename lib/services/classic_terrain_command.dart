@@ -17,6 +17,21 @@ class ClassicTerrainCommand {
     return '${match[1]}.${(match[2]??'').padRight(scale,'0')}';
   }
   static ClassicTerrainCommand? decode(String method,String path,Map<String,dynamic> source) {
+    if(path=='/depenses/create/' && method=='POST' && source.containsKey('vaccine_supply')) {
+      final data=Map<String,dynamic>.from(source);final id=data.remove('operation_uuid') as String?,at=data.remove('date')?.toString();
+      data['lot_ref']=reference(data.remove('lot'));data['categorie_id']=data.remove('categorie');data['vaccine_version']=1;
+      return ClassicTerrainCommand('DEPENSE',data,operationId:id,at:at);
+    }
+    if(path=='/vaccinations/' && method=='POST') {
+      final data=Map<String,dynamic>.from(source);final id=data.remove('operation_uuid') as String?,at=data.remove('vaccinated_at')?.toString();
+      data['lot_ref']=reference(data.remove('lot'));data['vaccine_version']=1;
+      return ClassicTerrainCommand('VACCINATION',data,operationId:id,at:at);
+    }
+    if(RegExp(r'^/vaccinations/\d+/$').hasMatch(path) && {'PATCH','DELETE'}.contains(method)) {
+      final data=Map<String,dynamic>.from(source);final id=data.remove('operation_uuid') as String?,version=data.remove('expected_version') as String;
+      data.remove('confirm');data['vaccination_ref']=reference(int.parse(path.split('/')[2]));data['vaccine_version']=1;
+      return ClassicTerrainCommand('VACCINATION',data,operation:method=='DELETE'?'REVERSE':'UPDATE',operationId:id,expectedVersion:version);
+    }
     if((method=='PATCH' || method=='DELETE') && RegExp(r'^/alimentation/distributions/[^/]+/$').hasMatch(path) && source.containsKey('expected_version')) {
       final id=path.split('/')[3];
       final parsed=int.tryParse(id);

@@ -12,19 +12,23 @@ class _OnlineExpenseForm extends StatefulWidget {
 
 class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   final amount = TextEditingController(), note = TextEditingController();
+  final vaccine=VaccineSupplyDraft();
+  final vaccineCategories=<int>{};
+  bool get wantsVaccine=>vaccineCategories.contains(categoryId);
+  String get supplyPath=>wantsVaccine?'/vaccine-supplies/':'/feed-supplies/';
   final feed = FeedSupplyDraft();
   final feedOperationId = newOperationUuid();
   final feedCategories = <int>{};
   Map<String,dynamic>? feedCatalog, pendingFeed;
   bool loadingFeed = false, feedLocalRecorded=false;
-  bool get wantsFeed => feedCategories.contains(categoryId) && !widget.api.hasUnifiedOfflineSession;
+  bool get wantsFeed => (feedCategories.contains(categoryId) && !widget.api.hasUnifiedOfflineSession) || wantsVaccine;
 
   Future<void> selectCategory(int? value) async {
-    setState(() {categoryId=value; error=null;});
+    setState(() {categoryId=value; error=null;feedCatalog=null;});
     if(!wantsFeed || feedCatalog!=null)return;
     setState(()=>loadingFeed=true);
     try {
-      final data=await widget.api.get('/feed-supplies/');
+      final data=await widget.api.get(supplyPath);
       if(!mounted || !sameToken)return;
       if(data is! Map<String,dynamic> || data['confirmed']!=true ||
           data['products'] is! List || data['species'] is! List || data['lots'] is! List || (widget.api.lastReadWasCached && data['local_estimate']!=true)) {
@@ -41,7 +45,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
     if(!mounted || !sameToken)throw StateError('Session changed');
     if(widget.api.hasUnifiedOfflineSession && result is Map && result['local_only']==true && result['operation_id']==feedOperationId) {
       setState(() {confirmed=true;feedLocalRecorded=true;error=null;});
-      try {final fresh=await widget.api.get('/feed-supplies/');if(mounted && sameToken && fresh is Map<String,dynamic>)setState(()=>feedCatalog=fresh);} catch(_) {}
+      try {final fresh=await widget.api.get(supplyPath);if(mounted && sameToken && fresh is Map<String,dynamic>)setState(()=>feedCatalog=fresh);} catch(_) {}
       return;
     }
     if(result is! Map || result['id'] is! int || result['stock_confirmed']!=true || result['operation_uuid']!=feedOperationId) {
@@ -49,7 +53,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
     }
     setState(() {confirmed=true;error=null;});
     try {
-      final fresh=await widget.api.get('/feed-supplies/');
+      final fresh=await widget.api.get(supplyPath);
       if(mounted && sameToken && fresh is Map<String,dynamic> && fresh['confirmed']==true && !(widget.api.lastReadWasCached && fresh['local_estimate']!=true)) {
         setState(()=>feedCatalog=fresh);
       }
@@ -92,7 +96,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
 
   @override
   void dispose() {
-    feed.dispose();
+    feed.dispose();vaccine.dispose();
     amount.dispose();
     note.dispose();
     super.dispose();
@@ -158,6 +162,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
           throw StateError('Invalid category');
         }
         nextCategories.add((row['id'] as int, row['nom'] as String));
+        if(row['stock_purpose']=='VACCINE')vaccineCategories.add(row['id'] as int);
         if(row['stock_purpose']=='FEED')feedCategories.add(row['id'] as int);
       }
       setState(() {
@@ -188,8 +193,8 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
     if(wantsFeed) {
       try {
         if(feedCatalog==null)throw const FormatException('Catalogue d’aliments requis.');
-        supply=feed.payload();
-      } on FormatException catch(e) {setState(()=>error=e.message.toString());return;}
+        supply=wantsVaccine?vaccine.payload():feed.payload();
+      } catch(e) {setState(()=>error=e.toString());return;}
     }
     day=dates.businessDayOf(DateTime.now().toUtc());
     final input = ExpenseInputContract.validate(
@@ -229,7 +234,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         'note': input.payload!['note'],
         'date':
             '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
-        if(supply!=null) ...{'operation_uuid':feedOperationId,'feed_supply':supply},
+        if(supply!=null) ...{'operation_uuid':feedOperationId,(wantsVaccine?'vaccine_supply':'feed_supply'):supply},
       };
       if(supply!=null) {pendingFeed=body;await sendFeed(body);return;}
       final result = await widget.api.post('/depenses/create/',body);
@@ -286,7 +291,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
           if(feedCategories.contains(categoryId) && widget.api.hasUnifiedOfflineSession)
             const Text('Les opérations locales restent en attente de validation du serveur.'),
           if(wantsFeed && loadingFeed) const LinearProgressIndicator(),
-          if(wantsFeed && feedCatalog!=null) FeedSupplyFields(draft:feed,catalog:feedCatalog!,editable:editable),
+          if(wantsFeed && feedCatalog!=null) wantsVaccine?VaccineSupplyFields(draft:vaccine,catalog:feedCatalog!,editable:editable):FeedSupplyFields(draft:feed,catalog:feedCatalog!,editable:editable),
           if(pendingFeed!=null && attempted && !confirmed && sameToken)
             TextButton(key:const Key('feed-retry'),onPressed:busy?null:retryFeed,child:const Text('Vérifier / renvoyer la même opération')),
           if (!widget.readOnly) FilledButton(

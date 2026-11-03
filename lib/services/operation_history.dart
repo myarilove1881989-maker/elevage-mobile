@@ -80,7 +80,7 @@ String historyTypeLabel(String code) =>
       'VOL': 'Vol',
       'COLLECTE_OEUFS': 'Collecte d’œufs',
       'ENCAISSEMENT': 'Encaissement',
-      'ALIMENTATION': 'Alimentation',
+      'VACCINATION':'Vaccination', 'ALIMENTATION': 'Alimentation',
       'PESEE': 'Pesée',
       'core.depense': 'Dépense',
       'core.achat': 'Achat',

@@ -588,6 +588,10 @@ class TabletController extends ChangeNotifier {
     if(knownDeviceRevoked || recovering) throw StateError('Cette tablette ne peut plus créer de déclaration.');
     final current=operators?.session;
     if(current==null || cache is! OutboxStore) throw StateError('Profil personnel ouvert requis.');
+    if(entityType=='VACCINATION' || payload['vaccine_version']==1) {
+      if((current.grant.claims['capabilities'] as Map)['vaccine_stock_contract']!=1)throw StateError('Renouvelez votre accès hors ligne pour les vaccins.');
+      if(entityType=='VACCINATION' && (payload['allocations'] as List? ?? const []).any((line)=>(line['lost'] as int? ?? 0)>0) && current.grant.finePermissions?.allows('vaccinations.loss')!=true)throw StateError('Déclaration de perte non autorisée.');
+    }
     if ({'VENTE_ANIMAUX','VENTE_OEUFS'}.contains(entityType) && operationType=='CREATE' &&
         current.grant.validAt(clock()) && !current.grant.permitsOperation(entityType,operationType,clock())) {
       throw StateError('La vente n’est pas autorisée avec vos permissions actuelles. Reconnectez votre compte ou contactez le propriétaire.');
@@ -660,6 +664,9 @@ class TabletController extends ChangeNotifier {
     if(collections.length==6 && extra is Map && extra['feed_stock_contract']==1) {
       await _refreshCollections(const ['feed_stock']);
       check();
+    }
+    if(collections.length==6 && extra is Map && extra['vaccine_stock_contract']==1) {
+      await _refreshCollections(const ['vaccine_stock']);check();
     }
     if(collections.length==6) lastCompleteCacheRefresh=clock();
     _notify();
