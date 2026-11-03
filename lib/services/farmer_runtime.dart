@@ -19,6 +19,9 @@ import '../offline/foundation_api.dart';
 import '../offline/offline_grant.dart';
 
 import '../offline/outbox.dart';
+import '../offline/feed_local_catalog.dart';
+import '../offline/vaccine_local.dart';
+import '../offline/health_task_state.dart';
 
 import '../offline/screen_snapshot_store.dart';
 
@@ -496,7 +499,7 @@ class FarmerRuntime extends ChangeNotifier {
 
         // lots remain in the encrypted ledger and the typed expense selector.
 
-        if(data['id'] is int && (collection!='tasks' || data['status']!='CANCELLED')) result.add(data);
+        if(data['id'] is int && (collection!='tasks' || uri.queryParameters['active']!='true' || data['status']!='CANCELLED')) result.add(data);
 
       }
 
@@ -618,6 +621,12 @@ class FarmerRuntime extends ChangeNotifier {
   Future<Object?> _projectRead(String path,Object? payload) async {
     if(!prepared) return payload;
     final uri=Uri.parse(path);
+    if(uri.path=='/tasks/' && payload is List) {
+      final originals=await vaccineOriginals(tablet);
+      return projectHealthTasks(payload,originals,grant!.farmId,grant!.userId);
+    }
+    if(uri.path=='/vaccinations/' && supportsVaccines(tablet))return localVaccinationHistory(tablet,uri.queryParameters['lot'],payload);
+    if(uri.path=='/alimentation/distributions/' && supportsFeedStock(tablet))return localFeedHistory(tablet,uri,payload);
     final lotMatch=RegExp(r'^/lots/(\d+)/$').firstMatch(uri.path);
     if(lotMatch!=null) {
       final id=int.parse(lotMatch[1]!);
@@ -684,6 +693,21 @@ class FarmerRuntime extends ChangeNotifier {
 
     void check() {if(!signedIn || identity!=captured) throw StateError('La session a changé.');}
 
+    if(prepared && request.method=='GET' && endpoint=='/vaccine-supplies/') {
+      if(connection.available!=false && supportsVaccines(tablet)) {
+        try {await _checkOnline();await tablet.refreshCache(collections:const ['vaccine_stock']);}
+        catch(error){if(!isTransportFailure(error))rethrow;}
+      }
+      final stock=await localVaccineCatalog(tablet);check();return _localJson(stock,200,headers:{'x-elevage-cached':'1'});
+    }
+    if(prepared && request.method=='GET' && endpoint=='/feed-supplies/') {
+      if(connection.available!=false && supportsFeedStock(tablet)) {
+        try {await _checkOnline();await tablet.refreshCache(collections:const ['feed_stock']);}
+        catch(error) {if(!isTransportFailure(error))rethrow;}
+      }
+      final stock=await localFeedCatalog(tablet);
+      return _localJson(stock,200,headers:{'x-elevage-cached':'1'});
+    }
     if(request.method=='GET' && endpoint=='/me/capabilities/') {
 
       final caps=await capabilities();check();return _localJson(caps,200);
@@ -692,13 +716,19 @@ class FarmerRuntime extends ChangeNotifier {
 
     if(prepared && request.method!='GET') {
 
-      final command=request is http.Request && request.method=='PATCH' && RegExp(r'^/oeufs/collectes/[^/]+/$').hasMatch(endpoint)
+      final taskEdit=request is http.Request && request.method=='PATCH' && endpoint.startsWith('/tasks/')?ClassicTerrainCommand.decode(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
+      final vaccineEdit=request is http.Request && {'PATCH','DELETE'}.contains(request.method) && endpoint.startsWith('/vaccinations/')?ClassicTerrainCommand.decode(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
+      final stockEdit=request is http.Request && {'PATCH','DELETE'}.contains(request.method) && RegExp(r'^/alimentation/distributions/[^/]+/$').hasMatch(endpoint)
+        ? ClassicTerrainCommand.decode(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
+      final command=taskEdit ?? vaccineEdit ?? stockEdit ?? (request is http.Request && request.method=='PATCH' && RegExp(r'^/oeufs/collectes/[^/]+/$').hasMatch(endpoint)
         ? _eggCorrection(endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map))
         : request is http.Request && request.method=='POST'
 
-        ?await _decodeCommand(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null;
+        ?await _decodeCommand(request.method,endpoint,Map<String,dynamic>.from(jsonDecode(request.body) as Map)):null);
 
       if(command!=null) {
+      if(command.payload['vaccine_version']==1 && !supportsVaccines(tablet))throw StateError('Renouvelez votre accès hors ligne pour les vaccins.');
+      if(command.payload['stock_version']==1 && !supportsFeedStock(tablet))throw StateError('Renouvelez votre accès hors ligne pour utiliser les stocks.');
 
       check();
 
@@ -706,7 +736,7 @@ class FarmerRuntime extends ChangeNotifier {
 
       check();
 
-      final id=newOperationUuid();
+      final id=command.operationId??newOperationUuid();
 
       final day=command.at;
 
@@ -721,7 +751,7 @@ class FarmerRuntime extends ChangeNotifier {
         payload:command.payload,businessOccurredAt:at,operationId:id,localEntityId:id,
 
         expectedServerVersion:command.expectedVersion,
-        dependencies:command.payload['_dependency'] is String ? [command.payload.remove('_dependency') as String] : const [],
+        dependencies:{...command.dependencies,if(command.payload['_dependency'] is String) command.payload.remove('_dependency') as String}.toList(),
 
         project:{'VENTE_ANIMAUX','VENTE_OEUFS'}.contains(command.kind)?() async {
 
@@ -837,7 +867,7 @@ class FarmerRuntime extends ChangeNotifier {
 
     check();
 
-    if(bootstrap!=null) return _localJson(bootstrap,200,headers:{'x-elevage-cached':'1'});
+    if(bootstrap!=null) return _localJson(endpoint=='/tasks/'?await _projectRead(path,bootstrap):bootstrap,200,headers:{'x-elevage-cached':'1'});
 
     return _localJson({'message':'Ces données ne sont pas encore disponibles sur cet appareil. Reconnectez-vous pour les charger.'},503);
 

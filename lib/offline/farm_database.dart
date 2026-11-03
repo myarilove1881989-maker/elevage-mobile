@@ -1,4 +1,8 @@
 import 'dart:convert';
+import 'feed_cache_sql.dart';
+import 'vaccine_local.dart';
+import 'health_task_state.dart';
+import '../services/health_notifications.dart';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -29,7 +33,7 @@ QueryExecutor encryptedExecutor(File file, String key) => NativeDatabase.createI
 );
 
 /// A shared encrypted farm database. Personal PIN/grant/JWT remain elsewhere.
-class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, TerrainProjection, ScreenSnapshotsSql implements FarmCache {
+class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, TerrainProjection, ScreenSnapshotsSql, FeedCacheSql, VaccineCacheSql, HealthTaskCacheSql implements FarmCache {
   FarmDatabase(super.executor, {required this.farmId, required this.serverNamespace,DateTime Function()? clock})
     :outboxClock=clock??DateTime.now;
   final int farmId;
@@ -58,7 +62,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
     if(lot['date_fin']!=null || lot['statut_production']=='TERMINE')throw StateError('Lot clôturé : nouvelle opération refusée. Les données existantes sont conservées.');
   }
   @override
-  Future<void> applyProjectionReceipt(Map<String,dynamic> receipt)=>projectReceipt(receipt);
+  Future<void> applyProjectionReceipt(Map<String,dynamic> receipt) async {await projectReceipt(receipt);await feedReceipt(receipt,farmId);await vaccineReceipt(receipt,farmId);await healthTaskReceipt(receipt,farmId);}
   @override
   Future<void> finishProjectionReceipts()=>finishStockCheckpoint();
   @override
@@ -108,7 +112,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
     },
   );
 
-  static const cacheCollections = {'lots', 'clients', 'species', 'tasks', 'dashboard', 'expense_categories', 'sales'};
+  static const cacheCollections = {'lots', 'clients', 'species', 'tasks', 'dashboard', 'expense_categories', 'sales', 'feed_stock', 'feed_distributions', 'vaccine_stock', 'vaccinations'};
 
   Future<void> _createStaging() => customStatement('CREATE TABLE confirmed_cache_staging '
       '(collection TEXT NOT NULL,entity_id TEXT NOT NULL,payload TEXT NOT NULL, '
@@ -140,6 +144,19 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   Future<void> commitCacheRefresh(String collection,{int? taskUserId,int? businessRevision}) async {
     if(!cacheCollections.contains(collection) || (taskUserId!=null && taskUserId<1)) throw ArgumentError('Contexte invalide.');
     await transaction(() async {
+      if(collection=='vaccine_stock') {
+        final staged=await customSelect("SELECT payload FROM confirmed_cache_staging WHERE collection='vaccine_stock'").get();
+        if(staged.length!=1)throw StateError('Stock vaccinal incomplet.');
+        await storeVaccineSnapshot(Map<String,dynamic>.from(jsonDecode(staged.single.read<String>('payload')) as Map),farmId);
+        await customStatement("DELETE FROM confirmed_cache_staging WHERE collection='vaccine_stock'");return;
+      }
+      if(collection=='feed_stock') {
+        final staged=await customSelect("SELECT payload FROM confirmed_cache_staging WHERE collection='feed_stock'").get();
+        if(staged.length!=1)throw StateError('Instantané de stock incomplet.');
+        await storeFeedSnapshot(Map<String,dynamic>.from(jsonDecode(staged.single.read<String>('payload')) as Map),farmId);
+        await customStatement("DELETE FROM confirmed_cache_staging WHERE collection='feed_stock'");
+        return;
+      }
       if(collection=='lots') {
         // A cache revision alone cannot identify which unacknowledged local
         // originals it includes. Keep the last coherent baseline until their
@@ -150,6 +167,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
           throw StateError('Actualisation du stock différée : attendez les confirmations de synchronisation, puis réessayez.');
         }
       }
+      final newerTasks=collection=='tasks'?await customSelect("SELECT c.* FROM confirmed_cache c JOIN confirmed_cache_staging s ON c.collection=s.collection AND c.entity_id=s.entity_id WHERE c.collection='tasks' AND json_extract(c.payload,'\$.health') IS NOT NULL AND COALESCE(json_extract(c.payload,'\$.version'),0)>COALESCE(json_extract(s.payload,'\$.version'),0)").get():<QueryRow>[];
       final newerLots=collection=='lots'?await customSelect("SELECT * FROM confirmed_cache c WHERE collection='lots' "
         "AND COALESCE(json_extract(c.payload,'\$.confirmed_business_revision'),0)>COALESCE((SELECT json_extract(s.payload,'\$.confirmed_business_revision') "
         "FROM confirmed_cache_staging s WHERE s.collection=c.collection AND s.entity_id=c.entity_id),?)",
@@ -164,7 +182,7 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
       await customStatement('INSERT OR REPLACE INTO confirmed_cache '
         'SELECT collection,entity_id,payload,received_at FROM confirmed_cache_staging WHERE collection=?',[collection]);
       await customStatement('DELETE FROM confirmed_cache_staging WHERE collection=?',[collection]);
-      for(final row in newerLots) {
+      for(final row in [...newerLots,...newerTasks]) {
         await customStatement('INSERT OR REPLACE INTO confirmed_cache VALUES(?,?,?,?)',
           [row.read<String>('collection'),row.read<String>('entity_id'),row.read<String>('payload'),row.read<int>('received_at')]);
       }
@@ -172,6 +190,10 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
         await customStatement('UPDATE tablet_sync_state SET stock_rebase_required=0 WHERE singleton=1');
       }
     });
+    if(collection=='tasks' && HealthReminderCoordinator.current!=null) {
+      final rows=await customSelect("SELECT payload FROM confirmed_cache WHERE collection='tasks'").get();
+      HealthReminderCoordinator.current!.tasksRefreshed([for(final row in rows)Map<String,dynamic>.from(jsonDecode(row.read<String>('payload')) as Map)],farmId);
+    }
   }
 
   @override
@@ -195,7 +217,14 @@ class FarmDatabase extends GeneratedDatabase with OutboxDatabaseMethods, Terrain
   @override
   Future<void> replaceConfirmedCache(String collection, List<Map<String, dynamic>> rows) async {
     if (!cacheCollections.contains(collection)) throw ArgumentError('Collection non autorisée.');
-    if(collection=='lots') {
+    if(collection=='tasks') {
+      await beginCacheRefresh(collection);
+      for(var start=0;start<rows.length;start+=200) {
+        await stageConfirmedPage(collection,rows.sublist(start,(start+200).clamp(0,rows.length)));
+      }
+      await commitCacheRefresh(collection);return;
+    }
+    if(collection=='lots' || collection=='feed_stock' || collection=='vaccine_stock') {
       await beginCacheRefresh(collection);await stageConfirmedPage(collection,rows);
       var revision=0;
       for(final row in rows) {final value=row['confirmed_business_revision'];if(value is int && value>revision) {revision=value;}}

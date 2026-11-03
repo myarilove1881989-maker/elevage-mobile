@@ -5,6 +5,7 @@ class PermissionContract {
   static const version = 1;
   static const ownerHttpActions = {'lots.create','lots.update','lots.delete','weights.update','weights.delete','egg_sales.update','expenses.update','animal_sales.update'};
   static const domains = <String, Set<String>>{
+    'vaccinations': {'read','create','update','delete','loss'},
     'purchases': {'read','create','delete'}, 'animal_sales': {'read','create','update','delete','cancel'},
     'expenses': {'read','create','update','delete','cancel'}, 'mortality': {'read','create','delete','cancel'},
     'births': {'read','create','delete'}, 'donations': {'read','create','delete','cancel'},
@@ -50,6 +51,8 @@ class PermissionContract {
     permissions.contains(action) && !(role == 'OWNER' && httpVersion == 1 && isBusinessWrite(action));
 
   static String? operationAction(String kind, String operation) {
+    if(kind=='VACCINATION')return {'CREATE':'vaccinations.create','UPDATE':'vaccinations.update','REVERSE':'vaccinations.delete'}[operation];
+    if(kind=='ALIMENTATION' && {'UPDATE','REVERSE'}.contains(operation)) return operation=='UPDATE'?'feed.update':'feed.delete';
     if(operation=='REVERSE') {
       const cancelDomains={'VENTE_ANIMAUX':'animal_sales','VENTE_OEUFS':'egg_sales',
         'DEPENSE':'expenses','MORTALITE':'mortality','DON':'donations','VOL':'thefts'};

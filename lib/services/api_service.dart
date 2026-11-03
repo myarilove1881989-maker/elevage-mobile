@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'health_notifications.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'token_service.dart';
@@ -344,6 +345,7 @@ class ApiService {
   }
 
   Future<void> logout() async {
+    try {await HealthReminderCoordinator.current?.suspend();}catch(_){}
     farmerSession = false;
     clearLocalPresentationIdentity();
     token = null;

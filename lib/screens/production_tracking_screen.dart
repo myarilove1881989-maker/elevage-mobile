@@ -7,6 +7,7 @@ import '../theme/terre_et_or_theme.dart';
 import 'egg_production_screen.dart';
 import 'feed_distribution_screen.dart';
 import 'growth_tracking_screen.dart';
+import 'vaccination_screen.dart';
 
 class ProductionTrackingScreen extends StatefulWidget {
   final ApiService apiService;
@@ -130,6 +131,8 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
       ),
     );
   }
+
+  Widget _vaccinationButton(Map<String,dynamic> lot)=>ElevatedButton.icon(key:const Key('openVaccinationTrackingButton'),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>VaccinationScreen(api:widget.apiService,lotId:_asInt(lot['id'])!,lotName:'${lot['nom']}'))),icon:const Icon(Icons.vaccines_outlined),label:const Text('Suivi de vaccination'));
 
   Widget _productionContent(Map<String, dynamic> lot) {
     final type = lot['type_production']?.toString() ?? 'CHAIR';
@@ -325,6 +328,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                         ),
                         const SizedBox(height: 18),
                         _productionContent(currentLot),
+                        _vaccinationButton(currentLot),
                       ],
                     ],
                   ],
