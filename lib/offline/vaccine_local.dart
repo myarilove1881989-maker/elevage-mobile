@@ -54,7 +54,7 @@ Map<String,dynamic> projectVaccines(Map<String,dynamic> data,List<OutboxEntry> o
   validateVaccineSnapshot(data,farm);
   final vials=[for(final vial in data['vials'] as List)Map<String,dynamic>.from(vial as Map)];
   final pending=<String>[],conflicts=<String>[];
-  for(final vial in vials) {vial['confirmed_physical']=vial['physical'];vial['pending_doses']=0;}
+  for(final vial in vials) {vial['confirmed_physical']=vial['physical'];vial['confirmed_usable_until']=vial['usable_until'];vial['confirmed_opened_at']=vial['opened_at'];vial['pending_doses']=0;}
   final ordered=[...originals]..sort((a,b)=>a.sequence.compareTo(b.sequence));
   for(final entry in ordered) {
     final d=entry.declaration,p=d['payload'] as Map;

@@ -28,6 +28,13 @@ void main(){
     await db.saveOperatorProfile(grant,'Synthétique');
     tablet.profiles=await db.operatorProfiles();tablet.selectedName='Synthétique';
     await db.replaceConfirmedCache('feed_stock',[baseline(kg:'0',revision:0)]);
+    final modern=baseline(kg:'0',revision:0)..['as_of']='2026-11-03T10:00:00Z';
+    modern['products'][0]['alert_threshold']='50.000';
+    await db.storeFeedSnapshot(modern,1);
+    await db.storeFeedSnapshot({...modern,'as_of':'2026-11-03T11:00:00Z'},1);
+    final bad=baseline(kg:'1',revision:0);
+    await expectLater(db.storeFeedSnapshot(bad,1),throwsStateError);
+
     await db.replaceConfirmedCache('lots',[{'id':10,'espece':4,'exploitation':1,'nom':'Lot','stock':10}]);
     await db.replaceConfirmedCache('species',[{'id':4,'exploitation':1,'nom':'Poulet'}]);
     await db.replaceConfirmedCache('expense_categories',[{'id':3,'nom':'Aliment','exploitation':1,'stock_purpose':'FEED'}]);

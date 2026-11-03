@@ -11,8 +11,14 @@ mixin FeedCacheSql on GeneratedDatabase {
     if(previous!=null) {
       final old=jsonDecode(previous.read<String>('payload')) as Map;
       if(old['confirmed_business_revision']>snapshot['confirmed_business_revision'])return;
-      if(old['confirmed_business_revision']==snapshot['confirmed_business_revision'] && canonicalDeclaration(old)!=canonicalDeclaration(snapshot)) {
+      Map stable(Map row)=>{...row}..remove('as_of')..['products']=[for(final p in row['products'] as List)({...p as Map}..remove('alert_threshold'))];
+      if(old['confirmed_business_revision']==snapshot['confirmed_business_revision'] && canonicalDeclaration(stable(old))!=canonicalDeclaration(stable(snapshot))) {
         throw StateError('Instantanés de stock contradictoires.');
+      }
+      if(old['confirmed_business_revision']==snapshot['confirmed_business_revision']) {
+        if(!snapshot.containsKey('as_of') && old.containsKey('as_of'))snapshot['as_of']=old['as_of'];
+        final prior={for(final p in old['products'] as List)p['id']:p};
+        for(final p in snapshot['products'] as List){if(!p.containsKey('alert_threshold') && prior[p['id']]?.containsKey('alert_threshold')==true)p['alert_threshold']=prior[p['id']]['alert_threshold'];}
       }
     }
     await customStatement("INSERT OR REPLACE INTO confirmed_cache VALUES('feed_stock','1',?,?)",[jsonEncode(snapshot),DateTime.now().toUtc().millisecondsSinceEpoch]);

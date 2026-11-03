@@ -645,7 +645,7 @@ class TabletController extends ChangeNotifier {
       await cache!.beginCacheRefresh(collection);
       while(true) {
         check();
-        final page=await api.request('GET','/cache-page/?collection=$collection&after=$after&limit=50');
+        final page=await api.request('GET','/cache-page/?collection=$collection&after=$after&limit=50${collection=='feed_stock'?'&presentation=1':''}');
         final revision=page['confirmed_business_revision'];
         if(revision!=null && (revision is! int || revision<0)) {throw StateError('Révision serveur invalide.');}
         if(revision is int && revision>businessRevision) {businessRevision=revision;}

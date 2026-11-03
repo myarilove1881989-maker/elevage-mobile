@@ -4,7 +4,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'health_agenda_screen.dart';
 import '../services/health_notifications.dart';
-import '../services/financial_indicators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app_elevage/screens/add_achat_screen.dart';
@@ -32,7 +31,7 @@ import 'package:app_elevage/screens/depense_detail_screen.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
-import 'package:app_elevage/screens/performance_screen.dart';
+import '../widgets/physical_stock_cards.dart';
 import 'package:app_elevage/screens/login_screen.dart';
 import 'package:app_elevage/screens/settings_screen.dart';
 import 'package:app_elevage/l10n/app_localizations.dart';
@@ -124,6 +123,12 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   Map<String, dynamic>? data;
   List lots = [];
   List especes = [];
+
+  int? get _stockSpecies {
+    if(displayedLotId==null)return displayedEspeceId;
+    for(final lot in lots){if(_intValue(lot['id'])==displayedLotId)return _intValue(lot['espece']);}
+    return null;
+  }
 
   int? _intValue(dynamic value) {
     if (value is int) return value;
@@ -1055,6 +1060,8 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
               ),
 
               const SizedBox(height: 22),
+              PhysicalStockCards(api:apiService,species:_stockSpecies,lot:displayedLotId,revision:lastApiSuccess?.millisecondsSinceEpoch??0),
+
 
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -1154,22 +1161,6 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                           );
                         },
                         isMoney: true,
-                      ),
-                      buildCard(
-                        'Solde / CA (hors achats)',
-                        operatingBalanceRate(kpis)?.toStringAsFixed(1),
-                        Icons.pie_chart,
-                        Colors.deepPurple,
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  PerformanceScreen(apiService: apiService),
-                            ),
-                          );
-                        },
-                        unit: '% · pas un bénéfice',
                       ),
                       buildCard(
                         context.tr('client_balance'),
