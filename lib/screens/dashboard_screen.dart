@@ -32,6 +32,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
 import '../widgets/physical_stock_cards.dart';
+import '../widgets/dashboard_kpi_card.dart';
 import 'package:app_elevage/screens/login_screen.dart';
 import 'package:app_elevage/screens/settings_screen.dart';
 import 'package:app_elevage/l10n/app_localizations.dart';
@@ -367,115 +368,11 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final subtitle = value == null ? '' :
         unit ?? (isMoney ? AppSettings.instance.currency.symbol : '');
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
-      elevation: 0,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE4E8EC), width: 1),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x10000000),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, size: 34, color: color),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      value == null ? 'Indisponible' : isMoney
-                          ? AppSettings.instance
-                                .formatMoney(value)
-                                .replaceAll(
-                                  AppSettings.instance.currency.symbol,
-                                  '',
-                                )
-                                .trim()
-                          : value.toString(),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF607080),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              // Trait coloré en bas de la card
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return DashboardKpiCard(title:title,icon:icon,color:color,onTap:onTap,content:Column(mainAxisSize:MainAxisSize.min,children:[
+      Text(value==null?'Indisponible':isMoney?AppSettings.instance.formatMoney(value).replaceAll(AppSettings.instance.currency.symbol,'').trim():value.toString(),
+        textAlign:TextAlign.center,maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:24,fontWeight:FontWeight.bold,color:color)),
+      if(subtitle.isNotEmpty)Text(subtitle,textAlign:TextAlign.center,style:const TextStyle(fontSize:14,color:Color(0xFF607080))),
+    ]));
   }
 
   List getFilteredLots() {
@@ -1060,7 +957,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
               ),
 
               const SizedBox(height: 22),
-              PhysicalStockCards(api:apiService,species:_stockSpecies,lot:displayedLotId,revision:lastApiSuccess?.millisecondsSinceEpoch??0),
+
 
 
               LayoutBuilder(
@@ -1070,7 +967,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                   if (constraints.maxWidth >= 1400) {
                     // Grand écran : 5 cards sur une ligne
                     columns = 5;
-                  } else if (constraints.maxWidth >= 1100) {
+                  } else if (constraints.maxWidth >= 1000) {
                     // écran moyen : 5 cards sur une ligne
                     columns = 5;
                   } else if (constraints.maxWidth >= 800) {
@@ -1178,6 +1075,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         },
                         isMoney: true,
                       ),
+                      PhysicalStockCards(api:apiService,species:_stockSpecies,lot:displayedLotId,revision:lastApiSuccess?.millisecondsSinceEpoch??0,compact:true),
                     ],
                   );
                 },

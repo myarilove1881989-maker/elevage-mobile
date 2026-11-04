@@ -19,8 +19,9 @@ import '../theme/terre_et_or_theme.dart';
 part 'online_expense_form.dart';
 
 class AddDepenseScreen extends StatefulWidget {
-  const AddDepenseScreen({super.key, this.tablet,this.apiService,this.simple=false});
+  const AddDepenseScreen({super.key, this.tablet,this.apiService,this.simple=false,this.procurementKind});
   final bool simple;
+  final String? procurementKind;
   final TabletController? tablet;
   final ApiService? apiService;
   @override
@@ -146,8 +147,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     final m = model;
     if(m==null) {
       return TerrainEntryGate(api:onlineApi!,actions:const {'expenses.create'},
-        ownerBuilder:(_)=>_OnlineExpenseForm(api:onlineApi!,readOnly:true),
-        builder:(_)=>_OnlineExpenseForm(api:onlineApi!));
+        ownerBuilder:(_)=>_OnlineExpenseForm(api:onlineApi!,readOnly:true,procurementKind:widget.procurementKind),
+        builder:(_)=>_OnlineExpenseForm(api:onlineApi!,procurementKind:widget.procurementKind));
     }
     return Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(
       appBar: AppBar(title: const Text('Nouvelle dépense')),
