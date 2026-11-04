@@ -2,6 +2,7 @@ import 'dart:convert';
 import '../config.dart';
 import '../services/lab_network_gate.dart';
 import 'dart:async';
+import '../services/health_notifications.dart';
 import 'package:flutter/foundation.dart';
 import 'farm_cache.dart';
 import 'foundation_api.dart';
@@ -196,7 +197,7 @@ class TabletController extends ChangeNotifier {
     _notify();
   }
 
-  void lock() {_inactivityTimer?.cancel();_inactivityTimer=null;_lastActivityAt=null;_inactivityDeadline=null;outboxOffset=0;_lockEpoch++;api.invalidatePendingPersonalWork();operators?.lock();selectedName=null;outboxRows=[];_notify();}
+  void lock() {unawaited(HealthReminderCoordinator.current?.suspend().catchError((Object _) {})??Future<void>.value());_inactivityTimer?.cancel();_inactivityTimer=null;_lastActivityAt=null;_inactivityDeadline=null;outboxOffset=0;_lockEpoch++;api.invalidatePendingPersonalWork();operators?.lock();selectedName=null;outboxRows=[];_notify();}
 
   Future<void> _refreshPreparedRights(DeviceOutboxApi deviceApi) async {
     final states=await deviceApi.permissionStates();
@@ -588,6 +589,11 @@ class TabletController extends ChangeNotifier {
     if(knownDeviceRevoked || recovering) throw StateError('Cette tablette ne peut plus créer de déclaration.');
     final current=operators?.session;
     if(current==null || cache is! OutboxStore) throw StateError('Profil personnel ouvert requis.');
+    if(entityType=='VACCINATION' || payload['vaccine_version']==1) {
+      if(entityType=='VACCINATION' && payload['task_id']!=null && ((current.grant.claims['capabilities'] as Map)['health_agenda_contract']!=1 || current.grant.finePermissions?.allows('agenda.read')!=true || current.grant.finePermissions?.allows('agenda.progress')!=true))throw StateError('Renouvelez votre accès et vos droits d’agenda avant ce rattachement.');
+      if((current.grant.claims['capabilities'] as Map)['vaccine_stock_contract']!=1)throw StateError('Renouvelez votre accès hors ligne pour les vaccins.');
+      if(entityType=='VACCINATION' && (payload['allocations'] as List? ?? const []).any((line)=>(line['lost'] as int? ?? 0)>0) && current.grant.finePermissions?.allows('vaccinations.loss')!=true)throw StateError('Déclaration de perte non autorisée.');
+    }
     if ({'VENTE_ANIMAUX','VENTE_OEUFS'}.contains(entityType) && operationType=='CREATE' &&
         current.grant.validAt(clock()) && !current.grant.permitsOperation(entityType,operationType,clock())) {
       throw StateError('La vente n’est pas autorisée avec vos permissions actuelles. Reconnectez votre compte ou contactez le propriétaire.');
@@ -639,7 +645,7 @@ class TabletController extends ChangeNotifier {
       await cache!.beginCacheRefresh(collection);
       while(true) {
         check();
-        final page=await api.request('GET','/cache-page/?collection=$collection&after=$after&limit=50');
+        final page=await api.request('GET','/cache-page/?collection=$collection&after=$after&limit=50${collection=='feed_stock'?'&presentation=1':''}');
         final revision=page['confirmed_business_revision'];
         if(revision!=null && (revision is! int || revision<0)) {throw StateError('Révision serveur invalide.');}
         if(revision is int && revision>businessRevision) {businessRevision=revision;}
@@ -656,6 +662,14 @@ class TabletController extends ChangeNotifier {
         businessRevision:businessRevision);
     }
     check();
+    final extra=personal.capabilities['capabilities'];
+    if(collections.length==6 && extra is Map && extra['feed_stock_contract']==1) {
+      await _refreshCollections(const ['feed_stock']);
+      check();
+    }
+    if(collections.length==6 && extra is Map && extra['vaccine_stock_contract']==1) {
+      await _refreshCollections(const ['vaccine_stock']);check();
+    }
     if(collections.length==6) lastCompleteCacheRefresh=clock();
     _notify();
   }

@@ -1,3 +1,4 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_localizations.dart';
@@ -15,9 +16,12 @@ class DettesScreen extends StatefulWidget {
   State<DettesScreen> createState() => _DettesScreenState();
 }
 
-class _DettesScreenState extends State<DettesScreen> {
+class _DettesScreenState extends State<DettesScreen> with MutationRefresh<DettesScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await loadData(); }
   List<DetteClient> clients = [];
   bool isLoading = true;
+  String? loadError;
   String selectedFilter = 'ALL';
   String searchQuery = '';
   @override
@@ -27,6 +31,8 @@ class _DettesScreenState extends State<DettesScreen> {
   }
 
   Future<void> loadData() async {
+    markDataFresh();
+    setState(() { isLoading = true; loadError = null; });
     try {
       final result = await widget.apiService.getDettesClients();
       result.sort((a, b) => b.reste.compareTo(a.reste));
@@ -37,12 +43,10 @@ class _DettesScreenState extends State<DettesScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erreur de chargement des soldes clients'),
-        ),
-      );
+      setState(() {
+        isLoading = false;
+        loadError = 'Impossible de charger les soldes clients. Vérifiez la connexion ou reconnectez-vous.';
+      });
     }
   }
 
@@ -79,6 +83,13 @@ class _DettesScreenState extends State<DettesScreen> {
       appBar: AppBar(title: Text(context.tr('customer_debts'))),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : loadError != null
+          ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(
+              mainAxisSize: MainAxisSize.min, children: [
+                Text(loadError!, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                FilledButton(onPressed: loadData, child: const Text('Réessayer')),
+              ])))
           : RefreshIndicator(
               onRefresh: loadData,
               child: LayoutBuilder(

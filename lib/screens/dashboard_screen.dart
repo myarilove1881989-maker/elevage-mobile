@@ -1,8 +1,9 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../services/financial_indicators.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'health_agenda_screen.dart';
+import '../services/health_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:app_elevage/screens/add_achat_screen.dart';
@@ -11,7 +12,6 @@ import 'package:app_elevage/screens/add_depense_screen.dart';
 import 'package:app_elevage/screens/lot_list_screen.dart';
 import 'package:app_elevage/screens/production_tracking_screen.dart';
 
-import '../main.dart';
 import '../config.dart';
 import '../widgets/connection_indicator.dart';
 import '../widgets/farm_navigation.dart';
@@ -20,13 +20,10 @@ import '../services/farm_session.dart';
 import '../services/farmer_runtime.dart';
 import '../services/server_connection.dart';
 import '../services/permission_contract.dart';
-import '../services/user_administration_service.dart';
 import '../offline/sync_state.dart';
 import 'operation_history_screen.dart';
 
 import 'owner_operation_history_screen.dart';
-import 'user_management_screen.dart';
-import 'package:timezone/timezone.dart' as tz;
 
 import 'package:app_elevage/screens/stock_detail_screen.dart';
 import 'package:app_elevage/screens/ca_detail_screen.dart';
@@ -34,7 +31,8 @@ import 'package:app_elevage/screens/depense_detail_screen.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
-import 'package:app_elevage/screens/performance_screen.dart';
+import '../widgets/physical_stock_cards.dart';
+import '../widgets/dashboard_kpi_card.dart';
 import 'package:app_elevage/screens/login_screen.dart';
 import 'package:app_elevage/screens/settings_screen.dart';
 import 'package:app_elevage/l10n/app_localizations.dart';
@@ -56,7 +54,9 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<DashboardScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await _reload(includeTasks: true); }
   late ApiService apiService;
   String _receiptState='';
   Timer? _receiptTimer;
@@ -91,7 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final result=await apiService.get('/me/capabilities/');
       final rights=PermissionContract.decode(Map<String,dynamic>.from(result['permission_contract'] as Map),
         userId:result['user'] as int,farmId:result['exploitation'] as int,
-        role:result['role'] as String,rightsVersion:result['membership']['version'] as int);
+        role:result['role'] as String,rightsVersion:result['membership']['version'] as int,allowHttpV2:true);
       if(!mounted || token!=(ApiService.sessionIdentity)) return;
       setState(() {commonSessionToken=token;commonSession=FarmSession(userId:rights.userId,farmId:rights.farmId,
         role:rights.role,permissions:rights,origin:apiService.hasUnifiedOfflineSession?SessionOrigin.tabletProfile:SessionOrigin.personalHttp,
@@ -125,6 +125,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List lots = [];
   List especes = [];
 
+  int? get _stockSpecies {
+    if(displayedLotId==null)return displayedEspeceId;
+    for(final lot in lots){if(_intValue(lot['id'])==displayedLotId)return _intValue(lot['espece']);}
+    return null;
+  }
+
   int? _intValue(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -155,6 +161,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool serverUnavailable = false;
   int? displayedLotId, displayedEspeceId;
   String username = '';
+  String farmName = '';
+  Future<void> loadFarmName() async {
+    final identity = ApiService.sessionIdentity;
+    try {
+      final profile = await apiService.get('/farm-profile/');
+      if (mounted && identity == ApiService.sessionIdentity) {
+        setState(() => farmName = profile['nom']?.toString().trim() ?? '');
+      }
+    } catch (_) { /* Keep the last confirmed name during a connection failure. */ }
+  }
 
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -208,8 +224,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     initData();
   }
 
+  Future<void> _syncHealthReminders(List tasks) async {
+    final coordinator=HealthReminderCoordinator.current;if(coordinator==null)return;
+    final captured=ApiService.sessionIdentity;
+    try {
+      await _loadCommonSession();final session=commonSession;
+      if(captured==null || captured!=ApiService.sessionIdentity || commonSessionToken!=captured || session?.permissions?.allows('agenda.read')!=true){await coordinator.suspend();return;}
+      final until=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.grant?.expiresAt:null;
+      await coordinator.sync(farm:session!.farmId,user:session.userId,tasks:tasks,isCurrent:()=>captured==ApiService.sessionIdentity && commonSessionToken==captured && commonSession?.permissions?.allows('agenda.read')==true,validUntil:until);
+    }catch(_){try{await coordinator.suspend();}catch(_){}}
+  }
+
   Future<void> loadTasks() async {
     final res = await apiService.getTasks();
+    unawaited(_syncHealthReminders(res));
 
     Map<String, List<Map<String, dynamic>>> temp = {};
 
@@ -258,6 +286,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> initData() async { await _reload(includeTasks: true); }
 
   Future<bool> _reload({bool includeTasks = false}) async {
+    markDataFresh();
+    unawaited(loadFarmName());
     final lotId = selectedLotId;
     final speciesId = selectedEspeceId;
     if (mounted) { setState(() { isLoading = true; loadError = null; }); }
@@ -271,7 +301,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (includeTasks) _requiredRead('liste des tâches',apiService.getTasks()),
       ]);
       final nextData = Map<String, dynamic>.from(results[0] as Map);
-      final nextLots = results[1] as List;
+      final allLots=results[1] as List;
+      final nextLots=allLots.where((lot)=>!ApiService.isLotClosed(lot as Map)).toList();
+      final closedSelection=lotId!=null && allLots.any((lot)=>_intValue(lot['id'])==lotId && ApiService.isLotClosed(lot as Map));
+      final closedSpecies=speciesId!=null && allLots.any((lot)=>_intValue(lot['espece'])==speciesId) && !nextLots.any((lot)=>_intValue(lot['espece'])==speciesId);
+      if(closedSelection || closedSpecies){
+        if(!mounted)return false;
+        selectedLotId=null;selectedEspeceId=null;
+        return await _reload(includeTasks:includeTasks);
+      }
       final nextSpecies = _createdSpecies(results[2] as List, nextLots);
       if ((speciesId != null && !nextSpecies.any((item) => _intValue(item['id']) == speciesId)) ||
           (lotId != null && !nextLots.any((item) => _intValue(item['id']) == lotId))) {
@@ -279,6 +317,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
       final nextDebt = results[3] as double;
       final nextEvents = includeTasks ? _taskEvents(results[4] as List) : events;
+      if(includeTasks)unawaited(_syncHealthReminders(results[4] as List));
       if (!mounted) { return false; }
       // Commit the view snapshot only when every requested read succeeded.
       setState(() {
@@ -317,32 +356,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> fetchDashboardByEspece(int? especeId) => _loadScope(speciesId: especeId);
   Future<void> fetchLotDetail(int lotId) => _loadScope(lotId: lotId, speciesId: selectedEspeceId);
 
-  Future<void> scheduleNotification(String title, DateTime date) async {
-    final scheduledDate = tz.TZDateTime.from(
-      DateTime(date.year, date.month, date.day, 8),
-      tz.local,
-    );
-
-    await notificationsPlugin.zonedSchedule(
-      0,
-      "Tâche du jour",
-      title,
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'tasks',
-          'Tasks',
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.dateAndTime,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-  }
-
   Widget buildCard(
     String title,
     dynamic value,
@@ -355,115 +368,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final subtitle = value == null ? '' :
         unit ?? (isMoney ? AppSettings.instance.currency.symbol : '');
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
-      elevation: 0,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE4E8EC), width: 1),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x10000000),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, size: 34, color: color),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      value == null ? 'Indisponible' : isMoney
-                          ? AppSettings.instance
-                                .formatMoney(value)
-                                .replaceAll(
-                                  AppSettings.instance.currency.symbol,
-                                  '',
-                                )
-                                .trim()
-                          : value.toString(),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF607080),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              // Trait coloré en bas de la card
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return DashboardKpiCard(title:title,icon:icon,color:color,onTap:onTap,content:Column(mainAxisSize:MainAxisSize.min,children:[
+      Text(value==null?'Indisponible':isMoney?AppSettings.instance.formatMoney(value).replaceAll(AppSettings.instance.currency.symbol,'').trim():value.toString(),
+        textAlign:TextAlign.center,maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:24,fontWeight:FontWeight.bold,color:color)),
+      if(subtitle.isNotEmpty)Text(subtitle,textAlign:TextAlign.center,style:const TextStyle(fontSize:14,color:Color(0xFF607080))),
+    ]));
   }
 
   List getFilteredLots() {
@@ -529,43 +438,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool get _mayPlanTasks => commonSessionToken == (ApiService.sessionIdentity) &&
       commonSession?.role == 'OWNER' && commonSession?.permissions?.allows('agenda.plan') == true;
 
+  void _showAgenda() {
+    showModalBottomSheet<void>(context:context,builder:(sheet)=>SafeArea(child:Column(
+      mainAxisSize:MainAxisSize.min,children:[
+        const ListTile(title:Text('Agenda')),
+        ListTile(leading:const Icon(Icons.vaccines_outlined),title:const Text('Agenda sanitaire'),onTap:(){Navigator.pop(sheet);Navigator.push(context,MaterialPageRoute(builder:(_)=>HealthAgendaScreen(api:apiService)));}),
+        ListTile(leading:const Icon(Icons.event),title:const Text('Voir les tâches du jour'),
+          onTap:(){Navigator.pop(sheet);_showTasksForDay(_selectedDay??_focusedDay);}),
+        if(_mayPlanTasks) ListTile(leading:const Icon(Icons.add_task),title:const Text('Attribuer une tâche'),
+          onTap:(){Navigator.pop(sheet);_addTask();}),
+      ])));
+  }
+
   void _addTask() async {
     await _loadCommonSession();
     if(!mounted || !_mayPlanTasks) return;
-    String newTask = "";
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(context.tr('new_task')),
-        content: TextField(onChanged: (value) => newTask = value),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(context.tr('cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final day = _selectedDay ?? DateTime.now();
-
-              await _loadCommonSession();
-              if(!mounted || !_mayPlanTasks) return;
-              await apiService.createTask(newTask, day);
-
-              try {
-                await scheduleNotification(newTask, day);
-              } catch (_) {
-                // Un rappel facultatif ne doit pas bloquer la tâche enregistrée.
-              }
-
-              Navigator.pop(context);
-              await loadTasks();
-            },
-            child: Text(context.tr('add')),
-          ),
+    final captured=ApiService.sessionIdentity;
+    List<Map<String,dynamic>> operators;
+    try {
+      final raw=await apiService.get('/memberships/');
+      if(!mounted || captured!=ApiService.sessionIdentity || !_mayPlanTasks) return;
+      operators=(raw as List).map((r)=>Map<String,dynamic>.from(r as Map))
+        .where((r)=>r['role']=='OPERATEUR' && r['is_active']==true && r['exploitation']==commonSession!.farmId).toList();
+    } catch (_) {
+      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Impossible de charger les opérateurs. Reconnectez-vous pour attribuer une tâche.')));
+      return;
+    }
+    if(!mounted) return;
+    final title=TextEditingController();
+    var day=_selectedDay??DateTime.now(); int? assignee; bool busy=false; String? error;
+    var repeat=false; var end=day; final weekdays=<int>{1,2,3,4,5,6,7};
+    final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>AlertDialog(
+      title:Text(context.tr('new_task')),
+      content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const InputDecoration(labelText:'Tâche')),
+        DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const InputDecoration(labelText:'Opérateur'),
+          items:operators.map((r)=>DropdownMenuItem<int>(value:r['user'] as int,child:Text(r['username'].toString()))).toList(),
+          onChanged:busy?null:(v)=>change(()=>assignee=v)),
+        TextButton(onPressed:busy?null:() async {
+          final selected=await showDatePicker(context:dialog,initialDate:day,firstDate:DateTime(2020),lastDate:DateTime(2100));
+          if(selected!=null && dialog.mounted) change(()=>day=selected);
+        },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(day))),
+        SwitchListTile(title:const Text('Répéter sur plusieurs jours'), value:repeat,
+          onChanged:busy?null:(v)=>change(()=>repeat=v)),
+        if(repeat) ...[
+          const Text('Date de fin (incluse)'),
+          TextButton(onPressed:busy?null:() async {
+            final selected=await showDatePicker(context:dialog,initialDate:end,
+              firstDate:DateTime(2020),lastDate:DateTime(2100));
+            if(selected!=null && dialog.mounted) change(()=>end=selected);
+          },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(end))),
+          const Text('Tous les jours, ou sélectionnez les jours souhaités'),
+          Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(
+            label:Text(['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]),
+            selected:weekdays.contains(i+1),onSelected:busy?null:(v)=>change((){
+              if(v){weekdays.add(i+1);}else{weekdays.remove(i+1);}
+            })))),
         ],
-      ),
-    );
+        if(error!=null) Text(error!),
+      ])),
+      actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(dialog,false),child:Text(context.tr('cancel'))),
+        FilledButton(onPressed:busy?null:() async {
+          if(title.text.trim().isEmpty || assignee==null) {change(()=>error='Renseignez la tâche et son opérateur.');return;}
+          final startDate=DateTime.utc(day.year,day.month,day.day);
+          final endDate=DateTime.utc(end.year,end.month,end.day);
+          if(repeat && (endDate.isBefore(startDate) || endDate.difference(startDate).inDays>365 || weekdays.isEmpty)) {
+            change(()=>error='Choisissez une fin après le début (un an maximum) et au moins un jour.');return;
+          }
+          if(repeat && !List.generate(endDate.difference(startDate).inDays+1,
+            (i)=>DateTime(startDate.year,startDate.month,startDate.day+i)).any((d)=>weekdays.contains(d.weekday))) {
+            change(()=>error='Aucun jour choisi dans cette période.');return;
+          }
+          change((){busy=true;error=null;});
+          try {
+            await _loadCommonSession();
+            if(captured!=ApiService.sessionIdentity || !_mayPlanTasks) throw StateError('Session modifiée');
+            if(repeat) {
+              final result=await apiService.createRepeatedTasks(title.text.trim(),startDate,endDate,
+                assignedTo:assignee!,weekdays:weekdays.toList()..sort());
+              if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content:Text('${result['created']} tâche(s) créée(s), ${result['skipped']} déjà présente(s).')));
+            } else {
+              await apiService.createTask(title.text.trim(),day,assignedTo:assignee);
+            }
+            if(dialog.mounted) Navigator.pop(dialog,true);
+          } catch (_) {if(dialog.mounted) change((){busy=false;error='Enregistrement non confirmé. Vérifiez l’agenda avant de recommencer.';});}
+        },child:Text(context.tr('add')))])));
+    final saved=await Navigator.of(context).push(route);await route.completed;title.dispose();
+    if(saved==true && mounted) await loadTasks();
   }
 
   Future<void> _refreshAll() async {
@@ -633,9 +593,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+      MaterialPageRoute(builder: (_) => SettingsScreen(apiService: apiService)),
     );
-    if (mounted) setState(() {});
+    if (mounted) await loadFarmName();
   }
 
   Future<void> _openTutorial(String languageCode) async {
@@ -762,9 +722,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          if (username.isNotEmpty)
+                          if (farmName.isNotEmpty)
                             TextSpan(
-                              text: " $username",
+                              text: " $farmName",
                               style: TextStyle(
                                 color: Color(0xFF16834B),
                                 fontSize: compact ? 28 : 42,
@@ -789,66 +749,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
   }
 
-  Widget _navigationDrawer() {
-    Widget item(String label, IconData icon, VoidCallback action) {
-      return ListTile(
-        leading: Icon(icon, color: const Color(0xFF063B63)),
-        title: Text(label),
-        onTap: () {
-          Navigator.pop(context);
-          action();
-        },
-      );
-    }
-
-    return Drawer(
-      child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            Container(
-              width: double.infinity,
-              color: const Color(0xFF063B63),
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-              child: _brandTitle(),
-            ),
-            FarmNavigation(session:commonSessionToken==(ApiService.sessionIdentity)?commonSession:null,labels:{
-              FarmDestination.dashboard:context.tr('dashboard'),
-              FarmDestination.lots:AppLocalizations.of(context).languageCode=='en'?'Batches':'Lots',
-              FarmDestination.purchases:context.tr('purchases'),
-              FarmDestination.sales:context.tr('sale'),
-              FarmDestination.expenses:context.tr('expenses'),
-              FarmDestination.movements:context.tr('movements'),
-              FarmDestination.history:context.tr('history'),
-              FarmDestination.agenda:AppLocalizations.of(context).languageCode=='en'?'Tasks':'Agenda',
-              FarmDestination.production:context.tr('production_tracking'),
-              FarmDestination.settings:context.tr('settings'),
-              FarmDestination.users:AppLocalizations.of(context).languageCode=='en'?'User management':'Gestion des utilisateurs',
-            },actions:{
-              FarmDestination.dashboard:()=>Navigator.pop(context),
-              FarmDestination.lots:() {Navigator.pop(context);_openLots();},
-              FarmDestination.purchases:() {Navigator.pop(context);_openAchat();},
-              FarmDestination.sales:() {Navigator.pop(context);_openMouvement();},
-              FarmDestination.expenses:() {Navigator.pop(context);_openDepense();},
-              FarmDestination.movements:() {Navigator.pop(context);_openMouvement();},
-              FarmDestination.history:() {Navigator.pop(context);_openHistory();},
-              FarmDestination.agenda:() {Navigator.pop(context);_showTasksForDay(_selectedDay??_focusedDay);},
-              FarmDestination.production:() {Navigator.pop(context);_openProductionTracking();},
-              FarmDestination.settings:() {Navigator.pop(context);_openSettings();},
-              FarmDestination.users:() {Navigator.pop(context);Navigator.push(context,MaterialPageRoute(builder:(_)=>UserManagementScreen(service:UserAdministrationService(apiService))));},
-            }),
-            item(
-              context.tr('tutorial'),
-              Icons.menu_book_outlined,
-              _chooseTutorialLanguage,
-            ),
-            const Divider(height: 1),
-            item(context.tr('logout'), Icons.logout, _logout),
-          ],
-        ),
-      ),
-    );
-  }
+  Map<FarmDestination,VoidCallback> get _navigationActions=>{
+    FarmDestination.lots:_openLots,FarmDestination.purchases:_openAchat,FarmDestination.expenses:_openDepense,
+    FarmDestination.production:_openProductionTracking,FarmDestination.movements:_openMouvement,
+    FarmDestination.billing:_openClients,FarmDestination.history:_openHistory,FarmDestination.agenda:_showAgenda,
+    FarmDestination.settings:_openSettings,FarmDestination.tutorial:_chooseTutorialLanguage,FarmDestination.logout:_logout};
+  FarmSession? get _navigationSession=>commonSessionToken==ApiService.sessionIdentity?commonSession:null;
+  Widget _navigationDrawer()=>Drawer(child:SafeArea(child:ListView(children:[
+    Container(color:const Color(0xFF063B63),padding:const EdgeInsets.all(20),child:_brandTitle()),
+    FarmNavigation(session:_navigationSession,actions:_navigationActions,beforeNavigate:()=>Navigator.pop(context)),
+  ])));
 
   @override
   void dispose() {
@@ -862,356 +772,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final kpis = data?["kpis"] ?? {};
     final filteredLots = getFilteredLots();
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final showNavActions = screenWidth >= 1100 && MediaQuery.textScalerOf(context).scale(13) <= 16;
-    final navSpacing = screenWidth < 1200 ? 4.0 : 18.0;
 
     return Scaffold(
       drawer: _navigationDrawer(),
-      appBar: screenWidth < 700
-          ? AppBar(
-              backgroundColor: const Color(0xFF063B63),
-              foregroundColor: Colors.white,
-              toolbarHeight: 64,
-              leading: Builder(
-                builder: (menuContext) => IconButton(
-                  tooltip: context.tr('open_menu'),
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(menuContext).openDrawer(),
-                ),
-              ),
-              title: const Text('Élev’Age'),
-              actions: [
-                _connectionIndicator(),
-                IconButton(
-                  tooltip: context.tr('refresh'),
-                  onPressed: isLoading ? null : _refreshAll,
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            )
-          : AppBar(
-              automaticallyImplyLeading: false,
-              backgroundColor: const Color(0xFF063B63),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              toolbarHeight: 76,
-              title: Row(
-                children: [
-                  // =========================
-                  // LOGO ELEV'AGE
-                  // =========================
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Builder(
-                        builder: (menuContext) => IconButton(
-                          tooltip: context.tr('open_menu'),
-                          icon: const Icon(Icons.menu, size: 30),
-                          onPressed: () =>
-                              Scaffold.of(menuContext).openDrawer(),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      RichText(
-                        text: const TextSpan(
-                          style:TextStyle(fontFamily:'Roboto'),
-                          children: [
-                            TextSpan(
-                              text: "Elev'",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 24,
-                              ),
-                            ),
-                            TextSpan(
-                              text: "Age",
-                              style: TextStyle(
-                                color: Color(0xFF4CAF50),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 24,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Espace entre le logo et les boutons
-                  const SizedBox(width: 8),
-
-                  // =========================
-                  // NAVIGATION
-                  // =========================
-                  Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        _connectionIndicator(),
-                        // ACTUALISER
-                        InkWell(
-                          onTap: isLoading ? null : _refreshAll,
-                          child: SizedBox(
-                            width: screenWidth < 700 ? 44 : 76,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.refresh,
-                                  color: Colors.white,
-                                  size: 27,
-                                ),
-                                if (screenWidth >= 700) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    context.tr('refresh'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        if (showNavActions) ...[
-                          const SizedBox(width: 8),
-
-                          // ACHATS
-                          InkWell(
-                            onTap: _openAchat,
-                            child: SizedBox(
-                              width: 80,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.shopping_bag_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('purchases'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // DÉPENSES
-                          InkWell(
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      _expenseScreen(),
-                                ),
-                              );
-
-                              if (result == true) {
-                                await refreshDashboard();
-                              }
-                            },
-                            child: SizedBox(
-                              width: 90,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.shopping_cart_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('expenses'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // SUIVI DE PRODUCTION
-                          InkWell(
-                            key: const Key('topProductionTrackingButton'),
-                            onTap: _openProductionTracking,
-                            child: SizedBox(
-                              width: 140,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.monitor_heart_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    context.tr('production_tracking'),
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // MOUVEMENTS
-                          InkWell(
-                            onTap: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AddMouvementScreen(
-                                    apiService: apiService,
-                                  ),
-                                ),
-                              );
-
-                              if (result == true) {
-                                await refreshDashboard();
-                              }
-                            },
-                            child: SizedBox(
-                              width: 105,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.swap_horiz,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('movements'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // FACTURATION
-                          InkWell(
-                            onTap: _openClients,
-                            child: SizedBox(
-                              width: 92,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.receipt_long_outlined,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('billing'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(width: navSpacing),
-
-                          // HISTORIQUE
-                          InkWell(
-                            onTap: _openHistory,
-                            child: SizedBox(
-                              width: 80,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.history,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    context.tr('history'),
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(width: 4),
-
-                        // DÉCONNEXION
-                        InkWell(
-                          onTap: _logout,
-                          child: SizedBox(
-                            width: screenWidth < 700 ? 44 : 64,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.logout,
-                                  color: Colors.white70,
-                                  size: 25,
-                                ),
-                                if (screenWidth >= 700) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    context.tr('logout'),
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      appBar: AppBar(backgroundColor:const Color(0xFF063B63),foregroundColor:Colors.white,
+        title:const Text('Élev’Age'),centerTitle:false,toolbarHeight:56,
+        leading:Builder(builder:(menuContext)=>IconButton(tooltip:context.tr('open_menu'),icon:const Icon(Icons.menu),onPressed:()=>Scaffold.of(menuContext).openDrawer())),
+        actions:[_connectionIndicator(),IconButton(tooltip:context.tr('refresh'),
+          onPressed:isLoading?null:_refreshAll,icon:const Icon(Icons.refresh)),
+          IconButton(key:const Key('topLogoutButton'),tooltip:'Quitter',onPressed:_logout,icon:const Icon(Icons.logout))],
+        bottom:PreferredSize(preferredSize:const Size.fromHeight(52),child:Theme(
+          data:Theme.of(context).copyWith(textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:Colors.white))),
+          child:FarmNavigation(horizontal:true,session:_navigationSession,actions:_navigationActions)))),
       body: LayoutBuilder(builder: (context, constraints) => Column(children: [
         if(apiService is FarmerApiService && (apiService as FarmerApiService).runtime.warning!=null)
           Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),
@@ -1219,6 +791,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               key:const Key('farmer-online-only-notice'),style:const TextStyle(color:Color(0xFF694A17)))),
         if(apiService.lastOperationMessage!=null) Padding(padding:const EdgeInsets.symmetric(horizontal:16,vertical:8),
           child:Text(apiService.lastOperationMessage!,key:const Key('last-operation-receipt'))),
+        if((kpis['lots_clotures']??0)>0) Padding(padding:const EdgeInsets.all(8),child:Text('Lots clôturés : ${kpis['lots_clotures']} · Stock restant conservé : ${kpis['stock_lots_clotures']??0}. Les finances incluent les lots clôturés.')),
         _dashboardHeading(constraints.maxHeight),
         Expanded(child: data == null
           ? Center(child: isLoading
@@ -1385,6 +958,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               const SizedBox(height: 22),
 
+
+
               LayoutBuilder(
                 builder: (context, constraints) {
                   int columns;
@@ -1392,7 +967,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   if (constraints.maxWidth >= 1400) {
                     // Grand écran : 5 cards sur une ligne
                     columns = 5;
-                  } else if (constraints.maxWidth >= 1100) {
+                  } else if (constraints.maxWidth >= 1000) {
                     // écran moyen : 5 cards sur une ligne
                     columns = 5;
                   } else if (constraints.maxWidth >= 800) {
@@ -1485,22 +1060,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         isMoney: true,
                       ),
                       buildCard(
-                        'Solde / CA (hors achats)',
-                        operatingBalanceRate(kpis)?.toStringAsFixed(1),
-                        Icons.pie_chart,
-                        Colors.deepPurple,
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  PerformanceScreen(apiService: apiService),
-                            ),
-                          );
-                        },
-                        unit: '% · pas un bénéfice',
-                      ),
-                      buildCard(
                         context.tr('client_balance'),
                         totalDettes,
                         Icons.credit_card,
@@ -1516,6 +1075,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                         isMoney: true,
                       ),
+                      PhysicalStockCards(api:apiService,species:_stockSpecies,lot:displayedLotId,revision:lastApiSuccess?.millisecondsSinceEpoch??0,compact:true),
                     ],
                   );
                 },

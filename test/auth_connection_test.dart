@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthApiFake extends ApiService {
   @override
+  Future<bool> probeServer() async => true;
+  @override
   Future<dynamic> get(String endpoint) async {
     if(endpoint!='/me/capabilities/') { throw StateError('Unmocked local request'); }
     return {'user':1,'exploitation':1,'role':'OWNER','membership':{'version':1},

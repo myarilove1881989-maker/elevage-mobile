@@ -103,6 +103,19 @@ class SupervisionService {
     return {for(final row in rows.take(200))if(row is Map && row['user'] is int)
       row['user'] as int:row['username']?.toString()??'Utilisateur ${row['user']}'};
   }
+  Future<Map<String,dynamic>> closeFeedConflict(PendingReconciliationDecision decision) async {
+    _guard();
+    if(!owner || decision.data['action']!='CANCEL')throw StateError('Classement réservé au propriétaire.');
+    final original=await detail(decision.operationId);
+    if(original['reconciliation_mode']!='FEED_CANCEL_ONLY' && original['receipt']['business_status']!='NOT_APPLIED')throw StateError('Cette déclaration ne peut pas être classée sans effet.');
+    _guard();
+    final result=Map<String,dynamic>.from(await api.post('/offline/reconciliation/${decision.operationId}/',decision.data) as Map);
+    _guard();
+    if(result['decision_uuid']!=decision.data['decision_uuid'] || result['decision_actor_id']!=capabilities!['user']) {
+      throw StateError('La confirmation ne correspond pas à votre décision.');
+    }
+    return result;
+  }
   Future<Map<String,dynamic>> decide(PendingReconciliationDecision decision) async {
     _guard();
     if(!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(decision.operationId)) {throw ArgumentError('Opération invalide.');}

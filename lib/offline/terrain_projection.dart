@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'outbox.dart';
+import 'health_task_state.dart';
 import 'terrain_store.dart';
 
 /// Projection is derived from the immutable ledger, so it cannot precede its commit.
@@ -95,7 +96,7 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
     final task=receipt['task_snapshot'];
     if(task==null) {return;}
     const allowed={'id','title','date','description','priority','status','assigned_to','created_by',
-      'created_at','updated_at','completed_by','completed_at','report','version','exploitation'};
+      'created_at','updated_at','completed_by','completed_at','report','version','exploitation','health','cancelled_by','cancelled_at','cancellation_reason'};
     if(declaration['entity_type']!='TASK' || task is! Map || task.keys.any((key)=>!allowed.contains(key)) ||
       task['id'] is! int || (task['id'] as int)<1 ||
       task['id']!=(declaration['payload'] as Map)['task_id'] || task['exploitation']!=declaration['exploitation_id'] ||
@@ -108,7 +109,7 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
     if(previous!=null) {
       final prior=jsonDecode(previous.read<String>('payload')) as Map;
       if(prior['version']>(task['version'] as int)) {return;}
-      if(prior['version']==task['version'] && prior.keys.any((key)=>task.containsKey(key) && prior[key]!=task[key])) {
+      if(prior['version']==task['version'] && prior.keys.any((key)=>task.containsKey(key) && !sameTaskField(key,prior[key],task[key]))) {
         throw StateError('État de tâche contradictoire pour une même version.');
       }
     }
@@ -371,6 +372,7 @@ mixin TerrainProjection on GeneratedDatabase implements TerrainStore {
         if(declaration['entity_type']=='COLLECTE_OEUFS') {
           final collected=payload['nombre_collecte']??(_quantity(payload['nombre_alveoles'])*30+_quantity(payload['oeufs_restants']));
           eggDelta+=_quantity(collected)-_quantity(payload['nombre_casses'])-_quantity(payload['nombre_declasses'])-_quantity(payload['nombre_consommes_donnes']);
+          if(declaration['operation_type']=='UPDATE') eggDelta-=_quantity(payload['previous_quantity']);
         }
         reconcile=reconcile || operation.read<String>('business_status')=='NEEDS_RECONCILIATION';
       }

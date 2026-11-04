@@ -59,4 +59,35 @@ void main() {
     }
   });
 
+  test('client sale read prepares egg reference before disconnect; cash survives reopen and sync is idempotent',() async {
+    final h=UnifiedAccessHarness();await h.start();h.codes.add('cash.create');
+    var runtime=await h.runtime();
+    try {
+      final api=await runtime.signIn('synthetic','1234');
+      h.serverSales=[{'id':51,'entity_type':'VENTE_OEUFS','reference_id':91,'client_id':11,
+        'montant_total':'500.00','reste_a_payer':'500.00','confirmed_business_revision':0}];
+      await api.getClientVentes(11);
+      h.down=true;await runtime.connection.probe();
+      expect(await api.createPayment(11,51,200,mode:'ESPECES'),isTrue);
+      final original=(await h.db.listOutbox()).single;
+      expect(original.declaration['payload']['vente_ref'],{'server_id':91});
+      runtime.connection.pause();runtime.tablet.setForeground(false);
+      await runtime.tablet.sync?.waitForIdle();runtime.dispose();
+      await h.db.close();h.db=h.openDatabase();await h.controller();runtime=await h.runtime();
+      final offline=await runtime.signIn('synthetic','1234');
+      expect((await h.db.listOutbox()).single.operationId,original.operationId);
+      await expectLater(offline.createPayment(11,51,200,mode:'ESPECES'),throwsA(anything));
+      h.now=h.now.add(const Duration(seconds:20));h.down=false;await runtime.connection.probe();await Future<void>.delayed(Duration.zero);await runtime.tablet.syncOutbox();
+      await runtime.tablet.sync?.waitForIdle();await runtime.tablet.syncOutbox();
+      expect(h.originals.keys.toList(),[original.operationId]);
+      expect(h.effects.length,1);
+      expect((await h.db.listOutbox()).single.businessStatus,'CONFIRMED');
+      expect(h.onlineWrites,isEmpty);
+    } finally {
+      runtime.connection.pause();runtime.tablet.setForeground(false);await runtime.tablet.sync?.waitForIdle();runtime.dispose();
+      await h.db.close();await h.directory.delete(recursive:true);
+      ApiService.token=null;globalToken=null;ApiService.clearLocalPresentationIdentity();ApiService.farmerSession=false;
+    }
+  });
+
 }

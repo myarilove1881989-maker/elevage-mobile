@@ -16,11 +16,13 @@ const permissionGroups = {
   'egg_collections': 'Collectes d’œufs',
   'egg_sales': 'Ventes d’œufs',
   'cash': 'Encaissements',
+  'vaccinations':'Vaccinations',
   'feed': 'Alimentation',
   'weights': 'Pesées',
   'agenda': 'Agenda',
 };
 const permissionActions = {
+  'loss':'Déclarer des doses perdues ou jetées',
   'create': 'Créer',
   'update': 'Modifier',
   'delete': 'Supprimer',

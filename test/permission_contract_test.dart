@@ -125,9 +125,9 @@ void main() {
     await expectLater(grant(rights:contract(user:2)),throwsStateError);
     await expectLater(grant(rights:contract()..['rights_version']=2),throwsStateError);
   });
-  test('no invented transfer or update command is authorized', () {
+  test('only reviewed update commands are authorized', () {
     expect(PermissionContract.operationAction('TRANSFERT','CREATE'),isNull);
-    expect(PermissionContract.operationAction('COLLECTE_OEUFS','UPDATE'),isNull);
+    expect(PermissionContract.operationAction('COLLECTE_OEUFS','UPDATE'),'egg_collections.update');
     expect(PermissionContract.operationAction('TASK','UPDATE'),'agenda.progress');
   });
 }

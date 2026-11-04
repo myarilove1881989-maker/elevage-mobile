@@ -109,12 +109,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
     for (final font in {
-      'Roboto': 'roboto-regular.ttf',
-      'MaterialIcons': 'materialicons-regular.otf',
+      'Roboto': 'Roboto-Regular.ttf',
+      'MaterialIcons': 'MaterialIcons-Regular.otf',
     }.entries) {
-      final bytes = await File(
+      final file = File(
         '${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts/${font.value}',
-      ).readAsBytes();
+      );
+      final bytes = await file.readAsBytes();
       final loader = FontLoader(font.key)
         ..addFont(Future.value(ByteData.sublistView(bytes)));
       await loader.load();
@@ -294,12 +295,12 @@ void main() {
     final api = AdminApi()..role = 'OPERATEUR';
     await tester.pumpWidget(MaterialApp(home: SettingsScreen(apiService: api)));
     await tester.pumpAndSettle();
-    expect(find.text('Création des utilisateurs'), findsNothing);
+    expect(find.text('Gestion des utilisateurs'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     api.role = 'OWNER';
     await tester.pumpWidget(MaterialApp(home: SettingsScreen(apiService: api)));
     await tester.pumpAndSettle();
-    expect(find.text('Création des utilisateurs'), findsOneWidget);
+    expect(find.text('Gestion des utilisateurs'), findsOneWidget);
     api.close();
   });
   testWidgets('responsive phone and landscape tablet with synthetic preview', (
@@ -329,9 +330,9 @@ void main() {
                       as RenderRepaintBoundary)
                   .toImage();
           final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-          await File(
-            '../reports/9a2b-interface-utilisateurs.png',
-          ).writeAsBytes(bytes!.buffer.asUint8List());
+          final preview=File('.local/test-previews/9a2b-interface-utilisateurs.png');
+          await preview.parent.create(recursive:true);
+          await preview.writeAsBytes(bytes!.buffer.asUint8List());
           image.dispose();
         });
       }

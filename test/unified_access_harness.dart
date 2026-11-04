@@ -33,6 +33,8 @@ class UnifiedAccessHarness {
   int posts=0,grants=0,capabilityReads=0;
   List<Map<String,dynamic>>? serverSales;
   final onlineWrites=<String>[];
+  final preparedReads=<String>[];
+  bool layingFixture=false;
   int version=1;
   bool down=false,lost=false,disabled=false,refuseGrant=false;
   bool expiredPersonal=false;
@@ -106,6 +108,11 @@ class UnifiedAccessHarness {
       'server_entity_id':confirmed?'${100+sequence}':'','server_version':confirmed?'farm:$sequence':'',
       'reason_code':businessState=='NEEDS_RECONCILIATION'?'OFFLINE_PERMISSION_DENIED':'',
     };
+    if(confirmed && kind=='ENCAISSEMENT') {
+      final p=operation['payload'] as Map;
+      result['cash_recognition']={'montant_recu':p['montant_recu'],'montant_affecte':p['montant_recu'],
+        'montant_a_rapprocher':'0.00','payment_id':100+sequence,'mode':p['mode']};
+    }
     if(confirmed && {'ACHAT','VENTE_ANIMAUX','MORTALITE'}.contains(kind)) {
       result['stock_snapshots']=[{'id':42,'nom':'Lot fictif','exploitation':1,'type_production':'CHAIR',
         'stock':kind=='ACHAT'?10:kind=='VENTE_ANIMAUX'?8:7,'stock_oeufs':0,
@@ -158,7 +165,7 @@ class UnifiedAccessHarness {
   Future<void> start() async {
     directory=await Directory.systemTemp.createTemp('elevage-seven-day-');
     db=openDatabase();
-    initial=await fineGrant(credentialVersion:1,codes:rights,now:now,duration:const Duration(days:7));
+    initial=await fineGrant(credentialVersion:1,codes:codes,now:now,duration:const Duration(days:7));
     await db.saveOperatorProfile(initial!,'synthetic');
     await enroll(initial!,'123456');
     secrets.values['tablet_context_${Uri.encodeComponent(base)}']=jsonEncode({
@@ -177,7 +184,7 @@ class UnifiedAccessHarness {
     await sessions.enroll(grant,pin);
     // Install only a verified synthetic response, as normal preparation would.
     late Map<String,dynamic> response;
-    final verified=await fineGrant(credentialVersion:1,user:grant.userId,expectedUser:grant.userId,codes:rights,
+    final verified=await fineGrant(credentialVersion:1,user:grant.userId,expectedUser:grant.userId,codes:codes,
       now:now,duration:const Duration(days:7),issued:(value)=>response=value);
     secrets.values['offline_grant_${Uri.encodeComponent(base)}_1_${grant.userId}']=jsonEncode({
       'token':verified.token,'public_key':response['public_key'],'key_id':response['key_id'],
@@ -231,6 +238,15 @@ class UnifiedAccessHarness {
     return FarmerRuntime(tablet:tablet,connection:connection,tokenStore:TokenService(useSecureStorage:false),
       onlineClient:MockClient((request) async {
         if(down) throw http.ClientException('Synthetic read offline');
+        preparedReads.add(request.url.toString());
+        if(request.url.path.endsWith('/production/pesees/')) return http.Response('{"effectif_actuel":10,"pesees":[{"id":17,"nombre_animaux_peses":10,"poids_total_kg":"18.000"}]}',200);
+        if(layingFixture) {
+          if(request.url.path.endsWith('/farm-profile/')) return http.Response('{"id":1,"nom":"Ferme partagée"}',200,headers:{'content-type':'application/json; charset=utf-8'});
+          if(request.url.path.endsWith('/oeufs/collectes/')) return http.Response('[{"id":90,"nombre_collecte":40}]',200);
+          if(request.url.path.endsWith('/oeufs/statistiques/')) return http.Response('{"stock_oeufs":38}',200);
+          if(request.url.path.endsWith('/oeufs/stock-date/')) return http.Response('{"stock_global":38}',200);
+          if(request.url.path.endsWith('/oeufs/kpi/')) return http.Response('{"production_jour":40}',200);
+        }
         if(request.method!='GET') onlineWrites.add('${request.method} ${request.url.path}');
         if(request.url.path.endsWith('/dashboard/')) return http.Response('{"stock_total":10}',200);
         if(request.url.path.endsWith('/clients/total-dettes/')) return http.Response('{"total_dettes":25.50}',200);

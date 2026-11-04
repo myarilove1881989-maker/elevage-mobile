@@ -77,10 +77,10 @@ class TerrainEntryAccess {
       userId: caps['user'] as int,
       farmId: caps['exploitation'] as int,
       role: caps['role'] as String,
-      rightsVersion: caps['membership']['version'] as int,
+      rightsVersion: caps['membership']['version'] as int, allowHttpV2:true,
     );
-    final required = caps['offline_policy_enabled'] == true && !api.hasUnifiedOfflineSession;
-    final message = rights.role == 'OWNER'
+    final required = rights.role != 'OWNER' && caps['offline_policy_enabled'] == true && !api.hasUnifiedOfflineSession;
+    final message = rights.role == 'OWNER' && rights.httpVersion == 1
         ? 'Le propriétaire consulte et supervise les opérations. La saisie terrain est réservée aux employés autorisés.'
         : !actions.any(rights.allows)
         ? 'Vous ne disposez pas du droit nécessaire pour cette saisie. Contactez le propriétaire.'
@@ -152,7 +152,7 @@ class _TerrainEntryGateState extends State<TerrainEntryGate> {
           ])));
       }
       final access = snapshot.data!;
-      if (access.rights.role == 'OWNER' && widget.ownerBuilder != null) {
+      if (access.rights.role == 'OWNER' && access.message != null && widget.ownerBuilder != null) {
         return widget.ownerBuilder!(context);
       }
       return access.message == null ? widget.builder(context) : _notice(access.message!);
@@ -190,7 +190,7 @@ class _BusinessCommandState extends State<BusinessCommand> {
     future: access, builder: (context, snapshot) {
       final rights = snapshot.data?.rights;
       if (snapshot.connectionState != ConnectionState.done || snapshot.hasError ||
-          identity != (ApiService.sessionIdentity) || rights?.role != 'OPERATEUR' ||
+          identity != (ApiService.sessionIdentity) || rights == null ||
           !widget.actions.any(rights!.allows)) return const SizedBox.shrink();
       return widget.child;
     });

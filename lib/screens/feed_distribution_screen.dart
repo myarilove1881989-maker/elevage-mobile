@@ -1,4 +1,7 @@
+import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
+import '../widgets/feed_distribution_fields.dart';
+import '../offline/outbox.dart' show newOperationUuid;
 
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
@@ -35,7 +38,9 @@ class FeedDistributionScreen extends StatefulWidget {
   State<FeedDistributionScreen> createState() => _FeedDistributionScreenState();
 }
 
-class _FeedDistributionScreenState extends State<FeedDistributionScreen> {
+class _FeedDistributionScreenState extends State<FeedDistributionScreen> with MutationRefresh<FeedDistributionScreen> {
+  @override
+  Future<void> refreshAfterMutation() async { await _load(); }
   List<dynamic> distributions = [];
   bool loading = true;
   String? error;
@@ -46,7 +51,28 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> {
     _load();
   }
 
+  Future<void> correctDistribution(Map entry,bool cancel) async {
+    final physical=entry['physical_stock'] as Map;
+    final amount=TextEditingController(text:'${entry['quantite_kg']}'),reason=TextEditingController();
+    Map<String,dynamic>? pending;
+    await showDialog<void>(context:context,builder:(dialog)=>StatefulBuilder(builder:(context,update)=>AlertDialog(
+      title:Text(cancel?'Annuler la distribution':'Corriger la quantité'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+        if(!cancel)TextField(controller:amount,enabled:pending==null,decoration:const InputDecoration(labelText:'Nouvelle quantité totale (kg)')),
+        TextField(controller:reason,enabled:pending==null,decoration:const InputDecoration(labelText:'Motif obligatoire'))]),
+      actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),
+        TextButton(onPressed:()async{
+          if(reason.text.trim().length<3)return;
+          pending??={'operation_uuid':newOperationUuid(),'expected_version':physical['distribution_version'],'reason':reason.text.trim(),if(cancel)'confirm':true,if(!cancel)'quantite_kg':amount.text.trim().replaceAll(',','.')};
+          try {
+            if(cancel)await widget.apiService.deleteForMaintenance('/alimentation/distributions/${entry['id']}/',pending!);
+            else await widget.apiService.patch('/alimentation/distributions/${entry['id']}/',pending!);
+            if(dialog.mounted)Navigator.pop(dialog);if(mounted)await _load();
+          } catch(_){if(dialog.mounted)update((){});if(mounted)ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content:Text('Résultat à vérifier : renvoyer conservera la même opération.')));}
+        },child:const Text('Confirmer'))])));
+    amount.dispose();reason.dispose();
+  }
   Future<void> _load() async {
+    markDataFresh();
     setState(() {
       loading = true;
       error = null;
@@ -148,8 +174,12 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> {
                             for (final entry in group.value)
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                leading: const Icon(Icons.grass_outlined),
-                                title: Text('${entry['aliment'] ?? ''}'),
+                                leading: entry['id'] is int && entry['local_only']!=true && entry['physical_stock'] is Map && entry['physical_stock']['distribution_version'] is String
+                                  ? BusinessCommand(api:widget.apiService,actions:const {'feed.update','feed.delete'},child:PopupMenuButton<bool>(
+                                    onSelected:(cancel)=>correctDistribution(Map<String,dynamic>.from(entry as Map),cancel),
+                                    itemBuilder:(_)=>const [PopupMenuItem(value:false,child:Text('Corriger la quantité')),PopupMenuItem(value:true,child:Text('Annuler avec motif'))]))
+                                  : const Icon(Icons.grass_outlined),
+                                title: Text('${entry['aliment'] ?? ''}${entry['local_only']==true?' - en attente':''}${entry['_review_required']==true?' - à examiner':''}'),
                                 subtitle: Text(
                                   entry['distribution_at'] == null
                                       ? context.tr('feed_time_unknown')
@@ -220,12 +250,38 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
   List<dynamic> expenses = [];
   int? selectedExpenseId;
   DateTime dateTime = DateTime.now();
-  bool saving = false;
+  bool saving = false, loadingStock=true, stockAttempted=false;
+  final stockDraft=FeedDistributionDraft();
+  final stockOperationId=newOperationUuid();
+  Map<String,dynamic>? stockCatalog, stockRequest;
+  Future<void> loadStock() async {
+    try {
+      final value=await widget.apiService.get('/feed-supplies/');
+      if(mounted && value is Map<String,dynamic> && value['stock_contract']==1)setState(()=>stockCatalog=value);
+    } catch(_) {} finally {if(mounted)setState(()=>loadingStock=false);}
+  }
+  Future<void> saveStock() async {
+    if(saving || loadingStock)return;
+    setState(()=>saving=true);
+    try {
+      stockRequest ??= {...stockDraft.payload(stockCatalog!,widget.lotId,quantity.text,note.text),
+        'operation_uuid':stockOperationId,'distribution_at':DateTime.now().toUtc().toIso8601String()};
+      if(!widget.apiService.hasUnifiedOfflineSession) {
+        stockRequest!.remove('_feed_dependencies');stockRequest!.remove('supply_parent_uuid');
+      }
+      stockAttempted=true;
+      final value=await widget.apiService.post('/alimentation/distributions/',stockRequest!);
+      if(value is! Map || (value['id']==null && value['local_only']!=true))throw StateError('Résultat non confirmé.');
+      if(mounted)Navigator.of(context).pop(true);
+    } catch(e) {if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(stockAttempted?'Résultat à vérifier. Renvoyer conservera la même opération, sans double sortie.':e.toString())));}
+    finally {if(mounted)setState(()=>saving=false);}
+  }
 
   @override
   void initState() {
     super.initState();
     _loadExpenses();
+    loadStock();
   }
 
   Future<void> _loadExpenses() async {
@@ -252,7 +308,8 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
 
 
   Future<void> _save() async {
-    if (saving || !formKey.currentState!.validate()) return;
+    if(stockCatalog!=null){await saveStock();return;}
+    if (saving || loadingStock || !formKey.currentState!.validate()) return;
     setState(() => saving = true);
     try {
       await widget.apiService.createFeedDistribution(
@@ -311,7 +368,10 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                     label: Text('${context.tr('feed_time')} : ${_feedTime(dateTime)}'),
                   ),
                   const SizedBox(height: 14),
-                  TextFormField(
+                  if(loadingStock)const LinearProgressIndicator(),
+                  if(!loadingStock && stockCatalog==null)const Text('Distribution non rattachée : aucun stock physique ne sera déduit. Rechargez le référentiel pour utiliser un stock suivi.'),
+                  if(stockCatalog!=null)FeedDistributionFields(draft:stockDraft,catalog:stockCatalog!,lotId:widget.lotId,editable:!saving && !stockAttempted),
+                  if(stockCatalog==null) TextFormField(
                     key: const Key('feedNameField'),
                     controller: feedName,
                     maxLength: 120,
@@ -322,6 +382,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                   ),
                   TextFormField(
                     key: const Key('feedQuantityField'),
+                    enabled:stockCatalog==null || (!stockAttempted && !saving),
                     controller: quantity,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(labelText: context.tr('feed_quantity')),
@@ -334,11 +395,12 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                   ),
                   TextFormField(
                     key: const Key('feedNoteField'),
+                    enabled:stockCatalog==null || (!stockAttempted && !saving),
                     controller: note,
                     maxLines: 2,
                     decoration: InputDecoration(labelText: context.tr('feed_note')),
                   ),
-                  ExpansionTile(
+                  if(stockCatalog==null) ExpansionTile(
                     title: Text(context.tr('feed_cost_optional')),
                     children: [
                       Text(context.tr('feed_cost_hint')),
@@ -383,7 +445,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                   const SizedBox(height: 18),
                   ElevatedButton(
                     key: const Key('saveFeedDistribution'),
-                    onPressed: saving ? null : _save,
+                    onPressed: saving || loadingStock ? null : _save,
                     child: Text(context.tr('save')),
                   ),
                 ],

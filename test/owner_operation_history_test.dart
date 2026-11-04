@@ -10,6 +10,7 @@ void main() {
   testWidgets('owner reads original, cancellation link, real status and server-side filters',(tester) async {
     final calls=<Map<String,String>>[];
     final api=ApiService(client:MockClient((request) async {
+      if(!request.url.path.endsWith('/history/')) return http.Response('[]',200);
       calls.add(request.url.queryParameters);
       return http.Response(jsonEncode({'results':[{
         'id':1,'operation_id':'11111111-1111-4111-8111-111111111111',
@@ -28,17 +29,18 @@ void main() {
     await tester.pumpWidget(MaterialApp(home:OwnerOperationHistoryScreen(api:api)));
     await tester.pumpAndSettle();
     expect(calls.single['view'],'operations');
-    expect(find.textContaining('Annulée — original conservé'),findsOneWidget);
+    expect(find.textContaining('Annulée — historique conservé'),findsOneWidget);
+    expect(find.text('Synchronisée'),findsOneWidget);
+    expect(find.textContaining('11111111-1111'),findsNothing);
+    await tester.tap(find.text('Filtres'));await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first,'2');
     await tester.enterText(find.byType(TextField).last,'42');
     await tester.tap(find.text('Appliquer les filtres'));await tester.pumpAndSettle();
     expect(calls.last['author'],'2');expect(calls.last['lot'],'42');
-    await tester.tap(find.byType(ExpansionTile));await tester.pumpAndSettle();
-    expect(find.textContaining('Acceptée avec les anciennes permissions'),findsOneWidget);
-    expect(find.textContaining('Reçue sous une ancienne autorisation'),findsOneWidget);
-    expect(find.textContaining('Quantité : 10'),findsWidgets);
-    await tester.ensureVisible(find.text('Ouvrir l’annulation — Erreur de quantité'));
-    await tester.tap(find.text('Ouvrir l’annulation — Erreur de quantité'));await tester.pumpAndSettle();
+    expect(find.textContaining('animal_sales.create'),findsNothing);
+    expect(find.textContaining('grant-original'),findsNothing);
+    await tester.ensureVisible(find.text('Voir l’annulation'));
+    await tester.tap(find.text('Voir l’annulation'));await tester.pumpAndSettle();
     expect(calls.last['operation'],'22222222-2222-4222-8222-222222222222');
     await tester.pumpWidget(const SizedBox.shrink());
   });

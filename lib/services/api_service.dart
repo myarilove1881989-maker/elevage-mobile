@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'health_notifications.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'token_service.dart';
 import 'initial_password.dart';
+import 'egg_collection_version.dart';
 import '../offline/outbox.dart';
 import 'guarded_api_client.dart';
 import 'package:http/http.dart' as http;
@@ -38,14 +40,20 @@ class _ApiClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final identity=ApiService.sessionIdentity;
     try {
       final response = await inner.send(request).timeout(requestTimeout);
       final bytes = await response.stream.toBytes().timeout(requestTimeout);
+      if (response.statusCode >= 200 && response.statusCode < 300 &&
+          identity == ApiService.sessionIdentity && {'POST', 'PUT', 'PATCH', 'DELETE'}.contains(request.method) &&
+          !RegExp(r'/(token|login|password|register|auth)(/|$)').hasMatch(request.url.path)) {
+        ApiService.businessChanges.value++;
+      }
       return http.StreamedResponse(
         Stream.value(bytes),
         response.statusCode,
         headers: response.headers,
-        request: response.request,
+        request: response.request ?? request,
         reasonPhrase: response.reasonPhrase,
         isRedirect: response.isRedirect,
       );
@@ -71,6 +79,7 @@ class ApiService {
   final http.Client _client;
   final TokenStore _tokenStore;
   static final sessionExpired = ValueNotifier<int>(0);
+  static final businessChanges = ValueNotifier<int>(0);
 
   void close() => _client.close();
   // ✅ URL API centralisée (compatible local + Render)
@@ -114,12 +123,12 @@ class ApiService {
     final currentToken = token ?? globalToken;
 
     if (currentToken == null) {
-      return {"Content-Type": "application/json"};
+      return {"Content-Type": "application/json", "Accept": "application/json; elevage-contract=2"};
     }
 
     return {
       "Authorization": "Bearer $currentToken",
-      "Content-Type": "application/json",
+      "Content-Type": "application/json", "Accept": "application/json; elevage-contract=2",
     };
   }
 
@@ -318,6 +327,11 @@ class ApiService {
     await _handleResponse(response,clearSessionOnUnauthorized:false);
   }
 
+  Future<dynamic> deleteForMaintenance(String endpoint, Map<String,dynamic> data) async {
+    final response=await _client.delete(Uri.parse('$baseUrl$endpoint'),headers:_headers(),body:jsonEncode(data));
+    return _handleResponse(response);
+  }
+
   Future<dynamic> patch(String endpoint, Map<String,dynamic> data) async {
     final response=await _client.patch(Uri.parse('$baseUrl${endpoint.startsWith('/')?'':'/'}$endpoint'),
       headers:_headers(),body:jsonEncode(data));
@@ -331,6 +345,7 @@ class ApiService {
   }
 
   Future<void> logout() async {
+    try {await HealthReminderCoordinator.current?.suspend();}catch(_){}
     farmerSession = false;
     clearLocalPresentationIdentity();
     token = null;
@@ -359,6 +374,9 @@ class ApiService {
   }
 
   // ================= LOTS =================
+  static bool isLotClosed(Map lot)=>lot['date_fin']!=null || lot['statut_production']=='TERMINE';
+  Future<List<dynamic>> getActiveLots() async=>(await getLots()).where((lot)=>!isLotClosed(lot as Map)).toList();
+
   Future<List<dynamic>> getLots() async {
     final response = await _client.get(
       Uri.parse("$baseUrl/lots/"),
@@ -479,7 +497,7 @@ class ApiService {
   // ================= DETTES CLIENTS =================
 
   Future<List<DetteClient>> getDettesClients() async {
-    final res = await get("/dettes-clients"); // ⚠️ slash important
+    final res = await get("/dettes-clients/");
 
     return (res as List).map((e) => DetteClient.fromJson(e)).toList();
   }
@@ -543,6 +561,17 @@ class ApiService {
     ).replace(queryParameters: query);
     final response = await _client.get(uri, headers: _headers());
     return await _handleResponse(response);
+  }
+
+  Future<Map<String,dynamic>> updateEggCollection(Map<String,dynamic> original, Map<String,dynamic> values) async {
+    final id=original['id'];
+    final response=await _client.patch(Uri.parse('$baseUrl/oeufs/collectes/$id/'),headers:_headers(),
+      body:jsonEncode({'lot':original['lot'], ...eggValues(values),
+        'expected_version':original['collection_version'] ?? (await eggVersion(original)),
+        if(original['_local_uuid']!=null) 'local_uuid':original['_local_uuid'],
+        if(original['_dependency']!=null) 'dependency':original['_dependency'],
+        'previous_quantity':eggAvailable(original)}));
+    return Map<String,dynamic>.from(await _handleResponse(response) as Map);
   }
 
   Future<Map<String, dynamic>> createEggCollection({
@@ -977,22 +1006,30 @@ class ApiService {
     }
   }
 
-  Future<void> createTask(String title, DateTime date) async {
+  Future<void> createTask(String title, DateTime date, {int? assignedTo}) async {
     final response = await _client.post(
       Uri.parse("$baseUrl/tasks/"),
-      headers: {
-        "Authorization": "Bearer $globalToken",
-        "Content-Type": "application/json",
-      },
+      headers: _headers(),
       body: jsonEncode({
         "title": title,
         "date": date.toIso8601String().split("T")[0],
+        if(assignedTo!=null) "assigned_to": assignedTo,
       }),
     );
 
     if (response.statusCode != 201) {
       throw Exception("Erreur création task");
     }
+  }
+
+  Future<Map<String, dynamic>> createRepeatedTasks(String title, DateTime start,
+      DateTime end, {required int assignedTo, required List<int> weekdays}) async {
+    final result = await post('/tasks/repeat/', {
+      'title': title, 'start_date': start.toIso8601String().split('T')[0],
+      'end_date': end.toIso8601String().split('T')[0],
+      'assigned_to': assignedTo, 'weekdays': weekdays,
+    });
+    return Map<String, dynamic>.from(result as Map);
   }
 
   Future<void> deleteTask(int id) async {

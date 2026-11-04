@@ -1,4 +1,9 @@
 import 'dart:async';
+import '../widgets/feed_supply_fields.dart';
+import '../widgets/vaccine_supply_fields.dart';
+import '../offline/vaccine_local.dart';
+import '../offline/outbox.dart' show newOperationUuid;
+import '../offline/feed_local_catalog.dart';
 import 'package:flutter/material.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../offline/expense_business_date.dart';
@@ -14,8 +19,9 @@ import '../theme/terre_et_or_theme.dart';
 part 'online_expense_form.dart';
 
 class AddDepenseScreen extends StatefulWidget {
-  const AddDepenseScreen({super.key, this.tablet,this.apiService,this.simple=false});
+  const AddDepenseScreen({super.key, this.tablet,this.apiService,this.simple=false,this.procurementKind});
   final bool simple;
+  final String? procurementKind;
   final TabletController? tablet;
   final ApiService? apiService;
   @override
@@ -26,6 +32,46 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
   final formScroll=ScrollController();
   bool resultShown=false;
   ExpenseFormController? model;
+  final localVaccine=VaccineSupplyDraft();
+  Map<String,dynamic>? localVaccineData;
+  bool get localVaccineCategory=>model?.categories?.catalog.categories.any((c)=>c.id==categoryId && c.stockPurpose=='VACCINE')==true;
+  Future<void> loadLocalVaccine() async {
+    try{final data=await localVaccineCatalog(widget.tablet!);if(mounted)setState(()=>localVaccineData=data);}
+    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
+  }
+  final localFeed=FeedSupplyDraft();
+  Map<String,dynamic>? localFeedData;
+  bool feedLoading=false;
+  bool get localFeedCategory=>model?.categories?.catalog.categories.any((c)=>c.id==categoryId && c.stockPurpose=='FEED')==true;
+  Future<void> loadLocalFeed() async {
+    if(feedLoading || widget.tablet==null || !supportsFeedStock(widget.tablet!))return;
+    setState(()=>feedLoading=true);
+    try {final data=await localFeedCatalog(widget.tablet!);if(mounted)setState(()=>localFeedData=data);}
+    catch(e) {if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));}
+    finally {if(mounted)setState(()=>feedLoading=false);}
+  }
+  Future<void> submitLocalExpense() async {
+    Map<String,dynamic>? supply,vaccineSupply;
+    if(localVaccineCategory) {
+      try{if(localVaccineData==null || !supportsVaccines(widget.tablet!))throw StateError('Référentiel vaccins et accès hors ligne à charger.');vaccineSupply=localVaccine.payload();}
+      catch(e){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));return;}
+    }
+    if(localFeedCategory && !supportsFeedStock(widget.tablet!)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Renouvelez votre accès hors ligne avant un approvisionnement suivi.')));return;
+    }
+    final dependencies=<String>[];
+    if(localFeedCategory && supportsFeedStock(widget.tablet!)) {
+      try {
+        if(localFeedData==null)throw StateError('Chargez le stock local avant cet approvisionnement.');
+        supply=localFeed.payload();
+        for(final parent in localFeedData!['pending_purchases'] as List? ?? const []) {
+          if(parent['product']==supply['product'])dependencies.add(parent['operation_id'] as String);
+        }
+      } catch(e) {ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));return;}
+    }
+    await model!.submit(lot:lot,categoryId:categoryId,amount:amount.text,note:note.text,
+      day:model!.dates.businessDayOf(model!.tablet.clock().toUtc()),feedSupply:supply,vaccineSupply:vaccineSupply,feedDependencies:dependencies);
+  }
   final amount = TextEditingController(), note = TextEditingController();
   ExpenseLotSelection? lot;
   int? categoryId;
@@ -75,6 +121,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     checkTimer?.cancel();
     model?.removeListener(_changed);
     model?.dispose();
+    localFeed.dispose();localVaccine.dispose();
     amount.dispose();
     note.dispose();
     super.dispose();
@@ -100,8 +147,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     final m = model;
     if(m==null) {
       return TerrainEntryGate(api:onlineApi!,actions:const {'expenses.create'},
-        ownerBuilder:(_)=>_OnlineExpenseForm(api:onlineApi!,readOnly:true),
-        builder:(_)=>_OnlineExpenseForm(api:onlineApi!));
+        ownerBuilder:(_)=>_OnlineExpenseForm(api:onlineApi!,readOnly:true,procurementKind:widget.procurementKind),
+        builder:(_)=>_OnlineExpenseForm(api:onlineApi!,procurementKind:widget.procurementKind));
     }
     return Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(
       appBar: AppBar(title: const Text('Nouvelle dépense')),
@@ -136,21 +183,24 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                   ExpenseFields(
                     lots:m.lots,categories:[for(final c in m.categories?.catalog.categories ?? <ExpenseCategorySelection>[]) (c.id,c.name)],
                     categoryKey:m.categories,lot:lot,categoryId:categoryId,amount:amount,note:note,day:day,editable:m.editable,
-                    fieldError:fieldError,onLot:(value)=>setState(()=>lot=value),onCategory:(value)=>setState(()=>categoryId=value),
+                    fieldError:fieldError,onLot:(value)=>setState(()=>lot=value),onCategory:(value){setState(()=>categoryId=value);if(localFeedCategory && localFeedData==null)loadLocalFeed();if(localVaccineCategory && localVaccineData==null)loadLocalVaccine();},
                     chooseDate:chooseDate,
                   ),
+                  if(localVaccineCategory)...[
+                    if(localVaccineData!=null)VaccineSupplyFields(draft:localVaccine,catalog:localVaccineData!,editable:m.editable),
+                    TextButton(onPressed:loadLocalVaccine,child:const Text('Charger le référentiel vaccins local')),
+                  ],
+                  if(localFeedCategory && supportsFeedStock(widget.tablet!)) ...[
+                    if(feedLoading)const LinearProgressIndicator(),
+                    if(localFeedData!=null)FeedSupplyFields(draft:localFeed,catalog:localFeedData!,editable:m.editable),
+                    TextButton(onPressed:feedLoading?null:loadLocalFeed,child:const Text('Actualiser le stock estimé')),
+                  ],
                   if (m.dateError != null)
                     Text(m.dateError!, key: const Key('expense-date-error')),
                   FilledButton(
                     key: const Key('expense-submit'),
                     onPressed: m.editable
-                        ? () => m.submit(
-                            lot: lot,
-                            categoryId: categoryId,
-                            amount: amount.text,
-                            note: note.text,
-                            day: m.dates.businessDayOf(m.tablet.clock().toUtc()),
-                          )
+                        ? submitLocalExpense
                         : null,
                     child: Text(widget.simple?'Enregistrer':'Enregistrer sur cet appareil'),
                   ),
@@ -183,6 +233,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
                 if (m.suspended) Text(widget.simple
                   ?'Reconnectez-vous pour consulter cette opération. La saisie déjà enregistrée sera conservée.'
                   :'Rouvrez manuellement le même profil et le grant original pour consulter. Le brouillon ne sera pas réactivé.'),
+                const Text('Les déclarations locales sont conservées. Les stocks estimés attendent leur validation par le serveur.'),
                 const Text(
                   'Le brouillon n’est pas récupérable après fermeture complète de l’application.',
                 ),
