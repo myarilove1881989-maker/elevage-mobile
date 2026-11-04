@@ -26,6 +26,7 @@ class OnlineExpenseServer {
       down = false,
       lost = false,
       refusePost = false;
+  int refusalStatus = 403;
   bool feed = false, vaccine=false;
   String role = 'OPERATEUR';
   int posts = 0, reads = 0;
@@ -88,7 +89,7 @@ class OnlineExpenseServer {
         saved = jsonDecode(request.body) as Map<String, dynamic>;
         if (lost) throw http.ClientException('Synthetic lost response');
         if (refusePost) {
-          return http.Response('{"detail":"DEVICE_PROOF_REQUIRED"}', 403);
+          return http.Response('{"detail":"SYNTHETIC_REJECTED"}', refusalStatus);
         }
         return http.Response(jsonEncode({'id': 40, ...saved!, if(feed || vaccine) 'stock_confirmed':true}), 201);
       }
