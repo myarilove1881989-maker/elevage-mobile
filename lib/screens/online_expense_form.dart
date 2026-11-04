@@ -3,8 +3,9 @@ part of 'add_depense_screen.dart';
 /// HTTP adapter of the shared expense fields and input contract. No local
 /// outbox, grant, new endpoint, automatic retry or alternative business ledger.
 class _OnlineExpenseForm extends StatefulWidget {
-  const _OnlineExpenseForm({required this.api,this.readOnly=false});
+  const _OnlineExpenseForm({required this.api,this.readOnly=false,this.procurementKind});
   final bool readOnly;
+  final String? procurementKind;
   final ApiService api;
   @override
   State<_OnlineExpenseForm> createState() => _OnlineExpenseFormState();
@@ -172,6 +173,8 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         categoryId = null;
         ready = true;
       });
+      final suggested=widget.procurementKind=='FEED'?feedCategories:widget.procurementKind=='VACCINE'?vaccineCategories:<int>{};
+      if(suggested.length==1 && !widget.readOnly)await selectCategory(suggested.single);
     } catch (_) {
       if (mounted) {
         setState(() {
