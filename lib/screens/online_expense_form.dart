@@ -60,6 +60,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         setState(()=>feedCatalog=fresh);
       }
     } catch(_) {if(mounted && sameToken)setState(()=>feedCatalog=null);}
+    if(mounted && sameToken)v2Confirmed(context,message:'Achat enregistré');
 
   }
 
@@ -291,6 +292,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         throw StateError('Unconfirmed response');
       }
       setState(() => confirmed = true);
+      if(result['local_only']!=true)v2Confirmed(context,message:'Dépense enregistrée');
     } catch (e) {
       if (mounted && !handlePurchaseRejection(e)) {
         setState(() {
@@ -306,8 +308,8 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(
-    appBar: AppBar(title: const Text('Nouvelle dépense')),
+  Widget build(BuildContext context) => Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>V2Scaffold(protectDraft:true,busy:busy,
+    appBar: V2AppBar(title: const Text('Nouvelle dépense')),
     body: ListView(
       controller: formScroll,
       padding: const EdgeInsets.all(20),

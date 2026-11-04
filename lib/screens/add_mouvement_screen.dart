@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../widgets/operation_status.dart';
 import '../l10n/app_localizations.dart';
@@ -187,23 +188,23 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
     await showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
+        builder: (dialogContext, setDialogState) => V2AlertDialog(
           title: Text(context.tr('new_customer')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                V2Field(child:TextField(
                   controller: nomController,
                   decoration: InputDecoration(labelText: context.tr('name')),
-                ),
-                TextField(
+                )),
+                V2Field(child:TextField(
                   controller: telController,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(labelText: context.tr('phone')),
-                ),
+                )),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
+                V2Field(child:DropdownButtonFormField<String>(
 
                   isExpanded: true,
 
@@ -231,14 +232,14 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                   onChanged: (value) {
                     setDialogState(() => pays = value ?? '');
                   },
-                ),
-                TextField(
+                )),
+                V2Field(child:TextField(
                   controller: villeController,
                   decoration: InputDecoration(
                     labelText:
                         '${context.tr('city')} (${context.tr('optional')})',
                   ),
-                ),
+                )),
               ],
             ),
           ),
@@ -337,7 +338,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
           await showDialog<void>(
             context: context,
             barrierDismissible: false,
-            builder: (dialogContext) => AlertDialog(
+            builder: (dialogContext) => V2AlertDialog(
               title: Text(context.tr('birth_saved')),
               content: Text(
                 '${saved['nouveau_lot']['nom']} : '
@@ -488,15 +489,15 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(protectDraft:true,body: Center(child: CircularProgressIndicator()));
     }
 
     return AbsorbPointer(
       absorbing: isSubmitting,
       child: Theme(
         data: terreEtOrTheme(context),
-        child: Scaffold(
-          appBar: AppBar(title: Text(context.tr('add_movement'))),
+        child: V2Scaffold(protectDraft:true,
+          appBar: V2AppBar(title: Text(context.tr('add_movement'))),
           body: Padding(
             padding: const EdgeInsets.all(16),
             child: SingleChildScrollView(
@@ -513,7 +514,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                     child: Column(
                       children: [
                         // TYPE
-                        DropdownButtonFormField<String>(
+                        V2Field(child:DropdownButtonFormField<String>(
 
                           isExpanded: true,
 
@@ -538,12 +539,12 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             labelText: context.tr('movement_type'),
                             border: OutlineInputBorder(),
                           ),
-                        ),
+                        )),
 
                         const SizedBox(height: 16),
 
                         if (selectedType == 'VENTE') ...[
-                          DropdownButtonFormField<String>(
+                          V2Field(child:DropdownButtonFormField<String>(
 
                             isExpanded: true,
 
@@ -571,12 +572,12 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                 eggOriginsComplete = false;
                               });
                             },
-                          ),
+                          )),
                           const SizedBox(height: 16),
                         ],
 
                         // LOT
-                        DropdownButtonFormField<int>(
+                        V2Field(child:DropdownButtonFormField<int>(
 
                           isExpanded: true,
 
@@ -606,7 +607,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                 : context.tr('batch'),
                             border: OutlineInputBorder(),
                           ),
-                        ),
+                        )),
                         if (selectedType == 'NAISSANCE' && selectedLot != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
@@ -629,7 +630,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               Row(
                                 children: [
                                   Expanded(
-                                    child: DropdownButtonFormField<int>(
+                                    child: V2Field(child:DropdownButtonFormField<int>(
 
                                       isExpanded: true,
 
@@ -650,7 +651,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                         labelText: context.tr('customer'),
                                         border: OutlineInputBorder(),
                                       ),
-                                    ),
+                                    )),
                                   ),
                                   const SizedBox(width: 10),
                                   IconButton(
@@ -722,7 +723,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                         // DATE
                         TerreEtOrDateTile(
                           label:
-                              "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
+                              "${context.tr('date')} : ${v2Day(selectedDate.toLocal().toIso8601String())}",
                           onTap: null,
                         ),
 
@@ -731,7 +732,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                         // QUANTITE
                         if (selectedType == 'VENTE' &&
                             selectedProduct == 'OEUFS') ...[
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('eggSaleTrays'),
                             controller: traysController,
                             keyboardType: TextInputType.number,
@@ -740,9 +741,9 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               border: const OutlineInputBorder(),
                             ),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('eggSaleExtra'),
                             controller: extraEggsController,
                             keyboardType: TextInputType.number,
@@ -751,7 +752,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               border: const OutlineInputBorder(),
                             ),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 8),
                           Text(
                             '${context.tr('sale_total_eggs')} : '
@@ -760,7 +761,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             key: const Key('eggSaleTotalEggs'),
                           ),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('eggSaleTotalPrice'),
                             controller: totalPriceController,
                             keyboardType: const TextInputType.numberWithOptions(
@@ -772,9 +773,9 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                   '(${AppSettings.instance.currency.symbol})',
                               border: const OutlineInputBorder(),
                             ),
-                          ),
+                          )),
                         ] else if (selectedType == 'NAISSANCE') ...[
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthTotal'),
                             controller: quantiteController,
                             keyboardType: TextInputType.number,
@@ -783,9 +784,9 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               border: const OutlineInputBorder(),
                             ),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthStillborn'),
                             controller: stillbornController,
                             keyboardType: TextInputType.number,
@@ -794,7 +795,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               border: const OutlineInputBorder(),
                             ),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 8),
                           Text(
                             '${context.tr('birth_live')} : '
@@ -802,16 +803,16 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             key: const Key('birthCalculatedLive'),
                           ),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthNewLotName'),
                             controller: birthLotNameController,
                             decoration: InputDecoration(
                               labelText: context.tr('birth_new_lot'),
                               border: const OutlineInputBorder(),
                             ),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
+                          V2Field(child:DropdownButtonFormField<String>(
 
                             isExpanded: true,
 
@@ -842,18 +843,18 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             onChanged: (value) => setState(
                               () => birthProductionType = value ?? 'CHAIR',
                             ),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthNote'),
                             controller: birthNoteController,
                             decoration: InputDecoration(
                               labelText: context.tr('birth_note'),
                               border: const OutlineInputBorder(),
                             ),
-                          ),
+                          )),
                         ] else ...[
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('animalSaleQuantity'),
                             controller: quantiteController,
                             keyboardType: TextInputType.number,
@@ -861,9 +862,9 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               labelText: context.tr('quantity'),
                               border: const OutlineInputBorder(),
                             ),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('animalSalePrice'),
                             controller: prixController,
                             keyboardType: TextInputType.number,
@@ -873,7 +874,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                   '(${AppSettings.instance.currency.symbol})',
                               border: const OutlineInputBorder(),
                             ),
-                          ),
+                          )),
                         ],
 
                         const SizedBox(height: 20),

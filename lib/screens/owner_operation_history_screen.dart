@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
@@ -89,20 +90,20 @@ class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScree
     ]);
   }
   @override
-  Widget build(BuildContext context)=>Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(appBar:AppBar(title:const Text('Activité complète reçue')),
+  Widget build(BuildContext context)=>Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>V2Scaffold(appBar:V2AppBar(title:const Text('Activité complète reçue')),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       const TerreEtOrHeader(icon:Icons.history,title:'Historique de l’exploitation',subtitle:'Consultez et filtrez les opérations de votre équipe'),
       const Text('Les opérations encore sur une tablette apparaîtront après transmission. Aucune validation du propriétaire n’est nécessaire.'),
       ExpansionTile(title:const Text('Filtres'),children:[
-      TextField(controller:author,enabled:!busy,decoration:const InputDecoration(labelText:'Éleveur — nom')),
-      TextField(controller:lot,enabled:!busy,decoration:const InputDecoration(labelText:'Lot — nom')),
-      DropdownButtonFormField<String>(initialValue:kind,decoration:const InputDecoration(labelText:'Type d’opération'),
+      V2Field(child:TextField(controller:author,enabled:!busy,decoration:const InputDecoration(labelText:'Éleveur — nom'))),
+      V2Field(child:TextField(controller:lot,enabled:!busy,decoration:const InputDecoration(labelText:'Lot — nom'))),
+      V2Field(child:DropdownButtonFormField<String>(initialValue:kind,decoration:const InputDecoration(labelText:'Type d’opération'),
         items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['VENTE_ANIMAUX','VENTE_OEUFS','DEPENSE','ACHAT','NAISSANCE','MORTALITE','DON','VOL','CLIENT','COLLECTE_OEUFS','ENCAISSEMENT','VACCINATION','ALIMENTATION','PESEE','TASK'])
-          DropdownMenuItem(value:code,child:Text(historyTypeLabel(code)))],onChanged:busy?null:(v)=>setState(()=>kind=v!)),
-      DropdownButtonFormField<String>(initialValue:status,decoration:const InputDecoration(labelText:'Statut'),
+          DropdownMenuItem(value:code,child:Text(historyTypeLabel(code)))],onChanged:busy?null:(v)=>setState(()=>kind=v!))),
+      V2Field(child:DropdownButtonFormField<String>(initialValue:status,decoration:const InputDecoration(labelText:'Statut'),
         items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['En attente','Synchronisée','Échec'])
           DropdownMenuItem(value:code,child:Text(code))],
-        onChanged:busy?null:(v)=>setState(()=>status=v!)),
+        onChanged:busy?null:(v)=>setState(()=>status=v!))),
       TextButton(onPressed:busy?null:()=>date(true),child:Text('Du : ${start?.toString().split(' ').first??'sans limite'}')),
       TextButton(onPressed:busy?null:()=>date(false),child:Text('Au : ${end?.toString().split(' ').first??'sans limite'}')),
       FilledButton(onPressed:busy?null:()=>load(),child:const Text('Appliquer les filtres')),

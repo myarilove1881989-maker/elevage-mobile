@@ -24,8 +24,11 @@ void main(){
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('distribution-stock-product')));await tester.pumpAndSettle();
     await tester.tap(find.text('Aliment suivi').last);await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Informations : Stock disponible'));await tester.pumpAndSettle();
     expect(find.textContaining('Confirmé : 500 kg'),findsOneWidget);
     expect(find.textContaining('Disponible estimé : 420 kg'),findsOneWidget);
+    await tester.tap(find.text('Fermer'));await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('feedQuantityField')));await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('feedQuantityField')),'421');
     await tester.scrollUntilVisible(find.byKey(const Key('saveFeedDistribution')), 250, scrollable:find.byType(Scrollable).first);await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('saveFeedDistribution')));await tester.pumpAndSettle();

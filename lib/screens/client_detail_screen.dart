@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
 import 'dart:async';
@@ -169,7 +170,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
       barrierDismissible:false,
       builder: (_) => StatefulBuilder(
         builder: (context, setStateDialog) {
-          return PopScope(canPop:!isPaying,child:AlertDialog(
+          return PopScope(canPop:!isPaying,child:V2AlertDialog(
             title: Row(
               children: [
                 const Icon(Icons.payment),
@@ -207,7 +208,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                V2Field(child:TextField(
                   controller: controller,
                   enabled:!isPaying,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -219,16 +220,16 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                     prefixIcon: Icon(Icons.euro),
                     border: OutlineInputBorder(),
                   ),
-                ),
+                )),
                 if(api.hasUnifiedOfflineSession) ...[
                   const SizedBox(height:14),
-                  DropdownButtonFormField<String>(initialValue:paymentMode,
+                  V2Field(child:DropdownButtonFormField<String>(initialValue:paymentMode,
                     decoration:const InputDecoration(labelText:'Mode de paiement'),
                     items:const [DropdownMenuItem(value:'ESPECES',child:Text('Espèces')),
                       DropdownMenuItem(value:'MOBILE_MONEY',child:Text('Mobile Money')),
                       DropdownMenuItem(value:'VIREMENT',child:Text('Virement')),
                       DropdownMenuItem(value:'CHEQUE',child:Text('Chèque'))],
-                    onChanged:isPaying?null:(value)=>setStateDialog(()=>paymentMode=value)),
+                    onChanged:isPaying?null:(value)=>setStateDialog(()=>paymentMode=value))),
                 ],
                 const SizedBox(height: 10),
                 SizedBox(
@@ -807,7 +808,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
               SizedBox(
                 width: double.infinity,
                 child: BusinessCommand(api: api, actions: const {'cash.create'}, child: ElevatedButton.icon(
-                  onPressed: () => payer((venteId as num).toInt(), reste),
+                  onPressed: () => payer(venteId.toInt(), reste),
                   icon: const Icon(Icons.payment, size: 18),
                   label: Text(context.tr('pay')),
                 )),
@@ -916,8 +917,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.nom), elevation: 0),
+    return V2Scaffold(
+      appBar: V2AppBar(title: Text(widget.nom), elevation: 0),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : loadError != null

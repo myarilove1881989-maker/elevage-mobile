@@ -12,7 +12,6 @@ import 'package:app_elevage/screens/settings_screen.dart';
 import 'package:app_elevage/screens/initial_password_screen.dart';
 import 'package:app_elevage/screens/supervision_screen.dart';
 import 'package:app_elevage/services/api_service.dart';
-import 'package:app_elevage/services/initial_password.dart';
 import 'package:app_elevage/services/supervision_service.dart';
 import 'package:app_elevage/widgets/operation_status.dart';
 import 'foundation_api_test.dart' show TestIdentity, TestSecretStore;

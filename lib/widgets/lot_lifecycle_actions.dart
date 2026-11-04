@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 
@@ -57,7 +58,7 @@ class _LifecycleDialogState extends State<_LifecycleDialog>{
       if(mounted)Navigator.pop(context,true);
     }catch(problem){if(mounted)setState((){sending=false;error='$problem';});}
   }
-  @override Widget build(BuildContext context)=>PopScope(canPop:!sending,child:AlertDialog(
+  @override Widget build(BuildContext context)=>PopScope(canPop:!sending,child:V2AlertDialog(
     title:Text(reopen?'Réouvrir le lot':'Clôturer le lot'),
     content:SizedBox(width:440,child:Form(key:form,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text('${widget.data['message']}'),const SizedBox(height:12),
@@ -65,11 +66,11 @@ class _LifecycleDialogState extends State<_LifecycleDialog>{
       if(!reopen)...[
         const SizedBox(height:12),
         const Text('Même si le stock est non nul, aucune vente, perte ou sortie ne sera créée.'),
-        TextFormField(key:const Key('lot-close-date'),controller:date,enabled:!sending,
+        V2Field(child:TextFormField(key:const Key('lot-close-date'),controller:date,enabled:!sending,
           decoration:InputDecoration(labelText:'Date de clôture (AAAA-MM-JJ)',helperText:'Au plus tôt : ${widget.data['date_minimum']}'),
-          keyboardType:TextInputType.datetime,validator:(value){final d=DateTime.tryParse(value??'');return d==null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value??'')?'Indiquez une date valide.':null;}),
+          keyboardType:TextInputType.datetime,validator:(value){final d=DateTime.tryParse(value??'');return d==null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value??'')?'Indiquez une date valide.':null;})),
       ],
-      TextFormField(controller:reason,enabled:!sending,maxLength:1000,decoration:const InputDecoration(labelText:'Motif (facultatif)')),
+      V2Field(child:TextFormField(controller:reason,enabled:!sending,maxLength:1000,decoration:const InputDecoration(labelText:'Motif (facultatif)'))),
       if(error!=null)Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error)),
     ])))),
     actions:[TextButton(onPressed:sending?null:()=>Navigator.pop(context,false),child:const Text('Annuler')),

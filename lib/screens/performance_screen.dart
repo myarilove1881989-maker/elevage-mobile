@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -282,8 +283,8 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
   @override
   Widget build(BuildContext context) => Theme(
         data: terreEtOrTheme(context),
-        child: Scaffold(
-          appBar: AppBar(title: Text(context.tr('performance'))),
+        child: V2Scaffold(
+          appBar: V2AppBar(title: Text(context.tr('performance'))),
           body: isLoading
               ? const Center(child: CircularProgressIndicator())
               : error != null
@@ -327,7 +328,7 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
                                     ? 'Compare margins and monthly sales by species'
                                     : 'Comparez les marges et les ventes mensuelles par espèce',
                               ),
-                              DropdownButtonFormField<int>(
+                              V2Field(child:DropdownButtonFormField<int>(
                                 value: selectedSpeciesId,
                                 decoration: InputDecoration(
                                   labelText: context.tr('species'),
@@ -348,7 +349,7 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
                                   if (value == null) return;
                                   setState(() => selectedSpeciesId = value);
                                 },
-                              ),
+                              )),
                               const SizedBox(height: 18),
                               LayoutBuilder(builder: (context, constraints) {
                                 if (constraints.maxWidth < 900) {

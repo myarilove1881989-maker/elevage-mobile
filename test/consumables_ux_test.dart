@@ -318,7 +318,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Croissance').last);
       await t.pumpAndSettle();
-      expect(find.text('Entrée · 500'), findsOneWidget);
+      expect(find.text('Entrée — Croissance — 500 kg'), findsOneWidget);
       expect(find.textContaining('03/11/2026'), findsOneWidget);
       expect(find.textContaining('private-'), findsNothing);
       expect(find.textContaining('opérateur 42'), findsNothing);

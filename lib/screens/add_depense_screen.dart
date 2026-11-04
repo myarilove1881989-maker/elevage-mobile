@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'dart:async';
 import '../widgets/feed_supply_fields.dart';
 import '../widgets/vaccine_supply_fields.dart';
@@ -150,8 +151,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
         ownerBuilder:(_)=>_OnlineExpenseForm(api:onlineApi!,readOnly:true,procurementKind:widget.procurementKind),
         builder:(_)=>_OnlineExpenseForm(api:onlineApi!,procurementKind:widget.procurementKind));
     }
-    return Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(
-      appBar: AppBar(title: const Text('Nouvelle dépense')),
+    return Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>V2Scaffold(protectDraft:true,
+      appBar: V2AppBar(title: const Text('Nouvelle dépense')),
       body: ListView(
               controller:formScroll,
               padding: const EdgeInsets.all(20),
@@ -260,15 +261,15 @@ class _OriginalExpensePinDialogState extends State<_OriginalExpensePinDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => V2AlertDialog(
     title: const Text('Consulter sous le profil original'),
-    content: TextField(
+    content: V2Field(child:TextField(
       key: const Key('expense-original-pin'),
       controller: pin,
       obscureText: true,
       keyboardType: TextInputType.number,
       decoration: InputDecoration(labelText:widget.personalCode?'Code personnel':'PIN personnel existant'),
-    ),
+    )),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),

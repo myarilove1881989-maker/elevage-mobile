@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
@@ -76,10 +77,10 @@ class _LotDetailScreenState extends State<LotDetailScreen> with MutationRefresh<
   @override
   Widget build(BuildContext context) {
     if (isLoading && lot == null)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(body: Center(child: CircularProgressIndicator()));
     if (lot == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Lot')),
+      return V2Scaffold(
+        appBar: V2AppBar(title: const Text('Lot')),
         body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(loadError ?? 'Lot indisponible.', textAlign: TextAlign.center),
           TextButton(onPressed: fetchLot, child: const Text('Réessayer')),
@@ -107,8 +108,8 @@ class _LotDetailScreenState extends State<LotDetailScreen> with MutationRefresh<
       0,
       (s, d) => s + numValue(d['montant']),
     );
-    return Scaffold(
-      appBar: AppBar(title: Text(lot!['nom']?.toString() ?? 'Lot')),
+    return V2Scaffold(
+      appBar: V2AppBar(title: Text(lot!['nom']?.toString() ?? 'Lot')),
       body: RefreshIndicator(
         onRefresh: fetchLot,
         child: LayoutBuilder(

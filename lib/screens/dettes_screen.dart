@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
@@ -79,8 +80,8 @@ class _DettesScreenState extends State<DettesScreen> with MutationRefresh<Dettes
     final billed = clients.fold<double>(0, (s, c) => s + c.totalFacture);
     final paid = clients.fold<double>(0, (s, c) => s + c.totalPaye);
     final due = clients.fold<double>(0, (s, c) => s + c.reste);
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('customer_debts'))),
+    return V2Scaffold(
+      appBar: V2AppBar(title: Text(context.tr('customer_debts'))),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : loadError != null
@@ -132,13 +133,13 @@ class _DettesScreenState extends State<DettesScreen> with MutationRefresh<Dettes
                       ],
                     ),
                     const SizedBox(height: 14),
-                    TextField(
+                    V2Field(child:TextField(
                       decoration: InputDecoration(
                         hintText: context.tr('search_name_phone'),
                         prefixIcon: const Icon(Icons.search),
                       ),
                       onChanged: (v) => setState(() => searchQuery = v),
-                    ),
+                    )),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,

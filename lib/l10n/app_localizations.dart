@@ -13,7 +13,7 @@ class AppLocalizations {
       'refresh': 'Actualiser',
       'purchases': 'Achats',
       'expenses': 'Dépenses',
-      'production_tracking': 'Suivi de production',
+      'production_tracking': 'Production',
       'production_tracking_subtitle':
           'Choisissez une espèce et un lot pour accéder à son suivi',
       'production_tracking_load_error':

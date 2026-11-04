@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -341,7 +342,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
   @override
   Widget build(BuildContext context)=>AnimatedBuilder(animation:tablet,builder:(context,_) {
     final session=tablet.operators?.session;
-    return Scaffold(
+    return V2Scaffold(
       bottomNavigationBar: Config.current.isLab ? SafeArea(child: ListenableBuilder(
         listenable: LabNetworkGate.instance,
         builder: (context, _) => MaterialBanner(
@@ -364,7 +365,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
         FarmDestination.agenda:()=>_selectPage('tasks'),
         FarmDestination.production:()=>_openOperation('COLLECTE_OEUFS'),
       }),
-    ]))),appBar:AppBar(title:Text(widget.configure?'Configurer ma tablette':'Parcours utilisateur'),actions:[
+    ]))),appBar:V2AppBar(title:Text(widget.configure?'Configurer ma tablette':'Parcours utilisateur'),actions:[
       ConnectionIndicator(networkAvailable:tablet.sync?.networkAvailable,
         lastSuccess:tablet.sync?.networkAvailable==true?tablet.sync?.summary.lastSuccess:null,
         syncing:manualSyncBusy || tablet.sync?.busy==true,syncUnavailable:tablet.sync?.error!=null,
@@ -420,9 +421,9 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
             : '5. Préparation à terminer : seules les étapes confirmées sont cochées.'),
           const SizedBox(height:12),
         ],
-        TextField(controller:username,autocorrect:false,decoration:const InputDecoration(labelText:'Compte personnel')),
-        TextField(controller:password,obscureText:true,enableSuggestions:false,autocorrect:false,
-          decoration:const InputDecoration(labelText:'Mot de passe')),
+        V2Field(child:TextField(controller:username,autocorrect:false,decoration:const InputDecoration(labelText:'Compte personnel'))),
+        V2Field(child:TextField(controller:password,obscureText:true,enableSuggestions:false,autocorrect:false,
+          decoration:const InputDecoration(labelText:'Mot de passe'))),
         FilledButton(onPressed:busy?null:()=>_run(() async {
           try {
             await tablet.signIn(username.text.trim(),password.text);
@@ -444,7 +445,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
             'La préparation de tablette ne l’active pas automatiquement.'),
           if(tablet.farmId!=null && !tablet.knownDeviceRevoked) OutlinedButton(
             onPressed:busy || tablet.offlinePolicyEnabled?null:() async {
-              final confirmed=await showDialog<bool>(context:context,builder:(context)=>AlertDialog(
+              final confirmed=await showDialog<bool>(context:context,builder:(context)=>V2AlertDialog(
                 title:const Text('Activer le parcours hors ligne ?'),
                 content:const Text('Cette décision concerne votre exploitation. Une tablette principale active et au moins un opérateur actif sont requis. Les droits individuels restent applicables.'),
                 actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('Annuler')),
@@ -489,11 +490,11 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
         },child:const Text('Changer mon PIN')),
         const Text('Les données confirmées et les déclarations de cette tablette restent distinctes.'),
         const SizedBox(height:12),
-        DropdownButtonFormField<String>(key:ValueKey(collection),initialValue:collection,decoration:const InputDecoration(labelText:'Consulter'),
+        V2Field(child:DropdownButtonFormField<String>(key:ValueKey(collection),initialValue:collection,decoration:const InputDecoration(labelText:'Consulter'),
           items:const [DropdownMenuItem(value:'lots',child:Text('Lots')),DropdownMenuItem(value:'clients',child:Text('Clients')),
             DropdownMenuItem(value:'species',child:Text('Espèces')),DropdownMenuItem(value:'tasks',child:Text('Agenda')),
             DropdownMenuItem(value:'sales',child:Text('Ventes')),DropdownMenuItem(value:'cash',child:Text('Encaissements reçus'))],
-          onChanged:busy?null:(value) { if(value==null) return;collection=value;offset=0;_run(_read); }),
+          onChanged:busy?null:(value) { if(value==null) return;collection=value;offset=0;_run(_read); })),
         for(final row in rows) ListTile(onTap:collection=='tasks' && !busy?()=>_reportTask(row):null,
           title:Text(((row['data'] as Map)['nom']??(row['data'] as Map)['title']??'Donnée').toString()),
           subtitle:collection=='lots'?Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -528,10 +529,10 @@ class _PersonalPinDialogState extends State<_PersonalPinDialog> {
   @override
   void dispose() {pin.dispose();super.dispose();}
   @override
-  Widget build(BuildContext context)=>AlertDialog(
-    title:Text(widget.title),content:TextField(controller:pin,obscureText:true,
+  Widget build(BuildContext context)=>V2AlertDialog(
+    title:Text(widget.title),content:V2Field(child:TextField(controller:pin,obscureText:true,
       keyboardType:TextInputType.number,maxLength:12,autofocus:true,
-      decoration:const InputDecoration(labelText:'6 à 12 chiffres')),
+      decoration:const InputDecoration(labelText:'6 à 12 chiffres'))),
     actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
       FilledButton(onPressed:()=>Navigator.pop(context,pin.text),child:const Text('Valider'))]);
 }

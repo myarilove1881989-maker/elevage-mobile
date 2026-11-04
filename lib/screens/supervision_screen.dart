@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/access_error.dart';
@@ -80,7 +81,7 @@ class _SupervisionScreenState extends State<SupervisionScreen> {
     if(mounted) {await load();}
   }
   @override
-  Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Supervision et activité')),
+  Widget build(BuildContext context)=>V2Scaffold(appBar:V2AppBar(title:const Text('Supervision et activité')),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       const Text('Données reçues par le serveur. Les opérations encore uniquement sur la tablette ne sont pas visibles ici.'),
       const SizedBox(height:12),
@@ -88,22 +89,22 @@ class _SupervisionScreenState extends State<SupervisionScreen> {
         ChoiceChip(label:const Text('Rapprochements'),selected:!journal,onSelected:loading?null:(_){setState(() {journal=false;page=1;});load();}),
         ChoiceChip(label:const Text('Journal d’activité'),selected:journal,onSelected:loading?null:(_){setState(() {journal=true;page=1;});load();}),
       ]),
-      if(!journal) DropdownButtonFormField<String>(isExpanded:true,initialValue:state,
+      if(!journal) V2Field(child:DropdownButtonFormField<String>(isExpanded:true,initialValue:state,
         decoration:const InputDecoration(labelText:'État des déclarations'),items:[for(final entry in _states.entries)DropdownMenuItem(value:entry.key,child:Text(entry.value))],
-        onChanged:loading?null:(value){if(value!=null) {setState(() {state=value;page=1;});load();}}),
+        onChanged:loading?null:(value){if(value!=null) {setState(() {state=value;page=1;});load();}})),
       if(journal) ...[
-        DropdownButtonFormField<int>(isExpanded:true,key:ValueKey('author-$authorFilter'),initialValue:authorFilter,
+        V2Field(child:DropdownButtonFormField<int>(isExpanded:true,key:ValueKey('author-$authorFilter'),initialValue:authorFilter,
           decoration:const InputDecoration(labelText:'Auteur original'),items:[const DropdownMenuItem(value:null,child:Text('Tous les auteurs')),
             for(final entry in names.entries)DropdownMenuItem(value:entry.key,child:Text(entry.value,maxLines:1,overflow:TextOverflow.ellipsis))],
-          onChanged:loading?null:(value){setState(() {authorFilter=value;page=1;});load();}),
-        DropdownButtonFormField<int>(isExpanded:true,key:ValueKey('decider-$deciderFilter'),initialValue:deciderFilter,
+          onChanged:loading?null:(value){setState(() {authorFilter=value;page=1;});load();})),
+        V2Field(child:DropdownButtonFormField<int>(isExpanded:true,key:ValueKey('decider-$deciderFilter'),initialValue:deciderFilter,
           decoration:const InputDecoration(labelText:'Décideur'),items:[const DropdownMenuItem(value:null,child:Text('Tous les décideurs')),
             for(final entry in names.entries)DropdownMenuItem(value:entry.key,child:Text(entry.value,maxLines:1,overflow:TextOverflow.ellipsis))],
-          onChanged:loading?null:(value){setState(() {deciderFilter=value;page=1;});load();}),
-        DropdownButtonFormField<String>(isExpanded:true,key:ValueKey('action-$actionFilter'),initialValue:actionFilter,
+          onChanged:loading?null:(value){setState(() {deciderFilter=value;page=1;});load();})),
+        V2Field(child:DropdownButtonFormField<String>(isExpanded:true,key:ValueKey('action-$actionFilter'),initialValue:actionFilter,
           decoration:const InputDecoration(labelText:'Action'),items:[const DropdownMenuItem(value:'',child:Text('Toutes les actions')),
             for(final entry in _actions.entries)DropdownMenuItem(value:entry.key,child:Text(entry.value,maxLines:1,overflow:TextOverflow.ellipsis))],
-          onChanged:loading?null:(value){setState(() {actionFilter=value??'';page=1;});load();}),
+          onChanged:loading?null:(value){setState(() {actionFilter=value??'';page=1;});load();})),
         Wrap(spacing:12,children:[TextButton(onPressed:loading?null:() async {
           final selected=await showDateRangePicker(context:context,firstDate:DateTime(2010),lastDate:DateTime.now(),initialDateRange:dateFilter);
           if(selected!=null && mounted) {setState(() {dateFilter=selected;page=1;});load();}
@@ -170,9 +171,9 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
     final reason=TextEditingController();
     PendingReconciliationDecision? pending;
     await showDialog<void>(context:context,builder:(dialog)=>StatefulBuilder(builder:(context,update){
-      return AlertDialog(title:const Text('Classer sans application'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+      return V2AlertDialog(title:const Text('Classer sans application'),content:Column(mainAxisSize:MainAxisSize.min,children:[
         const Text('Aucun stock ni montant ne sera modifié. L’original restera conservé. Une nouvelle saisie nécessitera un accès valide.'),
-        TextField(controller:reason,enabled:pending==null,decoration:const InputDecoration(labelText:'Motif obligatoire'))]),
+        V2Field(child:TextField(controller:reason,enabled:pending==null,decoration:const InputDecoration(labelText:'Motif obligatoire')))]),
         actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),
           TextButton(onPressed:()async{
             if(reason.text.trim().length<3)return;
@@ -192,7 +193,7 @@ class _DeclarationDetailState extends State<_DeclarationDetail> {
     final receipt=row?['receipt'] as Map?;
     final recognized=receipt?['cash_recognition'] as Map?;
     final applied=receipt?['applied_at']!=null;
-    return Scaffold(appBar:AppBar(title:const Text('Déclaration et historique')),body:ListView(padding:const EdgeInsets.all(16),children:[
+    return V2Scaffold(appBar:V2AppBar(title:const Text('Déclaration et historique')),body:ListView(padding:const EdgeInsets.all(16),children:[
       if(loading) const Center(child:CircularProgressIndicator()),
       if(error!=null) Text(error!,style:const TextStyle(color:Colors.red)),
       if(row!=null) ...[
@@ -318,32 +319,32 @@ class _DecisionDialogState extends State<_DecisionDialog> {
     finally {if(mounted) {setState(()=>busy=false);}}
   }
   @override
-  Widget build(BuildContext context)=>AlertDialog(title:const Text('Décision de rapprochement'),
+  Widget build(BuildContext context)=>V2AlertDialog(title:const Text('Décision de rapprochement'),
     content:SizedBox(width:460,child:SingleChildScrollView(child:Form(key:form,child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('L’auteur et la déclaration d’origine restent conservés. Votre décision sera enregistrée avec son motif.'),
-      DropdownButtonFormField<String>(isExpanded:true,initialValue:action,
+      V2Field(child:DropdownButtonFormField<String>(isExpanded:true,initialValue:action,
         decoration:const InputDecoration(labelText:'Décision'),items:[for(final value in availableActions)DropdownMenuItem(value:value,child:Text(_actions[value]!))],
-        onChanged:busy || pending!=null?null:(value){if(value!=null) {setState(()=>action=value);if(value=='CASH_ALLOCATION' && sales.isEmpty) {loadSales();}}}),
+        onChanged:busy || pending!=null?null:(value){if(value!=null) {setState(()=>action=value);if(value=='CASH_ALLOCATION' && sales.isEmpty) {loadSales();}}})),
       if(action=='REVERSE') Text((widget.row['receipt'] as Map)['cash_recognition']!=null?
         'Les affectations seront annulées. Le paiement et le montant physique reçu restent conservés.':
         'L’effet appliqué sera compensé. La déclaration et ses écritures d’origine restent dans l’historique.'),
       if(currentTask!=null) Text('État actuel de la tâche : ${{'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée','CANCELLED':'Annulée'}[currentTask!['status']]??'À vérifier'}'),
       if(action=='CORRECTION') for(final entry in editors.entries)if(entry.key=='status')
-        DropdownButtonFormField<String>(isExpanded:true,initialValue:entry.value.text,decoration:const InputDecoration(labelText:'État observé de la tâche'),
+        V2Field(child:DropdownButtonFormField<String>(isExpanded:true,initialValue:entry.value.text,decoration:const InputDecoration(labelText:'État observé de la tâche'),
           items:[for(final status in {'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée'}.entries)DropdownMenuItem(value:status.key,child:Text(status.value))],
-          onChanged:busy || pending!=null?null:(value){if(value!=null) {entry.value.text=value;}})
-      else TextFormField(key:ValueKey('correction-${entry.key}'),controller:entry.value,enabled:!busy && pending==null,
-        decoration:InputDecoration(labelText:_fields[entry.key]),validator:(value)=>validateField(entry.key,value)),
+          onChanged:busy || pending!=null?null:(value){if(value!=null) {entry.value.text=value;}}))
+      else V2Field(child:TextFormField(key:ValueKey('correction-${entry.key}'),controller:entry.value,enabled:!busy && pending==null,
+        decoration:InputDecoration(labelText:_fields[entry.key]),validator:(value)=>validateField(entry.key,value))),
       if(action=='CASH_ALLOCATION') ...[
-        DropdownButtonFormField<Map<String,dynamic>>(isExpanded:true,key:ValueKey('allocation-sales-$salesPage'),initialValue:sale,
+        V2Field(child:DropdownButtonFormField<Map<String,dynamic>>(isExpanded:true,key:ValueKey('allocation-sales-$salesPage'),initialValue:sale,
           decoration:const InputDecoration(labelText:'Vente du client à régler'),items:[for(final row in sales)DropdownMenuItem(value:row,child:Text('${_entities[row['entity_type']]} • ${_date(row['date'])} • dû ${row['reste_a_payer']}'))],
-          onChanged:busy || pending!=null?null:(value)=>setState(()=>sale=value),validator:(value)=>value==null?'Choisissez la vente à régler.':null),
+          onChanged:busy || pending!=null?null:(value)=>setState(()=>sale=value),validator:(value)=>value==null?'Choisissez la vente à régler.':null)),
         if(moreSales) TextButton(onPressed:busy || pending!=null?null:(){salesPage++;loadSales();},child:const Text('Afficher les ventes suivantes')),
-        TextFormField(controller:amount,enabled:!busy && pending==null,decoration:const InputDecoration(labelText:'Montant à affecter'),
-          keyboardType:const TextInputType.numberWithOptions(decimal:true),validator:(value)=>validateField('montant',value)),
+        V2Field(child:TextFormField(controller:amount,enabled:!busy && pending==null,decoration:const InputDecoration(labelText:'Montant à affecter'),
+          keyboardType:const TextInputType.numberWithOptions(decimal:true),validator:(value)=>validateField('montant',value))),
       ],
-      TextFormField(key:const ValueKey('decision-reason'),controller:reason,enabled:!busy && pending==null,maxLength:10000,
-        decoration:const InputDecoration(labelText:'Motif obligatoire'),validator:(value)=>(value??'').trim().length<3?'Indiquez le motif de votre décision.':null),
+      V2Field(child:TextFormField(key:const ValueKey('decision-reason'),controller:reason,enabled:!busy && pending==null,maxLength:10000,
+        decoration:const InputDecoration(labelText:'Motif obligatoire'),validator:(value)=>(value??'').trim().length<3?'Indiquez le motif de votre décision.':null)),
       if(error!=null) Text(error!,style:const TextStyle(color:Colors.red)),
       if(busy) const CircularProgressIndicator(),
     ])))),actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(context,false),child:const Text('Fermer')),

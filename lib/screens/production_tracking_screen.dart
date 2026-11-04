@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
@@ -234,8 +235,8 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
     final currentLot = selectedLot;
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('production_tracking'))),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('production_tracking'))),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
@@ -256,7 +257,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                         message: errorMessage!,
                       )
                     else ...[
-                      DropdownButtonFormField<int>(
+                      V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionSpeciesDropdown'),
                         initialValue: selectedSpeciesId,
                         decoration: InputDecoration(
@@ -277,9 +278,9 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                             selectedLotId = null;
                           });
                         },
-                      ),
+                      )),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<int>(
+                      V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionLotDropdown'),
                         initialValue: selectedLotId,
                         decoration: InputDecoration(
@@ -298,7 +299,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                                 filteredLots.isEmpty
                             ? null
                             : (value) => setState(() => selectedLotId = value),
-                      ),
+                      )),
                       if (selectedSpeciesId != null && filteredLots.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 10),

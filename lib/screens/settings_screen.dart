@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'offline_tablet_screen.dart';
@@ -111,15 +112,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('settings'))),
+    return V2Scaffold(protectDraft:true,
+      appBar: V2AppBar(title: Text(context.tr('settings'))),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextField(controller: farmController, maxLength: 100,
+          V2Field(child:TextField(controller: farmController, maxLength: 100,
             enabled: farmLoaded && owner && ownerSession == ApiService.sessionIdentity && !saving,
             decoration: InputDecoration(labelText: 'Nom de l’exploitation', errorText: farmError,
-              helperText: 'Nom partagé par tous les utilisateurs de cette exploitation.')),
+              helperText: 'Nom partagé par tous les utilisateurs de cette exploitation.'))),
           if (!farmLoaded) TextButton(onPressed: loadFarm, child: const Text('Recharger le nom')),
           if(checkingOwner) const LinearProgressIndicator(),
           if(ownerError!=null) ListTile(title:Text(ownerError!),trailing:TextButton(onPressed:checkingOwner?null:loadOwner,child:const Text('Réessayer'))),
@@ -131,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if(!kIsWeb && defaultTargetPlatform==TargetPlatform.android && owner && ownerSession==ApiService.sessionIdentity)
             ListTile(leading:const Icon(Icons.tablet_android),title:const Text('Configurer ma tablette'),
               onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const OfflineTabletScreen(configure:true)))),
-          DropdownButtonFormField<String>(
+          V2Field(child:DropdownButtonFormField<String>(
             isExpanded: true,
             value: countryCode,
             decoration: InputDecoration(
@@ -160,17 +161,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 }
               });
             },
-          ),
+          )),
           const SizedBox(height: 16),
-          TextFormField(
+          V2Field(child:TextFormField(
             controller: cityController,
             decoration: InputDecoration(
               labelText: '${context.tr('city')} (${context.tr('optional')})',
               border: const OutlineInputBorder(),
             ),
-          ),
+          )),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
+          V2Field(child:DropdownButtonFormField<String>(
             isExpanded: true,
             value: language,
             decoration: InputDecoration(
@@ -182,9 +183,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               DropdownMenuItem(value: 'en', child: Text(context.tr('english'))),
             ],
             onChanged: (value) => setState(() => language = value ?? 'fr'),
-          ),
+          )),
           const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
+          V2Field(child:DropdownButtonFormField<String>(
             isExpanded: true,
             value: currency,
             decoration: InputDecoration(
@@ -200,7 +201,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 )
                 .toList(),
             onChanged: (value) => setState(() => currency = value ?? 'XAF'),
-          ),
+          )),
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: saving ? null : save,

@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
@@ -219,8 +220,8 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
       (e) =>
           e.businessStatus != 'CONFIRMED' && e.businessStatus != 'SUPERSEDED',
     );
-    return Scaffold(
-      appBar: AppBar(
+    return V2Scaffold(
+      appBar: V2AppBar(
         title: const Text('Bilan du cycle'),
         actions: [
           IconButton(
@@ -271,6 +272,7 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text('Du ${_date(d['start'])} au ${_date(d['end'])}'),
+                          if((d['warnings'] as List).isNotEmpty)const Text('Données à vérifier',style:TextStyle(color:Color(0xFF9A5B00),fontWeight:FontWeight.w600)),
                           Text(
                             'Dernière actualisation : ${_date(d['generated_at'])}. Les corrections et réouvertures peuvent modifier ce bilan.',
                           ),
@@ -312,10 +314,7 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
                                   ),
                                 ),
                               const SizedBox(height: 12),
-                              Text('${d['formula']}'),
-                              const Text(
-                                'Ce résultat ne garantit pas un bénéfice net. Les créances ne sont pas des encaissements.',
-                              ),
+                              V2Help(title:'Résultat sur charges enregistrées',child:Text('${d['formula']}\nCe résultat ne garantit pas un bénéfice net. Les créances ne sont pas des encaissements.')),
                             ],
                           ),
                           section(
@@ -326,26 +325,17 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
                               for (final entry
                                   in (d['technical'] as Map).entries)
                                 metric('${entry.key}', entry.value),
-                              const Text(
-                                'Une absence de saisie ne signifie pas zéro. Les pesées décrivent un échantillon, pas le poids vendu.',
-                              ),
+                              const V2Help(title:'Indicateurs d’élevage',child:Text('Une absence de saisie ne signifie pas zéro. Les pesées décrivent un échantillon, pas le poids vendu.')),
                             ],
                           ),
                           section(
-                            'Points à vérifier',
+                            'Consommables utilisés',
                             Icons.fact_check_outlined,
                             Colors.purple,
                             [
-                              for (final warning in d['warnings'])
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: Text('• $warning'),
-                                ),
-                              const Divider(),
-                              const Text(
-                                'Consommables utilisés — analyse séparée',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
+                              V2Help(title:'Fiabilité des données',child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                                for(final warning in d['warnings'])Text('• $warning'),
+                              ])),
                               Text(
                                 {
                                       'documented':
@@ -388,8 +378,7 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
                                 label:
                                     'Dont doses périmées (date de référence)',
                               ),
-                              Text('${d['valuation']['method']}'),
-                              Text('${d['valuation']['explanation']}'),
+                              V2Help(title:'Méthode de valorisation',child:Text('${d['valuation']['method']}\n${d['valuation']['explanation']}')),
                             ],
                           ),
                           section(
@@ -397,11 +386,9 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
                             Icons.compare_arrows,
                             Colors.blue,
                             [
-                              const Text(
-                                'Choisissez un autre lot de même espèce et de même production. Les écarts sont calculés : ce cycle moins le cycle choisi.',
-                              ),
+                              const V2Help(title:'Comparer les cycles',child:Text('Choisissez un autre lot de même espèce et de même production. Les écarts sont calculés : ce cycle moins le cycle choisi.')),
                               const SizedBox(height: 12),
-                              DropdownButtonFormField<int>(
+                              V2Field(child:DropdownButtonFormField<int>(
                                 key: ValueKey('cycle-comparison-$compareId'),
                                 initialValue: compareId,
                                 isExpanded: true,
@@ -429,7 +416,7 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
                                         setState(() => compareId = value);
                                         load();
                                       },
-                              ),
+                              )),
                               if ((d['candidates'] as List).isEmpty)
                                 const Padding(
                                   padding: EdgeInsets.only(top: 12),

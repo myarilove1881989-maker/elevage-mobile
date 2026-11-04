@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 import '../l10n/app_localizations.dart';
@@ -70,22 +71,22 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
     await showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => V2AlertDialog(
           title: Text(context.tr('new_customer')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                V2Field(child:TextField(
                   controller: nomController,
                   decoration: InputDecoration(hintText: context.tr('name')),
-                ),
-                TextField(
+                )),
+                V2Field(child:TextField(
                   controller: telController,
                   decoration: InputDecoration(hintText: context.tr('phone')),
-                ),
+                )),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
+                V2Field(child:DropdownButtonFormField<String>(
                   value: pays.isEmpty ? null : pays,
                   isExpanded: true,
                   decoration: InputDecoration(
@@ -107,14 +108,14 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
                           .toList(),
                   onChanged: (value) =>
                       setDialogState(() => pays = value ?? ''),
-                ),
-                TextField(
+                )),
+                V2Field(child:TextField(
                   controller: villeController,
                   decoration: InputDecoration(
                     hintText:
                         '${context.tr('city')} (${context.tr('optional')})',
                   ),
-                ),
+                )),
               ],
             ),
           ),
@@ -169,8 +170,8 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
 
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('customers'))),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('customers'))),
         floatingActionButton: BusinessCommand(api: widget.apiService, actions: const {'clients.create'}, child: FloatingActionButton(
           onPressed: addClient,
           child: const Icon(Icons.add),
@@ -193,7 +194,7 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
                   // 🔍 BARRE DE RECHERCHE
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: TextField(
+                    child: V2Field(child:TextField(
                       decoration: InputDecoration(
                         hintText: context.tr('search_customer'),
                         prefixIcon: Icon(Icons.search),
@@ -204,7 +205,7 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
                           search = value.toLowerCase();
                         });
                       },
-                    ),
+                    )),
                   ),
 
                   // 📋 LISTE

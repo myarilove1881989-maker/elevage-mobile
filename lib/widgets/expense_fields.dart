@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../offline/expense_business_date.dart';
 import '../offline/expense_preparation.dart';
@@ -47,7 +48,7 @@ class ExpenseFields extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     spacing: 14,
     children: [
-      DropdownButtonFormField<ExpenseLotSelection>(
+      V2Field(child:DropdownButtonFormField<ExpenseLotSelection>(
         isExpanded: true,
         key: ValueKey(lots),
         initialValue: lot,
@@ -66,8 +67,8 @@ class ExpenseFields extends StatelessWidget {
             ),
         ],
         onChanged: editable ? onLot : null,
-      ),
-      DropdownButtonFormField<int>(
+      )),
+      V2Field(child:DropdownButtonFormField<int>(
         isExpanded: true,
         key: ValueKey(categoryKey),
         initialValue: categoryId,
@@ -80,8 +81,8 @@ class ExpenseFields extends StatelessWidget {
             DropdownMenuItem(value: value.$1, child: Text(value.$2,maxLines:1,overflow:TextOverflow.ellipsis)),
         ],
         onChanged: editable ? onCategory : null,
-      ),
-      TextField(
+      )),
+      V2Field(child:TextField(
         key: const Key('expense-amount'),
         controller: amount,
         enabled: editable,
@@ -90,8 +91,8 @@ class ExpenseFields extends StatelessWidget {
           labelText: 'Montant exact',
           errorText: fieldError('montant'),
         ),
-      ),
-      TextField(
+      )),
+      V2Field(child:TextField(
         key: const Key('expense-note'),
         controller: note,
         enabled: editable,
@@ -99,7 +100,7 @@ class ExpenseFields extends StatelessWidget {
           labelText: 'Note facultative',
           errorText: fieldError('note'),
         ),
-      ),
+      )),
       TextButton(
         onPressed: null,
         child: Text(

@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/user_administration_service.dart';
@@ -116,7 +117,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => V2AlertDialog(
     title: Text(
       widget.reset ? 'Réinitialiser le mot de passe' : 'Ajouter un utilisateur',
     ),
@@ -129,13 +130,13 @@ class _AccountDialogState extends State<_AccountDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (!widget.reset) ...[
-                TextFormField(
+                V2Field(child:TextFormField(
                   controller: name,
                   decoration: const InputDecoration(labelText: 'Nom affiché'),
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Indiquez un nom.' : null,
-                ),
-                TextFormField(
+                )),
+                V2Field(child:TextFormField(
                   controller: username,
                   decoration: const InputDecoration(
                     labelText: 'Identifiant unique',
@@ -144,16 +145,16 @@ class _AccountDialogState extends State<_AccountDialog> {
                       v == null || !RegExp(r'^[\w.@+-]+$').hasMatch(v.trim())
                       ? 'Indiquez un identifiant sans espace.'
                       : null,
-                ),
-                TextFormField(
+                )),
+                V2Field(child:TextFormField(
                   controller: email,
                   decoration: const InputDecoration(
                     labelText: 'Email facultatif',
                   ),
                   keyboardType: TextInputType.emailAddress,
-                ),
+                )),
               ],
-              TextFormField(
+              V2Field(child:TextFormField(
                 controller: password,
                 obscureText: true,
                 enableSuggestions: false,
@@ -164,7 +165,7 @@ class _AccountDialogState extends State<_AccountDialog> {
                 validator: (v) => v == null || v.trim().length < 4
                     ? 'Utilisez au moins 4 caractères.'
                     : null,
-              ),
+              )),
               TextButton(
                 onPressed: () => setState(
                   () => password.text =
@@ -175,7 +176,7 @@ class _AccountDialogState extends State<_AccountDialog> {
               TextButton(
                 onPressed: () => showDialog<void>(
                   context: context,
-                  builder: (context) => AlertDialog(
+                  builder: (context) => V2AlertDialog(
                     title: const Text('Transmission personnelle'),
                     content: SelectableText(password.text),
                     actions: [
@@ -279,7 +280,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Future<bool> confirm(String message) async =>
       await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => V2AlertDialog(
           title: const Text('Confirmer la modification'),
           content: Text(message),
           actions: [
@@ -337,7 +338,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
+        builder: (context, update) => V2AlertDialog(
           title: Text('Droits de ${member['username']}'),
           content: SizedBox(
             width: 560,
@@ -408,8 +409,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+  Widget build(BuildContext context) => V2Scaffold(
+    appBar: V2AppBar(
       title: const Text('Gestion des utilisateurs'),
       actions: [
         IconButton(

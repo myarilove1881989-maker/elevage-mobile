@@ -1,3 +1,4 @@
+import 'design_system_v2.dart';
 import 'package:flutter/material.dart';
 
 abstract final class TerreEtOrColors {
@@ -5,71 +6,14 @@ abstract final class TerreEtOrColors {
   static const teal = Color(0xFF167B77);
   static const green = Color(0xFF279B68);
   static const gold = Color(0xFFE4A13A);
-  static const cream = Color(0xFFFFFBF4);
+  static const cream = Color(0xFFFCF7FF);
   static const paleGold = Color(0xFFFFF1D8);
   static const ink = Color(0xFF17384D);
   static const muted = Color(0xFF6C7E78);
-  static const border = Color(0xFFE5DED0);
+  static const border = Color(0xFF315D79);
 }
 
-ThemeData terreEtOrTheme(BuildContext context) {
-  final base = Theme.of(context);
-  final outline = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: const BorderSide(color: TerreEtOrColors.border),
-  );
-
-  return base.copyWith(
-    scaffoldBackgroundColor: TerreEtOrColors.cream,
-    colorScheme: base.colorScheme.copyWith(
-      primary: TerreEtOrColors.green,
-      secondary: TerreEtOrColors.gold,
-      surface: Colors.white,
-    ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: TerreEtOrColors.navy,
-      foregroundColor: Colors.white,
-      elevation: 0,
-      centerTitle: false,
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.white,
-      border: outline,
-      enabledBorder: outline,
-      focusedBorder: outline.copyWith(
-        borderSide: const BorderSide(
-          color: TerreEtOrColors.green,
-          width: 2,
-        ),
-      ),
-      prefixIconColor: TerreEtOrColors.gold,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    ),
-    cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 2,
-      shadowColor: TerreEtOrColors.navy.withValues(alpha: 0.12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: TerreEtOrColors.green,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: TerreEtOrColors.green.withValues(alpha: 0.45),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: TerreEtOrColors.green,
-      foregroundColor: Colors.white,
-    ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: TerreEtOrColors.green,
-    ),
-  );
-}
+ThemeData terreEtOrTheme(BuildContext context) => designSystemV2(Theme.of(context));
 
 class TerreEtOrHeader extends StatelessWidget {
   final IconData icon;

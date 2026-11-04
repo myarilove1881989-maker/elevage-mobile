@@ -164,7 +164,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Nouvelle collecte'),
       300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first,
     );
     await tester.tap(find.text('Nouvelle collecte'));
     await tester.pumpAndSettle();
@@ -197,7 +197,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Nouvelle collecte'), 300,
-        scrollable: find.byType(Scrollable).first);
+        scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     await tester.tap(find.text('Nouvelle collecte'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('eggCollectionDate')), findsOneWidget);
@@ -235,11 +235,11 @@ void main() {
       home: EggProductionScreen(apiService: api, lotId: 1, lotName: 'Ponte'),
     ));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('2 alvéoles + 10 œufs'), 300,
-        scrollable: find.byType(Scrollable).first);
-    expect(find.text('2 alvéoles + 10 œufs'), findsOneWidget);
-    await tester.scrollUntilVisible(find.textContaining('Total du jour: 100'), 300,
-        scrollable: find.byType(Scrollable).first);
+    await tester.scrollUntilVisible(find.textContaining('2 alvéoles + 10 œufs'), 100,maxScrolls:100,
+        scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
+    expect(find.textContaining('2 alvéoles + 10 œufs'), findsOneWidget);
+    await tester.scrollUntilVisible(find.textContaining('Total du jour: 100'), 100,maxScrolls:100,
+        scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.textContaining('Total du jour: 100'), findsOneWidget);
   });
   testWidgets('Lie une dépense existante à la consommation', (tester) async {
@@ -260,7 +260,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Alimentation'),
       300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first,
     );
     await tester.tap(find.text('Alimentation'));
     await tester.pumpAndSettle();
@@ -333,19 +333,19 @@ void main() {
     ));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const Key('eggDatedGlobalStock')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.textContaining('2080 œufs'), findsOneWidget);
     expect(find.text('69 alvéoles + 10 œufs'), findsOneWidget);
     await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-2')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.textContaining('17:30'), findsOneWidget);
     expect(find.text('29 alvéoles + 10 œufs'), findsOneWidget);
     await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-1')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.textContaining('08:15'), findsOneWidget);
     expect(find.text('Restants : 1200'), findsOneWidget);
     await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-3')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.text('Épuisée'), findsOneWidget);
   });
 
@@ -376,11 +376,11 @@ void main() {
     ));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const Key('eggStockUnknown')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.textContaining('Stock disponible : 600 œufs'), findsOneWidget);
     expect(find.text('Sorties sans origine : 600'), findsOneWidget);
     await tester.scrollUntilVisible(find.byKey(const Key('eggStockCollection-1')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.text('Restant indéterminé'), findsOneWidget);
   });
 
@@ -399,13 +399,13 @@ void main() {
     ));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Aucune collecte enregistrée pour ce lot.'),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.text('Aucune collecte enregistrée pour ce lot.'), findsOneWidget);
     api.stockFails = true;
     await tester.widget<RefreshIndicator>(find.byType(RefreshIndicator)).onRefresh();
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.byKey(const Key('eggStockLoadError')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.text('Impossible de charger le stock par collecte.'), findsOneWidget);
     expect(api.stockLoads, greaterThanOrEqualTo(2));
     expect(tester.takeException(), isNull);
@@ -465,7 +465,7 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const Key('layingFeedPerHen'))).data,
         '—');
     await tester.scrollUntilVisible(find.byKey(const Key('layingEvolutionEmpty')),
-        250, scrollable: find.byType(Scrollable).first);
+        250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.byKey(const Key('layingEvolutionEmpty')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -518,7 +518,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(const Key('layingDay-2026-09-27')),
-      250, scrollable: find.byType(Scrollable).first,
+      250, scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first,
     );
     final missing = find.byKey(const Key('layingDay-2026-09-27'));
     final zero = find.byKey(const Key('layingDay-2026-09-28'));
@@ -583,7 +583,7 @@ void main() {
     expect(find.byKey(const Key('layingCount')), findsOneWidget);
     expect(find.byKey(const Key('layingRate')), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Alimentation'), 200,
-        scrollable: find.byType(Scrollable).first);
+        scrollable: find.descendant(of:find.byType(ListView).first,matching:find.byType(Scrollable)).first);
     expect(find.text('Alimentation'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
@@ -105,7 +106,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => V2AlertDialog(
           title: Text(context.tr('add_weighing')),
           content: Form(
             key: formKey,
@@ -113,7 +114,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextFormField(
+                  V2Field(child:TextFormField(
                     controller: countController,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -132,9 +133,9 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                       }
                       return null;
                     },
-                  ),
+                  )),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  V2Field(child:TextFormField(
                     controller: weightController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
@@ -153,7 +154,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                           ? context.tr('growth_invalid_weight')
                           : null;
                     },
-                  ),
+                  )),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -164,14 +165,14 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextFormField(
+                  V2Field(child:TextFormField(
                     controller: noteController,
                     maxLines: 2,
                     decoration: InputDecoration(
                       labelText: context.tr('growth_note_optional'),
                       prefixIcon: const Icon(Icons.notes_outlined),
                     ),
-                  ),
+                  )),
                 ],
               ),
             ),
@@ -254,8 +255,8 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
 
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('growth_tracking'))),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('growth_tracking'))),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
@@ -367,7 +368,7 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  OwnerMaintenanceActions(api:widget.apiService,kind:'weights',id:(item['id'] as num).toInt(),label:'la pesée',access:_ownerMaintenance,onChanged:_load),
+                                  if(item['id'] is num)OwnerMaintenanceActions(api:widget.apiService,kind:'weights',id:(item['id'] as num).toInt(),label:'la pesée',access:_ownerMaintenance,onChanged:_load),
                                   Text('${item['nombre_animaux_peses']} ${context.tr('animals_weighed').toLowerCase()}'),
                                   Text('${context.tr('sample_total_weight')}: ${_kg(item['poids_total_kg'])}'),
                                   Text('${context.tr('average_weight')}: ${_kg(item['poids_moyen_kg'])}'),

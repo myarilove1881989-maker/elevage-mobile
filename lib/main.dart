@@ -1,3 +1,4 @@
+import 'theme/design_system_v2.dart';
 import 'widgets/mutation_refresh.dart';
 import 'services/health_notifications.dart';
 
@@ -179,7 +180,7 @@ class _ElevageAppState extends State<ElevageApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        theme: ThemeData(primarySwatch: Colors.green),
+        theme: designSystemV2(),
         builder: (_, child) => SafeArea(
           top: false,
           child: Config.current.isLab
