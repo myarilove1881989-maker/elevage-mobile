@@ -42,6 +42,7 @@ void main(){
     await tester.pumpWidget(testApp(AddDepenseScreen(apiService:server.api)));await tester.pumpAndSettle();
     await fillFeed(tester);await tester.tap(find.byKey(const Key('expense-submit')));await tester.pumpAndSettle();
     final saved=Map<String,dynamic>.from(server.saved!);server.lost=false;
+    if(find.byKey(const Key('feed-retry')).evaluate().isEmpty) {tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);await tester.pumpAndSettle();await tester.scrollUntilVisible(find.byKey(const Key('feed-retry')),250,scrollable:find.byType(Scrollable).first);}
     await tester.ensureVisible(find.byKey(const Key('feed-retry')));
     await tester.tap(find.byKey(const Key('feed-retry')));await tester.pumpAndSettle();
     expect(server.posts,2);expect(server.saved,saved);expect(find.byKey(const Key('feed-retry')),findsNothing);

@@ -12,7 +12,7 @@ import 'vaccine_projection_test.dart' show vaccineSnapshot,vaccine,vialA,vialB;
 
 Future<void> reveal(WidgetTester tester,String key) async {
   final finder=find.byKey(Key(key));
-  if(finder.evaluate().isEmpty)await tester.scrollUntilVisible(finder,250,scrollable:find.byType(Scrollable).first);
+  if(finder.evaluate().isEmpty) {tester.state<ScrollableState>(find.byType(Scrollable).first).position.jumpTo(0);await tester.pumpAndSettle();await tester.scrollUntilVisible(finder,250,scrollable:find.byType(Scrollable).first);}
   await tester.ensureVisible(finder);await tester.pumpAndSettle();
 }
 class VaccineApi extends FeedApiFake {
