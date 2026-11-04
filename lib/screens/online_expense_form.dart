@@ -12,6 +12,7 @@ class _OnlineExpenseForm extends StatefulWidget {
 }
 
 class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
+  final formScroll = ScrollController();
   final amount = TextEditingController(), note = TextEditingController();
   final vaccine=VaccineSupplyDraft();
   final vaccineCategories=<int>{};
@@ -21,7 +22,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   final feedOperationId = newOperationUuid();
   final feedCategories = <int>{};
   Map<String,dynamic>? feedCatalog, pendingFeed;
-  bool loadingFeed = false, feedLocalRecorded=false;
+  bool loadingFeed = false, feedLocalRecorded=false, purchaseUncertain=false;
   bool get wantsFeed => (feedCategories.contains(categoryId) && !widget.api.hasUnifiedOfflineSession) || wantsVaccine;
 
   Future<void> selectCategory(int? value) async {
@@ -36,7 +37,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         throw StateError('Catalogue non confirmé');
       }
       setState(()=>feedCatalog=data);
-    } catch(_) {if(mounted)setState(()=>error='Catalogue d’aliments indisponible. Rechargez les références avant de poursuivre.');}
+    } catch(_) {if(mounted)setState(()=>error='Catalogue indisponible. Rechargez les références avant de poursuivre.');}
     finally {if(mounted)setState(()=>loadingFeed=false);}
   }
 
@@ -62,6 +63,41 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
 
   }
 
+  // Only explicit transactional rejections are safe to correct. A lost or
+  // failed response retains the original UUID and immutable request for replay.
+  bool handlePurchaseRejection(Object failure) {
+    if (pendingFeed == null || widget.api.hasUnifiedOfflineSession || !sameToken) return false;
+    if (purchaseUncertain || failure is! ApiHttpException ||
+        !{400, 403, 404, 422}.contains(failure.status)) {
+      purchaseUncertain = true;
+      return false;
+    }
+    final detail = failure.message.toString();
+    if (detail.contains('UUID') || detail.contains('CONFLICT')) {
+      purchaseUncertain = true;
+      return false;
+    }
+    final explanation = detail.contains('LOT_CLOSED')
+        ? 'Le lot est clôturé. Choisissez un lot ouvert.'
+        : detail.contains('CATEGORY_REQUIRED')
+        ? 'La catégorie ne correspond pas à cet approvisionnement. Rechargez les références.'
+        : failure.status == 403
+        ? 'Votre accès ne permet pas cet achat. Vérifiez vos droits et votre connexion au compte.'
+        : 'Vérifiez le produit, le lot, les quantités et les dates, puis corrigez la saisie.';
+    setState(() {
+      attempted = false;
+      pendingFeed = null;
+      error = 'Achat refusé par le serveur (${failure.status}). $explanation';
+    });
+    return true;
+  }
+
+  void revealErrors() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && formScroll.hasClients) formScroll.jumpTo(0);
+    });
+  }
+
   Future<void> retryFeed() async {
     if(busy || pendingFeed==null || !sameToken || confirmed)return;
     setState(()=>busy=true);
@@ -69,8 +105,8 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
       final value=await access();
       if(value.message!=null)throw StateError('Accès refusé');
       await sendFeed(pendingFeed!);
-    } catch(_) {if(mounted)setState(()=>error='Résultat non confirmé. La même opération est conservée pour vérification ; ne créez pas une autre dépense.');}
-    finally {if(mounted)setState(()=>busy=false);}
+    } catch(e) {if(mounted && !handlePurchaseRejection(e))setState(()=>error='Résultat non confirmé. La même opération est conservée pour vérification ; ne créez pas une autre dépense.');}
+    finally {if(mounted) {setState(()=>busy=false);if(error!=null)revealErrors();}}
   }
   late final dates = ExpenseBusinessDate(tz.getLocation('Europe/Paris'));
   late ExpenseBusinessDay day = dates.businessDayOf(DateTime.now().toUtc());
@@ -97,6 +133,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
 
   @override
   void dispose() {
+    formScroll.dispose();
     feed.dispose();vaccine.dispose();
     amount.dispose();
     note.dispose();
@@ -184,7 +221,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         });
       }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {setState(() => busy = false);if(error!=null)revealErrors();}
     }
   }
 
@@ -197,7 +234,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
       try {
         if(feedCatalog==null)throw const FormatException('Catalogue d’aliments requis.');
         supply=wantsVaccine?vaccine.payload():feed.payload();
-      } catch(e) {setState(()=>error=e.toString());return;}
+      } catch(e) {setState(()=>error=e.toString());revealErrors();return;}
     }
     day=dates.businessDayOf(DateTime.now().toUtc());
     final input = ExpenseInputContract.validate(
@@ -207,7 +244,11 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
       note: note.text,
     );
     setState(() => errors = input.errors);
-    if (!input.isValid) return;
+    if (!input.isValid) {
+      setState(()=>error='Vérifiez le lot comptable, la catégorie et le montant de la dépense ci-dessous.');
+      revealErrors();
+      return;
+    }
     if (!lots.contains(lot) || !categories.any((c) => c.$1 == categoryId)) {
       return;
     }
@@ -250,8 +291,8 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         throw StateError('Unconfirmed response');
       }
       setState(() => confirmed = true);
-    } catch (_) {
-      if (mounted) {
+    } catch (e) {
+      if (mounted && !handlePurchaseRejection(e)) {
         setState(() {
           blocked = blocked || !sameToken;
           error = attempted
@@ -260,7 +301,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         });
       }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {setState(() => busy = false);if(error!=null)revealErrors();}
     }
   }
 
@@ -268,6 +309,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
   Widget build(BuildContext context) => Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(
     appBar: AppBar(title: const Text('Nouvelle dépense')),
     body: ListView(
+      controller: formScroll,
       padding: const EdgeInsets.all(20),
       children: [
         const TerreEtOrHeader(icon:Icons.receipt_long_outlined,title:'Nouvelle dépense',subtitle:'Renseignez les informations de votre dépense'),
