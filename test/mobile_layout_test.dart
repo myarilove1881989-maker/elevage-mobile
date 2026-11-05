@@ -212,6 +212,7 @@ void main() {
       await tester.pumpWidget(testApp(entry.value(MobileApiFake())));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
+      if(find.byType(EditableText).evaluate().isEmpty) {await tester.drag(find.byType(Scrollable).first,const Offset(0,-350));await tester.pumpAndSettle();}
       final fields = find.byType(EditableText);
       expect(fields, findsWidgets);
       await tester.ensureVisible(fields.last);

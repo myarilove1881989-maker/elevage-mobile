@@ -191,7 +191,7 @@ class _BusinessCommandState extends State<BusinessCommand> {
       final rights = snapshot.data?.rights;
       if (snapshot.connectionState != ConnectionState.done || snapshot.hasError ||
           identity != (ApiService.sessionIdentity) || rights == null ||
-          !widget.actions.any(rights!.allows)) return const SizedBox.shrink();
+          !widget.actions.any(rights.allows)) return const SizedBox.shrink();
       return widget.child;
     });
 }

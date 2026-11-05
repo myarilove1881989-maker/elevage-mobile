@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -402,7 +403,7 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
         allowed: () => current,
         changes: widget.api.sessionChanges,
         child: StatefulBuilder(
-          builder: (context, setDialog) => AlertDialog(
+          builder: (context, setDialog) => V2AlertDialog(
             title: const Text('Seuil de stock faible'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -412,13 +413,12 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
                       ? 'Seuil en kilogrammes, au niveau de l’exploitation.'
                       : 'Seuil en doses entières, au niveau de l’exploitation.',
                 ),
-                TextField(
+                V2Field(child:TextField(
                   controller: controller,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Seuil (0 désactive le stock faible)',
-                  ),
-                ),
+                  decoration: const V2InputDecoration(
+                    labelText: 'Seuil (0 désactive le stock faible)',),
+                )),
                 if (failure != null) Text(failure!),
                 const Text('Configuration avec connexion requise.'),
               ],
@@ -529,10 +529,10 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
                     for (final row in rows)
                       ListTile(
                         title: Text(
-                          '${movementLabel(row['kind'])} · ${consumableQuantity(row['quantity'])}',
+                          '${movementLabel(row['kind'])} — ${product['name']} — ${row['kind']=='DISTRIBUTION'?consumableQuantity(row['quantity']).replaceFirst(RegExp(r"^-"),""):consumableQuantity(row['quantity'])} ${(feed?['products'] as List? ?? const []).any((p)=>p['id']==product['id'])?'kg':(vaccine?['products'] as List? ?? const []).any((p)=>p['id']==product['id'])?'doses':''}',
                         ),
                         subtitle: Text(
-                          '${day(row['at'])} · ${row['lot'] == null ? 'Stock partagé' : lotName(row['lot'])}\n${row['reason'] ?? ''}',
+                          '${speciesName(row['species'])} · ${row['kind']=='DISTRIBUTION'?(row['destination_lot']==null?'Destinataire non renseigné':lotName(row['destination_lot'])):(row['lot']==null?'Stock partagé':lotName(row['lot']))} · ${day(row['at'])}\n${row['reason'] ?? ''}',
                         ),
                       ),
                     if (loading)
@@ -567,7 +567,7 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
       builder: (context) => _StockScope(
         allowed: () => current,
         changes: widget.api.sessionChanges,
-        child: AlertDialog(
+        child: V2AlertDialog(
           title: const Text('Alertes visuelles'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -575,18 +575,16 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
               const Text(
                 'Choisissez vos horizons en jours. Vide : alerte anticipée désactivée. Aucun protocole vaccinal n’est proposé.',
               ),
-              TextField(
+              V2Field(child:TextField(
                 controller: expiry,
-                decoration: const InputDecoration(
-                  labelText: 'Péremption dans … jours',
-                ),
-              ),
-              TextField(
+                decoration: const V2InputDecoration(
+                  labelText: 'Péremption dans … jours',),
+              )),
+              V2Field(child:TextField(
                 controller: upcoming,
-                decoration: const InputDecoration(
-                  labelText: 'Vaccination dans … jours',
-                ),
-              ),
+                decoration: const V2InputDecoration(
+                  labelText: 'Vaccination dans … jours',),
+              )),
             ],
           ),
           actions: [
@@ -778,14 +776,14 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
     for (final row in stockLots) {
       if (row['id'] == id) return '${row['nom']}';
     }
-    return 'Lot sélectionné';
+    return 'Lot non renseigné';
   }
 
   String speciesName(Object? id) {
     for (final row in feed?['species'] as List? ?? const []) {
       if (row['id'] == id) return '${row['nom']}';
     }
-    return 'Espèce sélectionnée';
+    return 'Espèce non renseignée';
   }
 
   String day(Object? raw) {
@@ -800,14 +798,13 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
       for (final l in stockLots)
         if (selectedSpecies == null || l['espece_id'] == selectedSpecies) l,
     ];
-    final speciesField = DropdownButtonFormField<int>(
+    final speciesField = V2Field(child:DropdownButtonFormField<int>(
       key: ValueKey('consumables-species-$selectedSpecies'),
       initialValue: selectedSpecies,
       isExpanded: true,
-      decoration: const InputDecoration(
+      decoration: const V2InputDecoration(
         labelText: 'Espèce',
-        prefixIcon: Icon(Icons.pets_outlined),
-      ),
+        prefixIcon: Icon(Icons.pets_outlined),),
       items: [
         const DropdownMenuItem<int>(
           value: null,
@@ -826,15 +823,14 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
         selectedSpecies = id;
         selectedLot = null;
       }),
-    );
-    final lotField = DropdownButtonFormField<int>(
+    ));
+    final lotField = V2Field(child:DropdownButtonFormField<int>(
       key: ValueKey('consumables-lot-$selectedLot'),
       initialValue: selectedLot,
       isExpanded: true,
-      decoration: const InputDecoration(
+      decoration: const V2InputDecoration(
         labelText: 'Lot',
-        prefixIcon: Icon(Icons.inventory_2_outlined),
-      ),
+        prefixIcon: Icon(Icons.inventory_2_outlined),),
       items: [
         const DropdownMenuItem<int>(value: null, child: Text('Tous les lots')),
         if (selectedLot != null && !lots.any((l) => l['id'] == selectedLot))
@@ -846,7 +842,7 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
           DropdownMenuItem(value: l['id'] as int, child: Text('${l['nom']}')),
       ],
       onChanged: (id) => setState(() => selectedLot = id),
-    );
+    ));
     return trackingCard(
       LayoutBuilder(
         builder: (context, c) => c.maxWidth >= 600

@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../offline/expense_business_date.dart';
 import '../offline/expense_preparation.dart';
@@ -47,14 +48,13 @@ class ExpenseFields extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     spacing: 14,
     children: [
-      DropdownButtonFormField<ExpenseLotSelection>(
+      V2Field(child:DropdownButtonFormField<ExpenseLotSelection>(
         isExpanded: true,
         key: ValueKey(lots),
         initialValue: lot,
-        decoration: InputDecoration(
-          labelText: 'Lot',
-          errorText: fieldError('lot_ref'),
-        ),
+        decoration: V2InputDecoration(
+          labelText: 'Lot',prefixIcon:const Icon(Icons.inventory_2_outlined),
+          errorText: fieldError('lot_ref'),),
         items: [
           for (final value in lots)
             DropdownMenuItem(
@@ -66,46 +66,38 @@ class ExpenseFields extends StatelessWidget {
             ),
         ],
         onChanged: editable ? onLot : null,
-      ),
-      DropdownButtonFormField<int>(
+      )),
+      V2Field(child:DropdownButtonFormField<int>(
         isExpanded: true,
         key: ValueKey(categoryKey),
         initialValue: categoryId,
-        decoration: InputDecoration(
-          labelText: 'Catégorie',
-          errorText: fieldError('categorie_id'),
-        ),
+        decoration: V2InputDecoration(
+          labelText: 'Catégorie',prefixIcon:const Icon(Icons.category_outlined),
+          errorText: fieldError('categorie_id'),),
         items: [
           for (final value in categories)
             DropdownMenuItem(value: value.$1, child: Text(value.$2,maxLines:1,overflow:TextOverflow.ellipsis)),
         ],
         onChanged: editable ? onCategory : null,
-      ),
-      TextField(
+      )),
+      V2Field(child:TextField(
         key: const Key('expense-amount'),
         controller: amount,
         enabled: editable,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          labelText: 'Montant exact',
-          errorText: fieldError('montant'),
-        ),
-      ),
-      TextField(
+        decoration: V2InputDecoration(
+          labelText: 'Montant exact',prefixIcon:const Icon(Icons.payments_outlined),
+          errorText: fieldError('montant'),),
+      )),
+      V2Field(child:TextField(
         key: const Key('expense-note'),
         controller: note,
         enabled: editable,
-        decoration: InputDecoration(
-          labelText: 'Note facultative',
-          errorText: fieldError('note'),
-        ),
-      ),
-      TextButton(
-        onPressed: null,
-        child: Text(
-          'Date : ${day.day}/${day.month}/${day.year}',
-        ),
-      ),
+        decoration: V2InputDecoration(
+          labelText: 'Note facultative',prefixIcon:const Icon(Icons.note_alt_outlined),
+          errorText: fieldError('note'),),
+      )),
+      V2Field(child:V2PickerTile(label:'Date',value:'${day.day.toString().padLeft(2,'0')}/${day.month.toString().padLeft(2,'0')}/${day.year}',icon:Icons.calendar_month_outlined)),
     ],
   );
 }

@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 
 Future<String?> confirmCancellation(BuildContext context, String title) =>
@@ -23,7 +24,7 @@ class _CancellationDialogState extends State<CancellationDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => V2AlertDialog(
     title: Text(widget.title),
     content: SingleChildScrollView(
       child: Form(
@@ -32,14 +33,14 @@ class _CancellationDialogState extends State<CancellationDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('L’original et son historique seront conservés.'),
-            TextFormField(
+            V2Field(child:TextFormField(
               controller: reason,
               maxLength: 10000,
-              decoration: const InputDecoration(labelText: 'Motif obligatoire'),
+              decoration: const V2InputDecoration(labelText: 'Motif obligatoire',),
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Indiquez le motif.'
                   : null,
-            ),
+            )),
           ],
         ),
       ),

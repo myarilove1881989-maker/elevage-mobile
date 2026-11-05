@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app_elevage/services/api_service.dart';
 import 'package:app_elevage/widgets/terrain_entry_gate.dart';
 import 'package:app_elevage/screens/add_achat_screen.dart';
 import 'production_tracking_test.dart' show testApp;

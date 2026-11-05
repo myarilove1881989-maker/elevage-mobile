@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -67,14 +68,14 @@ class _CADetailScreenState extends State<CADetailScreen> with MutationRefresh<CA
   @override
   Widget build(BuildContext context) {
     if (isLoading)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(body: Center(child: CircularProgressIndicator()));
     if (error != null)
-      return Scaffold(
-          appBar: AppBar(title: Text(context.tr('revenue'))),
+      return V2Scaffold(
+          appBar: V2AppBar(title: Text(context.tr('revenue'))),
           body: Center(child: Text(error!)));
     if (data.isEmpty)
-      return Scaffold(
-          appBar: AppBar(title: Text(context.tr('revenue'))),
+      return V2Scaffold(
+          appBar: V2AppBar(title: Text(context.tr('revenue'))),
           body: Center(child: Text(context.tr('no_data'))));
     final revenue =
         data.fold<double>(0, (sum, item) => sum + _num(item['total_ca']));
@@ -82,8 +83,8 @@ class _CADetailScreenState extends State<CADetailScreen> with MutationRefresh<CA
         data.fold<double>(0, (sum, item) => sum + _num(item['investissement']));
     final margin = revenue - investment;
     final rate = investment == 0 ? 0.0 : revenue / investment * 100;
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('revenue'))),
+    return V2Scaffold(
+      appBar: V2AppBar(title: Text(context.tr('revenue'))),
       body: RefreshIndicator(
         onRefresh: load,
         child: LayoutBuilder(

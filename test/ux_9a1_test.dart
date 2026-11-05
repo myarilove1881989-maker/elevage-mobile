@@ -280,12 +280,12 @@ void main() {
     await tester.pumpWidget(testApp(LotListScreen(apiService: api)));
     await tester.pumpAndSettle();
     expect(find.textContaining('Lots indisponibles'), findsOneWidget);
-    expect(find.text('Aucun lot enregistré.'), findsNothing);
+    expect(find.text('Aucun lot actif.'), findsNothing);
     api.failLots = false;
     api.emptyLots = true;
     await tester.tap(find.text('Réessayer'));
     await tester.pumpAndSettle();
-    expect(find.text('Aucun lot enregistré.'), findsOneWidget);
+    expect(find.text('Aucun lot actif.'), findsOneWidget);
     expect(find.textContaining('Lots indisponibles'), findsNothing);
   });
 

@@ -832,6 +832,7 @@ void main() {
       await tester.tap(find.text('Transport').last);
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('expense-amount')), '0,29');
+      if(find.byKey(const Key('expense-submit')).evaluate().isEmpty)await tester.scrollUntilVisible(find.byKey(const Key('expense-submit')),250,scrollable:find.byType(Scrollable).first);
       await tester.ensureVisible(find.byKey(const Key('expense-submit')));
       await tester.pumpAndSettle();
       await tester.runAsync(() async {
@@ -877,7 +878,8 @@ void main() {
       find.textContaining('cohérence transactionnelle non vérifiée'),
       findsOneWidget,
     );
-    await tester.ensureVisible(find.byKey(const Key('expense-submit')));
+    if(find.byKey(const Key('expense-submit')).evaluate().isEmpty)await tester.scrollUntilVisible(find.byKey(const Key('expense-submit')),250,scrollable:find.byType(Scrollable).first);
+      await tester.ensureVisible(find.byKey(const Key('expense-submit')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('expense-submit')));
     await tester.pump();

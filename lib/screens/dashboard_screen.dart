@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'dart:async';
@@ -404,7 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => V2AlertDialog(
         title: Text("${context.tr('today_tasks')} ${day.day}/${day.month}"),
         content: tasks.isEmpty
             ? Text(context.tr('no_task'))
@@ -468,26 +469,25 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final title=TextEditingController();
     var day=_selectedDay??DateTime.now(); int? assignee; bool busy=false; String? error;
     var repeat=false; var end=day; final weekdays=<int>{1,2,3,4,5,6,7};
-    final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>AlertDialog(
+    final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>V2AlertDialog(
       title:Text(context.tr('new_task')),
       content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
-        TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const InputDecoration(labelText:'Tâche')),
-        DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const InputDecoration(labelText:'Opérateur'),
+        V2Field(child:TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const V2InputDecoration(labelText:'Tâche',))),
+        V2Field(child:DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const V2InputDecoration(labelText:'Opérateur',),
           items:operators.map((r)=>DropdownMenuItem<int>(value:r['user'] as int,child:Text(r['username'].toString()))).toList(),
-          onChanged:busy?null:(v)=>change(()=>assignee=v)),
-        TextButton(onPressed:busy?null:() async {
+          onChanged:busy?null:(v)=>change(()=>assignee=v))),
+        V2Field(child:V2PickerTile(label:'Date prévue',value:v2Day(day.toIso8601String()),icon:Icons.calendar_month_outlined,onTap:busy?null:() async {
           final selected=await showDatePicker(context:dialog,initialDate:day,firstDate:DateTime(2020),lastDate:DateTime(2100));
           if(selected!=null && dialog.mounted) change(()=>day=selected);
-        },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(day))),
+        })),
         SwitchListTile(title:const Text('Répéter sur plusieurs jours'), value:repeat,
           onChanged:busy?null:(v)=>change(()=>repeat=v)),
         if(repeat) ...[
-          const Text('Date de fin (incluse)'),
-          TextButton(onPressed:busy?null:() async {
+          V2Field(child:V2PickerTile(label:'Date de fin (incluse)',value:v2Day(end.toIso8601String()),icon:Icons.calendar_month_outlined,onTap:busy?null:() async {
             final selected=await showDatePicker(context:dialog,initialDate:end,
               firstDate:DateTime(2020),lastDate:DateTime(2100));
             if(selected!=null && dialog.mounted) change(()=>end=selected);
-          },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(end))),
+          })),
           const Text('Tous les jours, ou sélectionnez les jours souhaités'),
           Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(
             label:Text(['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]),
@@ -773,17 +773,10 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final kpis = data?["kpis"] ?? {};
     final filteredLots = getFilteredLots();
 
-    return Scaffold(
+    return V2Scaffold(isDashboard:true,
       drawer: _navigationDrawer(),
-      appBar: AppBar(backgroundColor:const Color(0xFF063B63),foregroundColor:Colors.white,
-        title:const Text('Élev’Age'),centerTitle:false,toolbarHeight:56,
-        leading:Builder(builder:(menuContext)=>IconButton(tooltip:context.tr('open_menu'),icon:const Icon(Icons.menu),onPressed:()=>Scaffold.of(menuContext).openDrawer())),
-        actions:[_connectionIndicator(),IconButton(tooltip:context.tr('refresh'),
-          onPressed:isLoading?null:_refreshAll,icon:const Icon(Icons.refresh)),
-          IconButton(key:const Key('topLogoutButton'),tooltip:'Quitter',onPressed:_logout,icon:const Icon(Icons.logout))],
-        bottom:PreferredSize(preferredSize:const Size.fromHeight(52),child:Theme(
-          data:Theme.of(context).copyWith(textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:Colors.white))),
-          child:FarmNavigation(horizontal:true,session:_navigationSession,actions:_navigationActions)))),
+      appBar: FarmTopBar(actions:_navigationActions,session:_navigationSession,connection:_connectionIndicator(),
+        onRefresh:isLoading?null:_refreshAll,onLogout:_logout),
       body: LayoutBuilder(builder: (context, constraints) => Column(children: [
         if(apiService is FarmerApiService && (apiService as FarmerApiService).runtime.warning!=null)
           Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),
@@ -816,12 +809,12 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                   final bool horizontal = constraints.maxWidth >= 900;
 
                   Widget especeFilter() {
-                    return DropdownButtonFormField<int>(
+                    return V2Field(child:DropdownButtonFormField<int>(
                       key: ValueKey('dashboardSpecies:$selectedEspeceId'),
                       isExpanded: true,
 
                       value: selectedEspeceId ?? 0,
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         labelText: context.tr('species'),
                         prefixIcon: const Icon(Icons.pets, color: Colors.green),
                         filled: true,
@@ -829,25 +822,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE0E6EA),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF0B4F7C),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
+                        ),),
                       items: [
                         DropdownMenuItem<int>(
                           value: 0,
@@ -868,18 +843,18 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
                         fetchDashboardByEspece(value == 0 ? null : value);
                       },
-                    );
+                    ));
                   }
 
                   Widget lotFilter() {
-                    return DropdownButtonFormField<int?>(
+                    return V2Field(child:DropdownButtonFormField<int?>(
                       key: ValueKey('dashboardLot:$selectedLotId'),
 
                       isExpanded: true,
 
 
                       value: selectedLotId,
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         labelText: context.tr('batch'),
                         prefixIcon: const Icon(
                           Icons.inventory_2_outlined,
@@ -890,25 +865,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE0E6EA),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF0B4F7C),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
+                        ),),
                       items: [
                         DropdownMenuItem<int?>(
                           value: null,
@@ -932,7 +889,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                           fetchLotDetail(value);
                         }
                       },
-                    );
+                    ));
                   }
 
                   if (horizontal) {
@@ -1092,6 +1049,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color:const Color(0xFF315D79),width:1.25),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
@@ -1145,6 +1103,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         ),
                         const SizedBox(height: 6),
                         TableCalendar(
+                          locale: AppSettings.instance.languageCode,
                           firstDay: DateTime.utc(2020, 1, 1),
                           lastDay: DateTime.utc(2030, 12, 31),
                           focusedDay: _focusedDay,
@@ -1254,6 +1213,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color:const Color(0xFF315D79),width:1.25),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
@@ -301,7 +302,7 @@ void main() {
         compensation: 'Annulation 9',
       );
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],
           home: RepaintBoundary(
             key: boundary,
             child: Scaffold(
@@ -342,7 +343,7 @@ void main() {
         });
       }
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],
           home: Scaffold(
             body: FarmNavigation(
               session: session('OPERATEUR'),
@@ -362,7 +363,7 @@ void main() {
     (tester) async {
       String? result;
       await tester.pumpWidget(
-        MaterialApp(
+        MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],
           home: Builder(
             builder: (context) => Scaffold(
               body: TextButton(

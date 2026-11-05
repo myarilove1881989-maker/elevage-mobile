@@ -35,6 +35,7 @@ void main() {
       final api=HistoryRouteApi(owner);
       addTearDown(() {ApiService.token=null;api.close();tester.view.reset();});
       await tester.pumpWidget(ElevageApp(apiService:api));await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Ouvrir le menu'));await tester.pumpAndSettle();
       await tester.tap(find.text('Historique').hitTestable());await tester.pumpAndSettle();
       expect(find.byType(owner?OwnerOperationHistoryScreen:OperationHistoryScreen),findsOneWidget);
       expect(api.requests.any((p)=>p.startsWith('/history/') && p.contains(owner?'view=operations':'page=1')),isTrue);

@@ -26,7 +26,7 @@ class DashboardKpiCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE4E8EC)),
+          border: Border.all(color: const Color(0xFF315D79),width:1.25),
           boxShadow: const [
             BoxShadow(
               color: Color(0x10000000),
@@ -78,7 +78,7 @@ class DashboardKpiCard extends StatelessWidget {
               right: 0,
               bottom: 0,
               child: Container(
-                height: 3,
+                height: 4,
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: const BorderRadius.vertical(
