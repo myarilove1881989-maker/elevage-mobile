@@ -55,6 +55,15 @@ void main(){
     api.lose=false;await revealHealth(tester,'health-save');await tester.tap(find.byKey(const Key('health-save')));await tester.pumpAndSettle();
     expect(api.requests,hasLength(2));expect(api.requests[0],api.requests[1]);await tester.pumpWidget(const SizedBox());api.close();
   });
+  testWidgets('single-date planning preserves the published backend contract',(tester)async{
+    final api=HealthAgendaApi();await tester.pumpWidget(testApp(HealthPlanForm(api:api,lotId:10)));await tester.pumpAndSettle();
+    await chooseHealth(tester);await revealHealth(tester,'health-save');await tester.tap(find.byKey(const Key('health-save')));await tester.pumpAndSettle();
+    expect(api.requests,hasLength(1));final body=api.requests.single;
+    expect(body.keys.toSet(),{'operation_uuid','date','planned_time','assigned_to','observations','product','lot','species'});
+    expect(body['date'],matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));expect(body.containsKey('dates'),isFalse);
+    expect(body['planned_time'],isNull);expect(find.textContaining('Planification non confirmée'),findsNothing);
+    await tester.pumpWidget(const SizedBox());api.close();
+  });
   testWidgets('explicit selected dates are submitted once without time or recurrence',(tester)async{
     final api=HealthAgendaApi();await tester.pumpWidget(testApp(HealthPlanForm(api:api,lotId:10)));await tester.pumpAndSettle();await chooseHealth(tester);
     await revealHealth(tester,'health-dates');

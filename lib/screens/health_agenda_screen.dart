@@ -159,11 +159,11 @@ class _HealthPlanFormState extends State<HealthPlanForm> {
         pending={'operation_uuid':uuid,if(widget.initial!=null)'date':date.text.trim(),
           'planned_time':widget.initial==null?null:time.text.trim().isEmpty?null:time.text.trim(),
           'assigned_to':assignee,'observations':notes.text,
-          if(widget.initial==null)...{'dates':selectedDates.toList()..sort(),'product':product,'lot':lot,'species':target.single['espece_id']}
+          if(widget.initial==null)...{if(selectedDates.length==1)'date':selectedDates.single else 'dates':selectedDates.toList()..sort(),'product':product,'lot':lot,'species':target.single['espece_id']}
           else ...{'expected_version':widget.initial!['version'],'reason':reason.text.trim()}};
       }
       final result=await widget.api.post(widget.initial==null?'/tasks/health-plan/':'/tasks/${widget.initial!['id']}/health-move/',pending!);
-      final valid=widget.initial==null?result is List && result.length==(pending!['dates'] as List).length && result.every((r)=>r is Map && r['id'] is int && r['local_only']!=true):result is Map && result['id'] is int && result['local_only']!=true;
+      final valid=widget.initial==null?result is List && result.length==((pending!['dates'] as List?)?.length??1) && result.every((r)=>r is Map && r['id'] is int && r['local_only']!=true):result is Map && result['id'] is int && result['local_only']!=true;
       if(!valid)throw StateError('Résultat non confirmé.');
       if(mounted && sameIdentity)v2Confirmed(context,message:'Programmation enregistrée');
     }catch(e){if(mounted)setState(()=>error=pending==null && e is StateError?'${e.message}':'Planification non confirmée. Les mêmes informations sont conservées pour vérification.');}
