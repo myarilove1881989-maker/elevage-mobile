@@ -191,39 +191,22 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 12,
-                      children: [
-                        TextButton.icon(
-                          key: const Key('eggCollectionDate'),
-                          icon: const Icon(Icons.calendar_today_outlined),
-                          label: Text(MaterialLocalizations.of(dialogContext)
-                              .formatMediumDate(selectedDate)),
-                          onPressed: null,
-                        ),
-                        TextButton.icon(
-                          key: const Key('eggCollectionTime'),
-                          icon: const Icon(Icons.access_time),
-                          label: Text(MaterialLocalizations.of(dialogContext)
-                              .formatTimeOfDay(selectedTime)),
-                          onPressed: null,
-                        ),
-                      ],
-                    ),
+                    V2Pair(first:V2PickerTile(key:const Key('eggCollectionDate'),label:'Date de collecte',value:v2Day(selectedDate.toIso8601String()),icon:Icons.calendar_today_outlined),
+                      second:V2PickerTile(key:const Key('eggCollectionTime'),label:'Heure',value:'${selectedTime.hour.toString().padLeft(2,'0')}:${selectedTime.minute.toString().padLeft(2,'0')}',icon:Icons.access_time)),
                     const SizedBox(height: 12),
                     Text(dialogContext.tr('egg_production_section')),
                     V2Field(child:TextField(
                       key: const Key('eggFullTrays'),
                       controller: trays,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_full_trays')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_full_trays'),),
                       onChanged: (_) => setDialogState(() {}),
                     )),
                     V2Field(child:TextField(
                       key: const Key('eggRemaining'),
                       controller: remainder,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_remaining')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_remaining'),),
                       onChanged: (_) => setDialogState(() {}),
                     )),
                     const SizedBox(height: 10),
@@ -234,21 +217,21 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                       key: const Key('eggBroken'),
                       controller: broken,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_broken')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_broken'),),
                       onChanged: (_) => setDialogState(() {}),
                     )),
                     V2Field(child:TextField(
                       key: const Key('eggDowngraded'),
                       controller: downgraded,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_downgraded')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_downgraded'),),
                       onChanged: (_) => setDialogState(() {}),
                     )),
                     V2Field(child:TextField(
                       key: const Key('eggConsumed'),
                       controller: consumed,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_consumed')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_consumed'),),
                       onChanged: (_) => setDialogState(() {}),
                     )),
                     const SizedBox(height: 10),
@@ -256,7 +239,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                     V2Field(child:TextField(
                       key: const Key('eggNote'),
                       controller: note,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_optional_note')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_optional_note'),),
                     )),
                   ],
                 ),
@@ -355,7 +338,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
               mainAxisSize: MainAxisSize.min,
               children: [
                 V2Field(child:DropdownButtonFormField<int>(
-                  decoration: const InputDecoration(labelText: 'Client'),
+                  decoration: const V2InputDecoration(labelText: 'Client',),
                   items: clients.map<DropdownMenuItem<int>>((client) {
                     return DropdownMenuItem(
                       value: client['id'] as int,
@@ -367,9 +350,8 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                 const SizedBox(height: 12),
                 V2Field(child:DropdownButtonFormField<String>(
                   initialValue: packaging,
-                  decoration: const InputDecoration(
-                    labelText: 'Conditionnement',
-                  ),
+                  decoration: const V2InputDecoration(
+                    labelText: 'Conditionnement',),
                   items: const [
                     DropdownMenuItem(value: 'UNITE', child: Text('Unité')),
                     DropdownMenuItem(
@@ -393,10 +375,9 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText:
-                        'Prix par conditionnement (${AppSettings.instance.currency.symbol})',
-                  ),
+                        'Prix par conditionnement (${AppSettings.instance.currency.symbol})',),
                 )),
               ],
             ),
@@ -465,7 +446,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
     return V2Field(child:TextField(
       controller: controller,
       keyboardType: TextInputType.number,
-      decoration: InputDecoration(labelText: label),
+      decoration: V2InputDecoration(labelText: label,),
     ));
   }
 

@@ -170,6 +170,7 @@ void main() {
         if (condition == 'lost') server.lost = true;
         if (condition == 'server-device-refusal') server.refusePost = true;
         final submit = find.byKey(const Key('expense-submit'));
+        if(submit.evaluate().isEmpty)await tester.scrollUntilVisible(submit,100,maxScrolls:100,scrollable:find.byType(Scrollable).first);
         await tester.ensureVisible(submit);
         await tester.pumpAndSettle();
         await tester.tap(submit);
@@ -194,6 +195,7 @@ void main() {
           });
         }
         if (condition == 'success') {
+          await tester.scrollUntilVisible(find.byKey(const Key('expense-status')),-100,maxScrolls:100,scrollable:find.byType(Scrollable).first);await tester.pumpAndSettle();
           expect(
             find.text('Dépense confirmée par le serveur.'),
             findsOneWidget,
@@ -221,6 +223,7 @@ void main() {
       await tester.pumpAndSettle();
       await selectExpense(tester);
       await tester.enterText(find.byKey(const Key('expense-amount')), '12.345');
+      if(find.byKey(const Key('expense-submit')).evaluate().isEmpty)await tester.scrollUntilVisible(find.byKey(const Key('expense-submit')),100,maxScrolls:100,scrollable:find.byType(Scrollable).first);
       await tester.ensureVisible(find.byKey(const Key('expense-submit')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('expense-submit')));

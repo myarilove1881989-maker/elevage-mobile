@@ -111,15 +111,15 @@ class _OperationHistoryScreenState extends State<OperationHistoryScreen> {
           builder:(_)=>OwnerOperationHistoryScreen(api:widget.api))),
           child:const Text('Activité complète des tablettes — propriétaire')),
         const TerreEtOrHeader(icon:Icons.history,title:'Historique',subtitle:'Retrouvez vos opérations et leur état'),
-        V2Field(child:TextField(decoration:const InputDecoration(labelText:'Rechercher un éleveur ou un lot',prefixIcon:Icon(Icons.search)),
+        V2Field(child:TextField(decoration:const V2InputDecoration(labelText:'Rechercher un éleveur ou un lot',prefixIcon:Icon(Icons.search),),
           onChanged:(value)=>setState(()=>search=value.trim().toLowerCase()))),
         ExpansionTile(title:const Text('Filtres'),children:[
-        V2Field(child:DropdownButtonFormField<String>(initialValue:typeFilter,decoration:const InputDecoration(labelText:'Type d’opération'),
+        V2Field(child:DropdownButtonFormField<String>(initialValue:typeFilter,decoration:const V2InputDecoration(labelText:'Type d’opération',),
           items:[const DropdownMenuItem(value:'',child:Text('Toutes les opérations')),
             for(final type in {if(typeFilter.isNotEmpty)typeFilter,...items.map((e)=>e.type),...widget.api.localOperations.map((e)=>OperationHistoryItem.local(e).type)})
               DropdownMenuItem(value:type,child:Text(type))],onChanged:(value)=>setState(()=>typeFilter=value??''))),
         const SizedBox(height:12),
-        V2Field(child:DropdownButtonFormField<String>(initialValue:statusFilter,decoration:const InputDecoration(labelText:'État'),
+        V2Field(child:DropdownButtonFormField<String>(initialValue:statusFilter,decoration:const V2InputDecoration(labelText:'État',),
           items:[const DropdownMenuItem(value:'',child:Text('Tous les états')),
             for(final status in ['En attente','Synchronisée','Échec'])
               DropdownMenuItem(value:status,child:Text(status))],onChanged:(value)=>setState(()=>statusFilter=value??''))),

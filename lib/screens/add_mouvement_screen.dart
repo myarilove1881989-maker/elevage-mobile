@@ -196,12 +196,12 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
               children: [
                 V2Field(child:TextField(
                   controller: nomController,
-                  decoration: InputDecoration(labelText: context.tr('name')),
+                  decoration: V2InputDecoration(labelText: context.tr('name'),),
                 )),
                 V2Field(child:TextField(
                   controller: telController,
                   keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(labelText: context.tr('phone')),
+                  decoration: V2InputDecoration(labelText: context.tr('phone'),),
                 )),
                 const SizedBox(height: 12),
                 V2Field(child:DropdownButtonFormField<String>(
@@ -210,10 +210,9 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
 
                   value: pays.isEmpty ? null : pays,
 
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText:
-                        '${context.tr('country')} (${context.tr('optional')})',
-                  ),
+                        '${context.tr('country')} (${context.tr('optional')})',),
                   items:
                       AppSettings.sortedCountries(
                             AppSettings.instance.languageCode,
@@ -235,10 +234,9 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                 )),
                 V2Field(child:TextField(
                   controller: villeController,
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText:
-                        '${context.tr('city')} (${context.tr('optional')})',
-                  ),
+                        '${context.tr('city')} (${context.tr('optional')})',),
                 )),
               ],
             ),
@@ -535,10 +533,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               eggOriginsComplete = false;
                             });
                           },
-                          decoration: InputDecoration(
-                            labelText: context.tr('movement_type'),
-                            border: OutlineInputBorder(),
-                          ),
+                          decoration: V2InputDecoration(
+                            labelText: context.tr('movement_type'),),
                         )),
 
                         const SizedBox(height: 16),
@@ -550,10 +546,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
 
                             key: const Key('saleProductDropdown'),
                             value: selectedProduct,
-                            decoration: InputDecoration(
-                              labelText: context.tr('sale_product'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('sale_product'),),
                             items: [
                               DropdownMenuItem(
                                 value: 'ANIMAUX',
@@ -601,12 +595,10 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               loadEggStock(value);
                             }
                           },
-                          decoration: InputDecoration(
+                          decoration: V2InputDecoration(
                             labelText: selectedType == 'NAISSANCE'
                                 ? context.tr('birth_parent')
-                                : context.tr('batch'),
-                            border: OutlineInputBorder(),
-                          ),
+                                : context.tr('batch'),),
                         )),
                         if (selectedType == 'NAISSANCE' && selectedLot != null)
                           Padding(
@@ -647,10 +639,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                           selectedClientId = value;
                                         });
                                       },
-                                      decoration: InputDecoration(
-                                        labelText: context.tr('customer'),
-                                        border: OutlineInputBorder(),
-                                      ),
+                                      decoration: V2InputDecoration(
+                                        labelText: context.tr('customer'),),
                                     )),
                                   ),
                                   const SizedBox(width: 10),
@@ -736,10 +726,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             key: const Key('eggSaleTrays'),
                             controller: traysController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('egg_full_trays'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('egg_full_trays'),),
                             onChanged: (_) => setState(() {}),
                           )),
                           const SizedBox(height: 16),
@@ -747,10 +735,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             key: const Key('eggSaleExtra'),
                             controller: extraEggsController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('sale_extra_eggs'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('sale_extra_eggs'),),
                             onChanged: (_) => setState(() {}),
                           )),
                           const SizedBox(height: 8),
@@ -767,22 +753,18 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
-                            decoration: InputDecoration(
+                            decoration: V2InputDecoration(
                               labelText:
                                   '${context.tr('sale_total_price')} '
-                                  '(${AppSettings.instance.currency.symbol})',
-                              border: const OutlineInputBorder(),
-                            ),
+                                  '(${AppSettings.instance.currency.symbol})',),
                           )),
                         ] else if (selectedType == 'NAISSANCE') ...[
                           V2Field(child:TextField(
                             key: const Key('birthTotal'),
                             controller: quantiteController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_total'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_total'),),
                             onChanged: (_) => setState(() {}),
                           )),
                           const SizedBox(height: 16),
@@ -790,10 +772,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             key: const Key('birthStillborn'),
                             controller: stillbornController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_stillborn'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_stillborn'),),
                             onChanged: (_) => setState(() {}),
                           )),
                           const SizedBox(height: 8),
@@ -806,10 +786,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                           V2Field(child:TextField(
                             key: const Key('birthNewLotName'),
                             controller: birthLotNameController,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_new_lot'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_new_lot'),),
                           )),
                           const SizedBox(height: 16),
                           V2Field(child:DropdownButtonFormField<String>(
@@ -818,10 +796,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
 
                             key: const Key('birthProductionType'),
                             initialValue: birthProductionType,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_new_lot_type'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_new_lot_type'),),
                             items: ['CHAIR', 'OEUFS', 'REPRODUCTION', 'AUTRE']
                                 .map(
                                   (type) => DropdownMenuItem<String>(
@@ -848,32 +824,26 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                           V2Field(child:TextField(
                             key: const Key('birthNote'),
                             controller: birthNoteController,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_note'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_note'),),
                           )),
                         ] else ...[
                           V2Field(child:TextField(
                             key: const Key('animalSaleQuantity'),
                             controller: quantiteController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('quantity'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('quantity'),),
                           )),
                           const SizedBox(height: 16),
                           V2Field(child:TextField(
                             key: const Key('animalSalePrice'),
                             controller: prixController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
+                            decoration: V2InputDecoration(
                               labelText:
                                   '${context.tr('unit_price_auto')} '
-                                  '(${AppSettings.instance.currency.symbol})',
-                              border: const OutlineInputBorder(),
-                            ),
+                                  '(${AppSettings.instance.currency.symbol})',),
                           )),
                         ],
 

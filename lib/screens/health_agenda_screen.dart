@@ -49,7 +49,7 @@ class _HealthAgendaScreenState extends State<HealthAgendaScreen> {
     final captured=ApiService.sessionIdentity;
     final reason=TextEditingController();bool busy=false;String? message;
     final route=DialogRoute<void>(context:context,builder:(dialog)=>StatefulBuilder(builder:(context,update)=>V2AlertDialog(title:const Text('Annuler le rendez-vous'),
-      content:Column(mainAxisSize:MainAxisSize.min,children:[V2Field(child:TextField(controller:reason,decoration:const InputDecoration(labelText:'Motif obligatoire'))),if(message!=null)Text(message!)]),
+      content:Column(mainAxisSize:MainAxisSize.min,children:[V2Field(child:TextField(controller:reason,decoration:const V2InputDecoration(labelText:'Motif obligatoire',))),if(message!=null)Text(message!)]),
       actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(dialog),child:const Text('Fermer')),TextButton(onPressed:busy?null:()async{
         if(reason.text.trim().length<3 || !current || captured!=ApiService.sessionIdentity)return;update(()=>busy=true);
         try {await widget.api.cancelTask(task['id'] as int,version:task['version'] as int,reason:reason.text.trim());if(dialog.mounted)Navigator.pop(dialog);await load();}
@@ -66,7 +66,7 @@ class _HealthAgendaScreenState extends State<HealthAgendaScreen> {
         const Text('Terminer la tâche ne déclare aucune vaccination et ne consomme aucune dose.'),
         V2Field(child:DropdownButtonFormField<String>(initialValue:status,items:[for(final s in choices)DropdownMenuItem(value:s,child:Text({'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée'}[s]!))],
           onChanged:pending!=null || busy?null:(v)=>update(()=>status=v!))),
-        V2Field(child:TextField(controller:report,enabled:pending==null && !busy,maxLength:10000,decoration:const InputDecoration(labelText:'Compte rendu'))),if(message!=null)Text(message!),
+        V2Field(child:TextField(controller:report,enabled:pending==null && !busy,maxLength:10000,decoration:const V2InputDecoration(labelText:'Compte rendu',))),if(message!=null)Text(message!),
       ])),actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(dialog),child:const Text('Fermer')),TextButton(onPressed:busy?null:()async{
         if(!current || captured!=ApiService.sessionIdentity)return;pending??={'status':status,'report':report.text,'expected_version':task['version'],
           if(widget.api.hasUnifiedOfflineSession)...{'operation_uuid':newOperationUuid(),'reported_at':DateTime.now().toUtc().toIso8601String()}};
@@ -172,17 +172,17 @@ class _HealthPlanFormState extends State<HealthPlanForm> {
   @override void dispose(){for(final c in [date,time,interval,end,notes,reason])c.dispose();super.dispose();}
   @override Widget build(BuildContext context) {
     final editable=!busy && pending==null;
-    Widget field(String key,String label,TextEditingController c)=>V2Field(child:TextField(key:Key(key),enabled:editable,controller:c,decoration:InputDecoration(labelText:label)));
+    Widget field(String key,String label,TextEditingController c)=>V2Field(child:TextField(key:Key(key),enabled:editable,controller:c,decoration:V2InputDecoration(labelText:label,)));
     return V2Scaffold(protectDraft:true,busy:busy,appBar:V2AppBar(title:Text(widget.initial==null?'Programmer une vaccination':'Reporter / réattribuer')),body:ListView(padding:const EdgeInsets.all(16),children:[
       if(error!=null)Text(error!),if(catalog==null)const Text('Chargement des références et des responsables…'),
       if(catalog!=null)...[
-        if(widget.initial==null)V2Field(child:DropdownButtonFormField<String>(key:const Key('health-product'),initialValue:product,isExpanded:true,decoration:const InputDecoration(labelText:'Vaccin'),
+        if(widget.initial==null)V2Field(child:DropdownButtonFormField<String>(key:const Key('health-product'),initialValue:product,isExpanded:true,decoration:const V2InputDecoration(labelText:'Vaccin',),
           items:[for(final p in catalog!['products'] as List)if(p['archived']!=true)DropdownMenuItem(value:p['id'] as String,child:Text('${p['name']}'))],onChanged:editable?(v)=>setState(()=>product=v):null)),
-        if(widget.initial==null)V2Field(child:DropdownButtonFormField<int>(key:const Key('health-lot'),initialValue:lot,isExpanded:true,decoration:const InputDecoration(labelText:'Espèce et lot'),
+        if(widget.initial==null)V2Field(child:DropdownButtonFormField<int>(key:const Key('health-lot'),initialValue:lot,isExpanded:true,decoration:const V2InputDecoration(labelText:'Espèce et lot',),
           items:[for(final l in catalog!['lots'] as List)DropdownMenuItem(value:l['id'] as int,child:Text('${l['nom']} — ${((catalog!['species'] as List? ?? const []).where((s)=>s['id']==l['espece_id']).map((s)=>s['nom']).firstOrNull)??'Espèce non renseignée'}'))],onChanged:editable?(v)=>setState(()=>lot=v):null)),
         if(widget.initial==null)V2DateSelection(key:const Key('health-dates'),selected:selectedDates,enabled:editable,onChanged:(value)=>setState((){selectedDates..clear()..addAll(value);})),
         if(widget.initial!=null)V2DateField(key:const Key('health-date'),controller:date,label:'Date prévue',enabled:editable),
-        V2Field(child:DropdownButtonFormField<int>(key:const Key('health-assignee'),initialValue:assignee,isExpanded:true,decoration:const InputDecoration(labelText:'Responsable autorisé'),
+        V2Field(child:DropdownButtonFormField<int>(key:const Key('health-assignee'),initialValue:assignee,isExpanded:true,decoration:const V2InputDecoration(labelText:'Responsable autorisé',),
           items:[for(final p in assignees)DropdownMenuItem(value:p['user'] as int,child:Text('${p['name']}'))],onChanged:editable?(v)=>setState(()=>assignee=v):null)),
         field('health-notes','Observations facultatives',notes),if(widget.initial!=null)field('health-reason','Motif obligatoire',reason),
         const V2Help(title:'Programmation sanitaire',child:Text('Une échéance est une intervention prévue. Elle ne déclare aucune vaccination et ne consomme aucune dose. La programmation nécessite Internet.')),

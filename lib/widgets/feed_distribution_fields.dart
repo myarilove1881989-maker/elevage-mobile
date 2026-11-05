@@ -38,16 +38,16 @@ class _FeedDistributionFieldsState extends State<FeedDistributionFields> {
     return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
       Text('${names.isEmpty?'Espèce non renseignée':names.single['nom']} · ${targets.isEmpty?'Lot non renseigné':targets.single['nom']}'),
       V2Field(child:DropdownButtonFormField<String>(key:const Key('distribution-stock-product'),initialValue:d.product,isExpanded:true,
-        decoration:const InputDecoration(labelText:'Aliment *',prefixIcon:Icon(Icons.grass_outlined)),
+        decoration:const V2InputDecoration(labelText:'Aliment *',prefixIcon:Icon(Icons.grass_outlined),),
         items:[for(final p in c['products'] as List)if(p['archived']!=true)
           DropdownMenuItem(value:p['id'] as String,child:Text(p['name'] as String))],
         onChanged:widget.editable?(v)=>setState(()=>d.product=v):null)),
       if(widget.quantityField==null) V2Field(child:DropdownButtonFormField<int>(key:const Key('distribution-stock-source'),initialValue:d.sourceLot??0,isExpanded:true,isDense:false,itemHeight:null,
-        decoration:const InputDecoration(labelText:'Stock à utiliser *',prefixIcon:Icon(Icons.inventory_2_outlined)),items:[
+        decoration:const V2InputDecoration(labelText:'Stock à utiliser *',prefixIcon:Icon(Icons.inventory_2_outlined),),items:[
           const DropdownMenuItem(value:0,child:Text('Stock partagé de cette espèce',maxLines:2,softWrap:true)),
           DropdownMenuItem(value:widget.lotId,child:const Text('Stock réservé à ce lot'))],
         onChanged:widget.editable?(v)=>setState(()=>d.sourceLot=v==0?null:v):null)) else V2Pair(first:V2Field(child:DropdownButtonFormField<int>(key:const Key('distribution-stock-source'),initialValue:d.sourceLot??0,isExpanded:true,isDense:false,itemHeight:null,
-        decoration:const InputDecoration(labelText:'Stock à utiliser *',prefixIcon:Icon(Icons.inventory_2_outlined)),items:[
+        decoration:const V2InputDecoration(labelText:'Stock à utiliser *',prefixIcon:Icon(Icons.inventory_2_outlined),),items:[
           const DropdownMenuItem(value:0,child:Text('Stock partagé de cette espèce',maxLines:2,softWrap:true)),
           DropdownMenuItem(value:widget.lotId,child:const Text('Stock réservé à ce lot'))],
         onChanged:widget.editable?(v)=>setState(()=>d.sourceLot=v==0?null:v):null)),second:widget.quantityField!),

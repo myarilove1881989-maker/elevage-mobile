@@ -95,17 +95,17 @@ class _OwnerOperationHistoryScreenState extends State<OwnerOperationHistoryScree
       const TerreEtOrHeader(icon:Icons.history,title:'Historique de l’exploitation',subtitle:'Consultez et filtrez les opérations de votre équipe'),
       const Text('Les opérations encore sur une tablette apparaîtront après transmission. Aucune validation du propriétaire n’est nécessaire.'),
       ExpansionTile(title:const Text('Filtres'),children:[
-      V2Field(child:TextField(controller:author,enabled:!busy,decoration:const InputDecoration(labelText:'Éleveur — nom'))),
-      V2Field(child:TextField(controller:lot,enabled:!busy,decoration:const InputDecoration(labelText:'Lot — nom'))),
-      V2Field(child:DropdownButtonFormField<String>(initialValue:kind,decoration:const InputDecoration(labelText:'Type d’opération'),
+      V2Field(child:TextField(controller:author,enabled:!busy,decoration:const V2InputDecoration(labelText:'Éleveur — nom',))),
+      V2Field(child:TextField(controller:lot,enabled:!busy,decoration:const V2InputDecoration(labelText:'Lot — nom',))),
+      V2Field(child:DropdownButtonFormField<String>(initialValue:kind,decoration:const V2InputDecoration(labelText:'Type d’opération',),
         items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['VENTE_ANIMAUX','VENTE_OEUFS','DEPENSE','ACHAT','NAISSANCE','MORTALITE','DON','VOL','CLIENT','COLLECTE_OEUFS','ENCAISSEMENT','VACCINATION','ALIMENTATION','PESEE','TASK'])
           DropdownMenuItem(value:code,child:Text(historyTypeLabel(code)))],onChanged:busy?null:(v)=>setState(()=>kind=v!))),
-      V2Field(child:DropdownButtonFormField<String>(initialValue:status,decoration:const InputDecoration(labelText:'Statut'),
+      V2Field(child:DropdownButtonFormField<String>(initialValue:status,decoration:const V2InputDecoration(labelText:'Statut',),
         items:[const DropdownMenuItem(value:'',child:Text('Tous')),for(final code in ['En attente','Synchronisée','Échec'])
           DropdownMenuItem(value:code,child:Text(code))],
         onChanged:busy?null:(v)=>setState(()=>status=v!))),
-      TextButton(onPressed:busy?null:()=>date(true),child:Text('Du : ${start?.toString().split(' ').first??'sans limite'}')),
-      TextButton(onPressed:busy?null:()=>date(false),child:Text('Au : ${end?.toString().split(' ').first??'sans limite'}')),
+      V2Field(child:V2PickerTile(label:'Du',value:start==null?'Sans limite':v2Day(start),icon:Icons.calendar_month_outlined,onTap:busy?null:()=>date(true))),
+      V2Field(child:V2PickerTile(label:'Au',value:end==null?'Sans limite':v2Day(end),icon:Icons.calendar_month_outlined,onTap:busy?null:()=>date(false))),
       FilledButton(onPressed:busy?null:()=>load(),child:const Text('Appliquer les filtres')),
       TextButton(onPressed:busy?null:() {author.clear();lot.clear();start=null;end=null;operation='';kind='';status='';load();},child:const Text('Effacer les filtres')),
       ]),

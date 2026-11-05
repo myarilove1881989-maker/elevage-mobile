@@ -118,10 +118,9 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                     controller: countController,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
+                    decoration: V2InputDecoration(
                       labelText: context.tr('animals_weighed'),
-                      prefixIcon: const Icon(Icons.groups_outlined),
-                    ),
+                      prefixIcon: const Icon(Icons.groups_outlined),),
                     validator: (value) {
                       final count = int.tryParse(value ?? '');
                       if (count == null || count <= 0) {
@@ -141,11 +140,10 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9,\.]')),
                     ],
-                    decoration: InputDecoration(
+                    decoration: V2InputDecoration(
                       labelText: context.tr('sample_total_weight'),
                       suffixText: 'kg',
-                      prefixIcon: const Icon(Icons.monitor_weight_outlined),
-                    ),
+                      prefixIcon: const Icon(Icons.monitor_weight_outlined),),
                     validator: (value) {
                       final weight = double.tryParse(
                         (value ?? '').replaceAll(',', '.'),
@@ -158,20 +156,15 @@ class _GrowthTrackingScreenState extends State<GrowthTrackingScreen> with Mutati
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
-                      onPressed: null,
-                      icon: const Icon(Icons.event_outlined),
-                      label: Text(_dateTime(weighedAt.toIso8601String())),
-                    ),
+                    child: V2PickerTile(label:'Date et heure',value:_dateTime(weighedAt.toIso8601String()),icon:Icons.event_outlined),
                   ),
                   const SizedBox(height: 8),
                   V2Field(child:TextFormField(
                     controller: noteController,
                     maxLines: 2,
-                    decoration: InputDecoration(
+                    decoration: V2InputDecoration(
                       labelText: context.tr('growth_note_optional'),
-                      prefixIcon: const Icon(Icons.notes_outlined),
-                    ),
+                      prefixIcon: const Icon(Icons.notes_outlined),),
                   )),
                 ],
               ),

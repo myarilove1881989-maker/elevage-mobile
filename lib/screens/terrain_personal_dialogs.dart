@@ -18,7 +18,7 @@ class _RecoveryReasonDialogState extends State<_RecoveryReasonDialog> {
       if(!widget.cancellation) const Text('Transmettre au maximum 50 déclarations conservées avec leurs auteurs d’origine. '
         'Cette action ne réactive pas la tablette. Les nouvelles déclarations reçues devront être rapprochées séparément.'),
       V2Field(child:TextFormField(controller:reason,maxLength:widget.cancellation?1000:10000,maxLines:4,
-        decoration:InputDecoration(labelText:widget.cancellation?'Motif d’annulation':'Motif de récupération'),
+        decoration:V2InputDecoration(labelText:widget.cancellation?'Motif d’annulation':'Motif de récupération',),
         validator:(value)=>(value?.trim().length??0)<3?'Indiquez un motif explicite.':null)),
     ]))),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
       FilledButton(onPressed:(){if(form.currentState!.validate()) Navigator.pop(context,reason.text.trim());},
@@ -41,10 +41,10 @@ class _TerrainClientDialogState extends State<_TerrainClientDialog> {
   Widget build(BuildContext context)=>V2AlertDialog(title:const Text('Client sur la tablette'),
     content:SingleChildScrollView(child:Form(key:form,child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('Confirmation serveur en attente. Votre auteur personnel sera conservé.'),
-      V2Field(child:TextFormField(controller:name,maxLength:255,decoration:const InputDecoration(labelText:'Nom'),
+      V2Field(child:TextFormField(controller:name,maxLength:255,decoration:const V2InputDecoration(labelText:'Nom',),
         validator:(value)=>value==null || value.trim().isEmpty?'Indiquez le nom du client.':null)),
-      V2Field(child:TextFormField(controller:phone,maxLength:20,keyboardType:TextInputType.phone,decoration:const InputDecoration(labelText:'Téléphone'))),
-      V2Field(child:TextFormField(controller:city,maxLength:100,decoration:const InputDecoration(labelText:'Ville'))),
+      V2Field(child:TextFormField(controller:phone,maxLength:20,keyboardType:TextInputType.phone,decoration:const V2InputDecoration(labelText:'Téléphone',))),
+      V2Field(child:TextFormField(controller:city,maxLength:100,decoration:const V2InputDecoration(labelText:'Ville',))),
     ]))),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
       FilledButton(onPressed:(){if(form.currentState!.validate()) {Navigator.pop(context,<String,dynamic>{'nom':name.text.trim(),'telephone':phone.text.trim(),'ville':city.text.trim()});}},child:const Text('Enregistrer sur la tablette'))]);
 }
@@ -65,10 +65,10 @@ class _TerrainTaskDialogState extends State<_TerrainTaskDialog> {
     final choices=widget.task['status']=='DONE'?['DONE']:widget.task['status']=='IN_PROGRESS'?['IN_PROGRESS','DONE']:['TODO','IN_PROGRESS'];
     return V2AlertDialog(title:Text(widget.task['title'] as String),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('Compte rendu conservé sur cette tablette. Un changement du propriétaire peut nécessiter un rapprochement.'),
-      V2Field(child:DropdownButtonFormField<String>(initialValue:status,decoration:const InputDecoration(labelText:'État'),
+      V2Field(child:DropdownButtonFormField<String>(initialValue:status,decoration:const V2InputDecoration(labelText:'État',),
         items:[for(final value in choices)DropdownMenuItem(value:value,child:Text(_taskStatus(value)))],
         onChanged:(value){if(value!=null) {setState(()=>status=value);}})),
-      V2Field(child:TextField(controller:report,maxLength:10000,maxLines:4,decoration:const InputDecoration(labelText:'Compte rendu'))),
+      V2Field(child:TextField(controller:report,maxLength:10000,maxLines:4,decoration:const V2InputDecoration(labelText:'Compte rendu',))),
     ])),actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
       FilledButton(onPressed:()=>Navigator.pop(context,<String,dynamic>{'status':status,'report':report.text}),child:const Text('Conserver mon compte rendu'))]);
   }

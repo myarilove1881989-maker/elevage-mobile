@@ -5,7 +5,7 @@ import '../services/farm_session.dart';
 import '../l10n/app_localizations.dart';
 
 enum FarmDestination {dashboard,billing,lots,purchases,sales,expenses,movements,history,agenda,production,settings,users,tutorial,logout}
-const farmNavigationOrder=[FarmDestination.dashboard,FarmDestination.users,FarmDestination.lots,FarmDestination.purchases,FarmDestination.expenses,
+const farmNavigationOrder=[FarmDestination.users,FarmDestination.lots,FarmDestination.purchases,FarmDestination.expenses,
   FarmDestination.production,FarmDestination.movements,FarmDestination.billing,FarmDestination.history,
   FarmDestination.agenda,FarmDestination.settings,FarmDestination.tutorial,FarmDestination.logout];
 const farmDestinationLabels={FarmDestination.dashboard:'Tableau de bord',FarmDestination.lots:'Lots',

@@ -421,9 +421,9 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
             : '5. Préparation à terminer : seules les étapes confirmées sont cochées.'),
           const SizedBox(height:12),
         ],
-        V2Field(child:TextField(controller:username,autocorrect:false,decoration:const InputDecoration(labelText:'Compte personnel'))),
+        V2Field(child:TextField(controller:username,autocorrect:false,decoration:const V2InputDecoration(labelText:'Compte personnel',))),
         V2Field(child:TextField(controller:password,obscureText:true,enableSuggestions:false,autocorrect:false,
-          decoration:const InputDecoration(labelText:'Mot de passe'))),
+          decoration:const V2InputDecoration(labelText:'Mot de passe',))),
         FilledButton(onPressed:busy?null:()=>_run(() async {
           try {
             await tablet.signIn(username.text.trim(),password.text);
@@ -490,7 +490,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
         },child:const Text('Changer mon PIN')),
         const Text('Les données confirmées et les déclarations de cette tablette restent distinctes.'),
         const SizedBox(height:12),
-        V2Field(child:DropdownButtonFormField<String>(key:ValueKey(collection),initialValue:collection,decoration:const InputDecoration(labelText:'Consulter'),
+        V2Field(child:DropdownButtonFormField<String>(key:ValueKey(collection),initialValue:collection,decoration:const V2InputDecoration(labelText:'Consulter',),
           items:const [DropdownMenuItem(value:'lots',child:Text('Lots')),DropdownMenuItem(value:'clients',child:Text('Clients')),
             DropdownMenuItem(value:'species',child:Text('Espèces')),DropdownMenuItem(value:'tasks',child:Text('Agenda')),
             DropdownMenuItem(value:'sales',child:Text('Ventes')),DropdownMenuItem(value:'cash',child:Text('Encaissements reçus'))],
@@ -532,7 +532,7 @@ class _PersonalPinDialogState extends State<_PersonalPinDialog> {
   Widget build(BuildContext context)=>V2AlertDialog(
     title:Text(widget.title),content:V2Field(child:TextField(controller:pin,obscureText:true,
       keyboardType:TextInputType.number,maxLength:12,autofocus:true,
-      decoration:const InputDecoration(labelText:'6 à 12 chiffres'))),
+      decoration:const V2InputDecoration(labelText:'6 à 12 chiffres',))),
     actions:[TextButton(onPressed:()=>Navigator.pop(context),child:const Text('Annuler')),
       FilledButton(onPressed:()=>Navigator.pop(context,pin.text),child:const Text('Valider'))]);
 }

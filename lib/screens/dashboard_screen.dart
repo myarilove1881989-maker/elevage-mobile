@@ -472,23 +472,22 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>V2AlertDialog(
       title:Text(context.tr('new_task')),
       content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
-        V2Field(child:TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const InputDecoration(labelText:'Tâche'))),
-        V2Field(child:DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const InputDecoration(labelText:'Opérateur'),
+        V2Field(child:TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const V2InputDecoration(labelText:'Tâche',))),
+        V2Field(child:DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const V2InputDecoration(labelText:'Opérateur',),
           items:operators.map((r)=>DropdownMenuItem<int>(value:r['user'] as int,child:Text(r['username'].toString()))).toList(),
           onChanged:busy?null:(v)=>change(()=>assignee=v))),
-        TextButton(onPressed:busy?null:() async {
+        V2Field(child:V2PickerTile(label:'Date prévue',value:v2Day(day.toIso8601String()),icon:Icons.calendar_month_outlined,onTap:busy?null:() async {
           final selected=await showDatePicker(context:dialog,initialDate:day,firstDate:DateTime(2020),lastDate:DateTime(2100));
           if(selected!=null && dialog.mounted) change(()=>day=selected);
-        },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(day))),
+        })),
         SwitchListTile(title:const Text('Répéter sur plusieurs jours'), value:repeat,
           onChanged:busy?null:(v)=>change(()=>repeat=v)),
         if(repeat) ...[
-          const Text('Date de fin (incluse)'),
-          TextButton(onPressed:busy?null:() async {
+          V2Field(child:V2PickerTile(label:'Date de fin (incluse)',value:v2Day(end.toIso8601String()),icon:Icons.calendar_month_outlined,onTap:busy?null:() async {
             final selected=await showDatePicker(context:dialog,initialDate:end,
               firstDate:DateTime(2020),lastDate:DateTime(2100));
             if(selected!=null && dialog.mounted) change(()=>end=selected);
-          },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(end))),
+          })),
           const Text('Tous les jours, ou sélectionnez les jours souhaités'),
           Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(
             label:Text(['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]),
@@ -815,7 +814,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                       isExpanded: true,
 
                       value: selectedEspeceId ?? 0,
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         labelText: context.tr('species'),
                         prefixIcon: const Icon(Icons.pets, color: Colors.green),
                         filled: true,
@@ -823,25 +822,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF315D79),width:1.25,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF0B4F7C),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
+                        ),),
                       items: [
                         DropdownMenuItem<int>(
                           value: 0,
@@ -873,7 +854,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
 
                       value: selectedLotId,
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         labelText: context.tr('batch'),
                         prefixIcon: const Icon(
                           Icons.inventory_2_outlined,
@@ -884,25 +865,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF315D79),width:1.25,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF0B4F7C),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
+                        ),),
                       items: [
                         DropdownMenuItem<int?>(
                           value: null,

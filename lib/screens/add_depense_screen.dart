@@ -268,7 +268,7 @@ class _OriginalExpensePinDialogState extends State<_OriginalExpensePinDialog> {
       controller: pin,
       obscureText: true,
       keyboardType: TextInputType.number,
-      decoration: InputDecoration(labelText:widget.personalCode?'Code personnel':'PIN personnel existant'),
+      decoration: V2InputDecoration(labelText:widget.personalCode?'Code personnel':'PIN personnel existant',),
     )),
     actions: [
       TextButton(

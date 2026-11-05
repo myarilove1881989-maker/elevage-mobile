@@ -119,8 +119,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           V2Field(child:TextField(controller: farmController, maxLength: 100,
             enabled: farmLoaded && owner && ownerSession == ApiService.sessionIdentity && !saving,
-            decoration: InputDecoration(labelText: 'Nom de l’exploitation', errorText: farmError,
-              helperText: 'Nom partagé par tous les utilisateurs de cette exploitation.'))),
+            decoration: V2InputDecoration(labelText: 'Nom de l’exploitation', errorText: farmError,
+              helperText: 'Nom partagé par tous les utilisateurs de cette exploitation.',))),
           if (!farmLoaded) TextButton(onPressed: loadFarm, child: const Text('Recharger le nom')),
           if(checkingOwner) const LinearProgressIndicator(),
           if(ownerError!=null) ListTile(title:Text(ownerError!),trailing:TextButton(onPressed:checkingOwner?null:loadOwner,child:const Text('Réessayer'))),
@@ -135,10 +135,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           V2Field(child:DropdownButtonFormField<String>(
             isExpanded: true,
             value: countryCode,
-            decoration: InputDecoration(
-              labelText: '${context.tr('country')} (${context.tr('optional')})',
-              border: const OutlineInputBorder(),
-            ),
+            decoration: V2InputDecoration(
+              labelText: '${context.tr('country')} (${context.tr('optional')})',),
             items:
                 [
                       const CountryOption('', '—', '—', 'XAF'),
@@ -165,19 +163,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 16),
           V2Field(child:TextFormField(
             controller: cityController,
-            decoration: InputDecoration(
-              labelText: '${context.tr('city')} (${context.tr('optional')})',
-              border: const OutlineInputBorder(),
-            ),
+            decoration: V2InputDecoration(
+              labelText: '${context.tr('city')} (${context.tr('optional')})',),
           )),
           const SizedBox(height: 16),
           V2Field(child:DropdownButtonFormField<String>(
             isExpanded: true,
             value: language,
-            decoration: InputDecoration(
-              labelText: context.tr('language'),
-              border: const OutlineInputBorder(),
-            ),
+            decoration: V2InputDecoration(
+              labelText: context.tr('language'),),
             items: [
               DropdownMenuItem(value: 'fr', child: Text(context.tr('french'))),
               DropdownMenuItem(value: 'en', child: Text(context.tr('english'))),
@@ -188,10 +182,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           V2Field(child:DropdownButtonFormField<String>(
             isExpanded: true,
             value: currency,
-            decoration: InputDecoration(
-              labelText: context.tr('currency'),
-              border: const OutlineInputBorder(),
-            ),
+            decoration: V2InputDecoration(
+              labelText: context.tr('currency'),),
             items: AppSettings.currencies
                 .map(
                   (item) => DropdownMenuItem(

@@ -1,3 +1,4 @@
+export '../theme/design_system_v2.dart' show V2InputDecoration;
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -438,7 +439,7 @@ class _V2DateFieldState extends State<V2DateField> {
       controller: display,
       enabled: widget.enabled,
       keyboardType: TextInputType.datetime,
-      decoration: InputDecoration(
+      decoration: V2InputDecoration(
         labelText: widget.label,
         prefixIcon: const Icon(Icons.calendar_month_outlined),
         suffixIcon: IconButton(
@@ -573,7 +574,7 @@ class _V2DurationFieldState extends State<V2DurationField> {
       controller: minutes,
       enabled: widget.enabled,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
+      decoration: const V2InputDecoration(
         labelText: 'Durée après ouverture (minutes, facultative)',
         prefixIcon: Icon(Icons.timer_outlined),
       ),
@@ -728,7 +729,40 @@ class V2AlertDialog extends StatelessWidget {
           ),
       builder: (context, state) {
         Widget action(Widget widget) {
-          if (!cancel(widget)) return widget;
+          if (!cancel(widget)) {
+            if (widget is TextButton) {
+              final text = label(widget.child).toLowerCase();
+              final destructive =
+                  text.contains('supprim') ||
+                  text.contains('annulation') ||
+                  text.contains('delete');
+              return TextButton(
+                key: widget.key,
+                onPressed: widget.onPressed,
+                onLongPress: widget.onLongPress,
+                style: TextButton.styleFrom(
+                  backgroundColor: destructive
+                      ? Theme.of(context).colorScheme.error
+                      : V2Colors.green,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade200,
+                  disabledForegroundColor: Colors.grey.shade700,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ).merge(widget.style),
+                focusNode: widget.focusNode,
+                autofocus: widget.autofocus,
+                child: widget.child!,
+              );
+            }
+            return widget;
+          }
           final button = widget as ButtonStyleButton;
           final VoidCallback? callback = button.onPressed == null
               ? null
@@ -741,7 +775,19 @@ class V2AlertDialog extends StatelessWidget {
               key: button.key,
               onPressed: callback,
               onLongPress: button.onLongPress,
-              style: button.style,
+              style: TextButton.styleFrom(
+                foregroundColor: V2Colors.navy,
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: V2Colors.border, width: 1.25),
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ).merge(button.style),
               focusNode: button.focusNode,
               autofocus: button.autofocus,
               child: button.child!,
@@ -751,7 +797,19 @@ class V2AlertDialog extends StatelessWidget {
               key: button.key,
               onPressed: callback,
               onLongPress: button.onLongPress,
-              style: button.style,
+              style: TextButton.styleFrom(
+                foregroundColor: V2Colors.navy,
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: V2Colors.border, width: 1.25),
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ).merge(button.style),
               focusNode: button.focusNode,
               autofocus: button.autofocus,
               child: button.child!,
@@ -761,7 +819,19 @@ class V2AlertDialog extends StatelessWidget {
               key: button.key,
               onPressed: callback,
               onLongPress: button.onLongPress,
-              style: button.style,
+              style: TextButton.styleFrom(
+                foregroundColor: V2Colors.navy,
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: V2Colors.border, width: 1.25),
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ).merge(button.style),
               focusNode: button.focusNode,
               autofocus: button.autofocus,
               child: button.child!,
@@ -771,7 +841,19 @@ class V2AlertDialog extends StatelessWidget {
               key: button.key,
               onPressed: callback,
               onLongPress: button.onLongPress,
-              style: button.style,
+              style: TextButton.styleFrom(
+                foregroundColor: V2Colors.navy,
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: V2Colors.border, width: 1.25),
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ).merge(button.style),
               focusNode: button.focusNode,
               autofocus: button.autofocus,
               child: button.child!,
@@ -791,7 +873,7 @@ class V2AlertDialog extends StatelessWidget {
           insetPadding:
               insetPadding ??
               const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          backgroundColor: backgroundColor,
+          backgroundColor: backgroundColor ?? Colors.white,
           shape:
               shape ??
               RoundedRectangleBorder(

@@ -260,10 +260,9 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                       V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionSpeciesDropdown'),
                         initialValue: selectedSpeciesId,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText: context.tr('species'),
-                          prefixIcon: const Icon(Icons.pets_outlined),
-                        ),
+                          prefixIcon: const Icon(Icons.pets_outlined),),
                         items: species
                             .map(
                               (item) => DropdownMenuItem<int>(
@@ -283,10 +282,9 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                       V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionLotDropdown'),
                         initialValue: selectedLotId,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText: context.tr('batch'),
-                          prefixIcon: const Icon(Icons.inventory_2_outlined),
-                        ),
+                          prefixIcon: const Icon(Icons.inventory_2_outlined),),
                         items: filteredLots
                             .map(
                               (item) => DropdownMenuItem<int>(
@@ -313,10 +311,9 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                       if (currentLot != null) ...[
                         const SizedBox(height: 14),
                         InputDecorator(
-                          decoration: InputDecoration(
+                          decoration: V2InputDecoration(
                             labelText: context.tr('production_type'),
-                            prefixIcon: const Icon(Icons.category_outlined),
-                          ),
+                            prefixIcon: const Icon(Icons.category_outlined),),
                           child: Text(
                             _productionTypeLabel(
                               context,

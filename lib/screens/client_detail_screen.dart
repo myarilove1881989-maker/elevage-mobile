@@ -175,7 +175,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
               children: [
                 const Icon(Icons.payment),
                 const SizedBox(width: 10),
-                Text(context.tr('save_payment')),
+                Expanded(child:Text(context.tr('save_payment'))),
               ],
             ),
             content: SingleChildScrollView(child:Column(
@@ -214,17 +214,15 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText: context.tr('amount'),
                     hintText: "Ex : 50000",
-                    prefixIcon: Icon(Icons.euro),
-                    border: OutlineInputBorder(),
-                  ),
+                    prefixIcon: Icon(Icons.euro),),
                 )),
                 if(api.hasUnifiedOfflineSession) ...[
                   const SizedBox(height:14),
                   V2Field(child:DropdownButtonFormField<String>(initialValue:paymentMode,
-                    decoration:const InputDecoration(labelText:'Mode de paiement'),
+                    decoration:const V2InputDecoration(labelText:'Mode de paiement',),
                     items:const [DropdownMenuItem(value:'ESPECES',child:Text('Espèces')),
                       DropdownMenuItem(value:'MOBILE_MONEY',child:Text('Mobile Money')),
                       DropdownMenuItem(value:'VIREMENT',child:Text('Virement')),
@@ -784,7 +782,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  date.toString(),
+                  v2Day(date),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
@@ -891,7 +889,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    date.toString(),
+                    v2Day(date),
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   if (note != null && note.toString().trim().isNotEmpty) ...[

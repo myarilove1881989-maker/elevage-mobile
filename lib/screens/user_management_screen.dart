@@ -132,15 +132,14 @@ class _AccountDialogState extends State<_AccountDialog> {
               if (!widget.reset) ...[
                 V2Field(child:TextFormField(
                   controller: name,
-                  decoration: const InputDecoration(labelText: 'Nom affiché'),
+                  decoration: const V2InputDecoration(labelText: 'Nom affiché',),
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Indiquez un nom.' : null,
                 )),
                 V2Field(child:TextFormField(
                   controller: username,
-                  decoration: const InputDecoration(
-                    labelText: 'Identifiant unique',
-                  ),
+                  decoration: const V2InputDecoration(
+                    labelText: 'Identifiant unique',),
                   validator: (v) =>
                       v == null || !RegExp(r'^[\w.@+-]+$').hasMatch(v.trim())
                       ? 'Indiquez un identifiant sans espace.'
@@ -148,9 +147,8 @@ class _AccountDialogState extends State<_AccountDialog> {
                 )),
                 V2Field(child:TextFormField(
                   controller: email,
-                  decoration: const InputDecoration(
-                    labelText: 'Email facultatif',
-                  ),
+                  decoration: const V2InputDecoration(
+                    labelText: 'Email facultatif',),
                   keyboardType: TextInputType.emailAddress,
                 )),
               ],
@@ -159,9 +157,8 @@ class _AccountDialogState extends State<_AccountDialog> {
                 obscureText: true,
                 enableSuggestions: false,
                 autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Mot de passe initial (4 caractères minimum)',
-                ),
+                decoration: const V2InputDecoration(
+                  labelText: 'Mot de passe initial (4 caractères minimum)',),
                 validator: (v) => v == null || v.trim().length < 4
                     ? 'Utilisez au moins 4 caractères.'
                     : null,

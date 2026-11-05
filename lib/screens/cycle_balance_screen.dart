@@ -392,10 +392,8 @@ class _CycleBalanceScreenState extends State<CycleBalanceScreen> {
                                 key: ValueKey('cycle-comparison-$compareId'),
                                 initialValue: compareId,
                                 isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Cycle de référence',
-                                  border: OutlineInputBorder(),
-                                ),
+                                decoration: const V2InputDecoration(
+                                  labelText: 'Cycle de référence',),
                                 items: [
                                   const DropdownMenuItem<int>(
                                     value: null,

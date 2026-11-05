@@ -134,10 +134,9 @@ class _DettesScreenState extends State<DettesScreen> with MutationRefresh<Dettes
                     ),
                     const SizedBox(height: 14),
                     V2Field(child:TextField(
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         hintText: context.tr('search_name_phone'),
-                        prefixIcon: const Icon(Icons.search),
-                      ),
+                        prefixIcon: const Icon(Icons.search),),
                       onChanged: (v) => setState(() => searchQuery = v),
                     )),
                     const SizedBox(height: 10),

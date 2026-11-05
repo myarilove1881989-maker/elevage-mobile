@@ -35,7 +35,7 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
   Future<void> cancel(Map row) async {
     final reason=TextEditingController();final id=newOperationUuid();Map<String,dynamic>? request;
     await showDialog<void>(context:context,builder:(dialog)=>StatefulBuilder(builder:(context,update)=>V2AlertDialog(
-      title:const Text('Annuler la vaccination'),content:V2Field(child:TextField(key:const Key('vaccination-cancel-reason'),controller:reason,enabled:request==null,decoration:const InputDecoration(labelText:'Motif obligatoire'))),
+      title:const Text('Annuler la vaccination'),content:V2Field(child:TextField(key:const Key('vaccination-cancel-reason'),controller:reason,enabled:request==null,decoration:const V2InputDecoration(labelText:'Motif obligatoire',))),
       actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),TextButton(onPressed:() async {
         if(reason.text.trim().length<3)return;
         request??={'operation_uuid':id,'expected_version':row['version'],'reason':reason.text.trim(),'confirm':true};
@@ -122,15 +122,15 @@ class _VaccinationFormState extends State<VaccinationForm> {
   @override void dispose(){for(final c in [animals,date,observations,reason,...opened.values,...used.values,...lost.values,...duration.values])c.dispose();super.dispose();}
   @override Widget build(BuildContext context) {
     final editable=!busy && pending==null;
-    Widget text(String key,String label,TextEditingController controller)=>controller==date || opened.values.contains(controller)?V2DateField(key:Key(key),controller:controller,label:controller==date?'Date et heure de vaccination':'Ouverture antérieure (facultative)',enabled:editable,withTime:true):duration.values.contains(controller)?V2DurationField(key:Key(key),controller:controller,enabled:editable):V2Field(child:TextField(key:Key(key),enabled:editable,controller:controller,decoration:InputDecoration(labelText:label)));
+    Widget text(String key,String label,TextEditingController controller)=>controller==date || opened.values.contains(controller)?V2DateField(key:Key(key),controller:controller,label:controller==date?'Date et heure de vaccination':'Ouverture antérieure (facultative)',enabled:editable,withTime:true):duration.values.contains(controller)?V2DurationField(key:Key(key),controller:controller,enabled:editable):V2Field(child:TextField(key:Key(key),enabled:editable,controller:controller,decoration:V2InputDecoration(labelText:label,)));
     return V2Scaffold(protectDraft:true,busy:busy,appBar:V2AppBar(title:Text(widget.initial==null?'Vaccination / perte':'Corriger la vaccination')),body:ListView(padding:const EdgeInsets.all(16),children:[
       if(error!=null)Text(error!),if(catalog==null)const Text('Référentiel et flacons requis.'),
       if(catalog!=null)...[
         const Text('Opérateur responsable : votre identité connectée, conservée avec la déclaration.'),
-        V2Field(child:DropdownButtonFormField<String>(key:const Key('vaccination-product'),initialValue:product,isExpanded:true,decoration:const InputDecoration(labelText:'Vaccin'),
+        V2Field(child:DropdownButtonFormField<String>(key:const Key('vaccination-product'),initialValue:product,isExpanded:true,decoration:const V2InputDecoration(labelText:'Vaccin',),
           items:[for(final p in catalog!['products'] as List)if(p['archived']!=true || p['id']==product)DropdownMenuItem(value:p['id'] as String,child:Text('${p['name']}'))],
           onChanged:editable && widget.initial==null && widget.plannedTask==null?(v)=>setState(() {product=v;selectedTask=null;}):null)),
-        if(widget.initial==null && plannedTasks.any((r)=>r['health']['product']==product))V2Field(child:DropdownButtonFormField<int>(key:ValueKey('vaccination-planned-task-$product'),initialValue:selectedTask?['id'] as int? ?? 0,isExpanded:true,decoration:const InputDecoration(labelText:'Rendez-vous sanitaire facultatif'),items:[const DropdownMenuItem(value:0,child:Text('Sans rattachement')),for(final task in plannedTasks)if(task['health']['product']==product)DropdownMenuItem(value:task['id'] as int,child:Text('${v2Day(task['date'])} — ${task['title']}'))],onChanged:editable?(id)=>setState(()=>selectedTask=id==0?null:plannedTasks.singleWhere((r)=>r['id']==id)):null)),
+        if(widget.initial==null && plannedTasks.any((r)=>r['health']['product']==product))V2Field(child:DropdownButtonFormField<int>(key:ValueKey('vaccination-planned-task-$product'),initialValue:selectedTask?['id'] as int? ?? 0,isExpanded:true,decoration:const V2InputDecoration(labelText:'Rendez-vous sanitaire facultatif',),items:[const DropdownMenuItem(value:0,child:Text('Sans rattachement')),for(final task in plannedTasks)if(task['health']['product']==product)DropdownMenuItem(value:task['id'] as int,child:Text('${v2Day(task['date'])} — ${task['title']}'))],onChanged:editable?(id)=>setState(()=>selectedTask=id==0?null:plannedTasks.singleWhere((r)=>r['id']==id)):null)),
         text('vaccination-date','Date et heure (ex. 2026-11-03 08:30)',date),text('vaccination-animals','Nombre d’animaux vaccinés (0 pour perte seule)',animals),
         for(final vial in catalog!['vials'] as List)if(eligible(vial as Map))...[
           Text('Flacon ${vial['label']} — péremption ${v2Day(vial['expires_on'])}\nPhysique confirmé : ${vial['physical']} ; attente : ${vial['pending_doses']??0} ; utilisable estimé : ${vial['estimated_usable']??vial['usable']}\nOuverture : ${vial['opened_at']==null?'non ouvert':v2Moment(vial['opened_at'])}'),

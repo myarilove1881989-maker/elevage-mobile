@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'design_system_v2.dart';
 import 'package:flutter/material.dart';
 
@@ -37,10 +38,10 @@ class TerreEtOrHeader extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: TerreEtOrColors.paleGold,
+              color: V2Colors.green.withValues(alpha:0.10),
               borderRadius: BorderRadius.circular(15),
             ),
-            child: Icon(icon, color: TerreEtOrColors.gold, size: 28),
+            child: Icon(icon, color: V2Colors.green, size: 28),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -80,10 +81,8 @@ class TerreEtOrPanel extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: const Border(
-          top: BorderSide(color: TerreEtOrColors.gold, width: 5),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color:V2Colors.border,width:1.25),
         boxShadow: [
           BoxShadow(
             color: TerreEtOrColors.navy.withValues(alpha: 0.08),
@@ -109,16 +108,6 @@ class TerreEtOrDateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: TerreEtOrColors.paleGold.withValues(alpha: 0.55),
-      borderRadius: BorderRadius.circular(14),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        leading: const Icon(Icons.calendar_month, color: TerreEtOrColors.gold),
-        title: Text(label),
-          trailing: onTap==null?null:const Icon(Icons.chevron_right, color: TerreEtOrColors.navy),
-        onTap: onTap,
-      ),
-    );
+    return V2PickerTile(label:'Date',value:label.replaceFirst(RegExp(r'^Date\s*:\s*'),''),icon:Icons.calendar_month_outlined,onTap:onTap);
   }
 }

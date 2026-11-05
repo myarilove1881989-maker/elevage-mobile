@@ -416,9 +416,8 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
                 V2Field(child:TextField(
                   controller: controller,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Seuil (0 désactive le stock faible)',
-                  ),
+                  decoration: const V2InputDecoration(
+                    labelText: 'Seuil (0 désactive le stock faible)',),
                 )),
                 if (failure != null) Text(failure!),
                 const Text('Configuration avec connexion requise.'),
@@ -578,15 +577,13 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
               ),
               V2Field(child:TextField(
                 controller: expiry,
-                decoration: const InputDecoration(
-                  labelText: 'Péremption dans … jours',
-                ),
+                decoration: const V2InputDecoration(
+                  labelText: 'Péremption dans … jours',),
               )),
               V2Field(child:TextField(
                 controller: upcoming,
-                decoration: const InputDecoration(
-                  labelText: 'Vaccination dans … jours',
-                ),
+                decoration: const V2InputDecoration(
+                  labelText: 'Vaccination dans … jours',),
               )),
             ],
           ),
@@ -805,10 +802,9 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
       key: ValueKey('consumables-species-$selectedSpecies'),
       initialValue: selectedSpecies,
       isExpanded: true,
-      decoration: const InputDecoration(
+      decoration: const V2InputDecoration(
         labelText: 'Espèce',
-        prefixIcon: Icon(Icons.pets_outlined),
-      ),
+        prefixIcon: Icon(Icons.pets_outlined),),
       items: [
         const DropdownMenuItem<int>(
           value: null,
@@ -832,10 +828,9 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
       key: ValueKey('consumables-lot-$selectedLot'),
       initialValue: selectedLot,
       isExpanded: true,
-      decoration: const InputDecoration(
+      decoration: const V2InputDecoration(
         labelText: 'Lot',
-        prefixIcon: Icon(Icons.inventory_2_outlined),
-      ),
+        prefixIcon: Icon(Icons.inventory_2_outlined),),
       items: [
         const DropdownMenuItem<int>(value: null, child: Text('Tous les lots')),
         if (selectedLot != null && !lots.any((l) => l['id'] == selectedLot))

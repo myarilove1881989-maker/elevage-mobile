@@ -206,10 +206,8 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                       // ================= NOM LOT =================
                       V2Field(child:TextFormField(
                         controller: nomLotController,
-                        decoration: InputDecoration(
-                          labelText: context.tr('lot_name'),
-                          border: const OutlineInputBorder(),
-                        ),
+                        decoration: V2InputDecoration(
+                          labelText: context.tr('lot_name'),prefixIcon:const Icon(Icons.inventory_2_outlined),),
                         validator: (value) => value == null || value.isEmpty
                             ? context.tr('required')
                             : null,
@@ -247,13 +245,11 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                                 focusNode: focusNode,
                                 onChanged: (_) =>
                                     setState(() => selectedEspece = null),
-                                decoration: InputDecoration(
+                                decoration: V2InputDecoration(
                                   labelText: context.tr('choose_species'),
                                   hintText: context.tr('search_species'),
                                   prefixIcon: const Icon(Icons.pets_outlined),
-                                  suffixIcon: const Icon(Icons.arrow_drop_down),
-                                  border: const OutlineInputBorder(),
-                                ),
+                                  suffixIcon: const Icon(Icons.arrow_drop_down),),
                                 validator: (_) => selectedEspece == null
                                     ? context.tr('species_required')
                                     : null,
@@ -268,10 +264,9 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                         isExpanded: true,
 
                         initialValue: selectedProductionType,
-                        decoration: const InputDecoration(
+                        decoration: const V2InputDecoration(
                           labelText: 'Type de production',
-                          prefixIcon: Icon(Icons.category_outlined),
-                        ),
+                          prefixIcon: Icon(Icons.category_outlined),),
                         items: const [
                           DropdownMenuItem(
                             value: 'CHAIR',
@@ -309,9 +304,8 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                           isExpanded: true,
 
                           initialValue: selectedProductionStatus,
-                          decoration: const InputDecoration(
-                            labelText: 'Statut du lot',
-                          ),
+                          decoration: const V2InputDecoration(
+                            labelText: 'Statut du lot',),
                           items: const [
                             DropdownMenuItem(
                               value: 'ELEVAGE',
@@ -361,10 +355,8 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                       V2Field(child:TextFormField(
                         controller: quantiteController,
                         keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: context.tr('quantity'),
-                          border: const OutlineInputBorder(),
-                        ),
+                        decoration: V2InputDecoration(
+                          labelText: context.tr('quantity'),prefixIcon:const Icon(Icons.numbers),),
                         onChanged: (_) => calculatePrixUnitaire(),
                         validator: (value) => value == null || value.isEmpty
                             ? context.tr('required')
@@ -377,11 +369,9 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                       V2Field(child:TextFormField(
                         controller: prixTotalController,
                         keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText:
-                              '${context.tr('total_price')} (${AppSettings.instance.currency.symbol})',
-                          border: const OutlineInputBorder(),
-                        ),
+                              '${context.tr('total_price')} (${AppSettings.instance.currency.symbol})',),
                         onChanged: (_) => calculatePrixUnitaire(),
                         validator: (value) => value == null || value.isEmpty
                             ? context.tr('required')
@@ -394,11 +384,9 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                       V2Field(child:TextFormField(
                         controller: prixUnitaireController,
                         readOnly: true,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText:
-                              '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',
-                          border: const OutlineInputBorder(),
-                        ),
+                              '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',),
                       )),
 
                       const SizedBox(height: 16),

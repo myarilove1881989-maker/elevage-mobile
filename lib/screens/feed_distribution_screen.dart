@@ -58,8 +58,8 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> with Mu
     Map<String,dynamic>? pending;
     await showDialog<void>(context:context,builder:(dialog)=>StatefulBuilder(builder:(context,update)=>V2AlertDialog(
       title:Text(cancel?'Annuler la distribution':'Corriger la quantité'),content:Column(mainAxisSize:MainAxisSize.min,children:[
-        if(!cancel)V2Field(child:TextField(controller:amount,enabled:pending==null,decoration:const InputDecoration(labelText:'Nouvelle quantité totale (kg)'))),
-        V2Field(child:TextField(controller:reason,enabled:pending==null,decoration:const InputDecoration(labelText:'Motif obligatoire')))]),
+        if(!cancel)V2Field(child:TextField(controller:amount,enabled:pending==null,decoration:const V2InputDecoration(labelText:'Nouvelle quantité totale (kg)',))),
+        V2Field(child:TextField(controller:reason,enabled:pending==null,decoration:const V2InputDecoration(labelText:'Motif obligatoire',)))]),
       actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),
         TextButton(onPressed:()async{
           if(reason.text.trim().length<3)return;
@@ -363,7 +363,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                     enabled:stockCatalog==null || (!stockAttempted && !saving),
                     controller: quantity,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined)),
+                    decoration: V2InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined),),
                     validator: (value) {
                       final parsed = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
                       return parsed == null || !parsed.isFinite || parsed <= 0
@@ -375,7 +375,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                     key: const Key('feedNameField'),
                     controller: feedName,
                     maxLength: 120,
-                    decoration: InputDecoration(labelText: context.tr('feed_name')),
+                    decoration: V2InputDecoration(labelText: context.tr('feed_name'),),
                     validator: (value) => value == null || value.trim().isEmpty
                         ? context.tr('feed_invalid_name')
                         : null,
@@ -385,7 +385,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                     enabled:stockCatalog==null || (!stockAttempted && !saving),
                     controller: quantity,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined)),
+                    decoration: V2InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined),),
                     validator: (value) {
                       final parsed = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
                       return parsed == null || !parsed.isFinite || parsed <= 0
@@ -398,7 +398,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                     enabled:stockCatalog==null || (!stockAttempted && !saving),
                     controller: note,
                     maxLines: 2,
-                    decoration: InputDecoration(labelText: context.tr('feed_note'),hintText:'Ex. : distribution du jour',prefixIcon:const Icon(Icons.note_alt_outlined)),
+                    decoration: V2InputDecoration(labelText: context.tr('feed_note'),hintText:'Ex. : distribution du jour',prefixIcon:const Icon(Icons.note_alt_outlined),),
                   )),
                   if(stockCatalog==null) ExpansionTile(
                     title: Text(context.tr('feed_cost_optional')),
@@ -409,9 +409,8 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                           key: const Key('feedExpenseDropdown'),
                           isExpanded: true,
                           initialValue: selectedExpenseId ?? 0,
-                          decoration: InputDecoration(
-                            labelText: context.tr('feed_existing_expense'),
-                          ),
+                          decoration: V2InputDecoration(
+                            labelText: context.tr('feed_existing_expense'),),
                           items: [
                             DropdownMenuItem(
                               value: 0,
@@ -431,7 +430,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                         key: const Key('feedPriceField'),
                         controller: price,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(labelText: context.tr('feed_price_kg')),
+                        decoration: V2InputDecoration(labelText: context.tr('feed_price_kg'),),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) return null;
                           final amount = double.tryParse(value.trim().replaceAll(',', '.'));

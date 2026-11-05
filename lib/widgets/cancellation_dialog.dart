@@ -36,7 +36,7 @@ class _CancellationDialogState extends State<CancellationDialog> {
             V2Field(child:TextFormField(
               controller: reason,
               maxLength: 10000,
-              decoration: const InputDecoration(labelText: 'Motif obligatoire'),
+              decoration: const V2InputDecoration(labelText: 'Motif obligatoire',),
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Indiquez le motif.'
                   : null,

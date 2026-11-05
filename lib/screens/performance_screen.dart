@@ -330,10 +330,9 @@ class _PerformanceScreenState extends State<PerformanceScreen> {
                               ),
                               V2Field(child:DropdownButtonFormField<int>(
                                 value: selectedSpeciesId,
-                                decoration: InputDecoration(
+                                decoration: V2InputDecoration(
                                   labelText: context.tr('species'),
-                                  prefixIcon: const Icon(Icons.pets_outlined),
-                                ),
+                                  prefixIcon: const Icon(Icons.pets_outlined),),
                                 items: [
                                   DropdownMenuItem<int>(
                                       value: 0,

@@ -164,7 +164,7 @@ void main() {
     await tester.runAsync(()=>precacheImage(const AssetImage('assets/images/elevage_logo.png'),tester.element(find.byType(LoginScreen))));
     await tester.pumpAndSettle();await capture(tester,key,'01-accueil');
     await tester.pumpWidget(testApp(Scaffold(body:FarmNavigation(actions:{FarmDestination.agenda:(){},FarmDestination.dashboard:(){}}))));
-    expect(find.text('Agenda'),findsNothing);expect(find.text('Tableau de bord'),findsOneWidget);
+    expect(find.text('Agenda'),findsNothing);expect(find.text('Tableau de bord'),findsNothing);
     await tester.pumpWidget(const SizedBox());await tester.binding.setSurfaceSize(null);api.close();
   });
   testWidgets('expense fields and history filters keep shared visual language and all inputs',(tester) async {

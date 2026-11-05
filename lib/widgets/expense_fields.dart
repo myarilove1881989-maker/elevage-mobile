@@ -52,10 +52,9 @@ class ExpenseFields extends StatelessWidget {
         isExpanded: true,
         key: ValueKey(lots),
         initialValue: lot,
-        decoration: InputDecoration(
-          labelText: 'Lot',
-          errorText: fieldError('lot_ref'),
-        ),
+        decoration: V2InputDecoration(
+          labelText: 'Lot',prefixIcon:const Icon(Icons.inventory_2_outlined),
+          errorText: fieldError('lot_ref'),),
         items: [
           for (final value in lots)
             DropdownMenuItem(
@@ -72,10 +71,9 @@ class ExpenseFields extends StatelessWidget {
         isExpanded: true,
         key: ValueKey(categoryKey),
         initialValue: categoryId,
-        decoration: InputDecoration(
-          labelText: 'Catégorie',
-          errorText: fieldError('categorie_id'),
-        ),
+        decoration: V2InputDecoration(
+          labelText: 'Catégorie',prefixIcon:const Icon(Icons.category_outlined),
+          errorText: fieldError('categorie_id'),),
         items: [
           for (final value in categories)
             DropdownMenuItem(value: value.$1, child: Text(value.$2,maxLines:1,overflow:TextOverflow.ellipsis)),
@@ -87,26 +85,19 @@ class ExpenseFields extends StatelessWidget {
         controller: amount,
         enabled: editable,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          labelText: 'Montant exact',
-          errorText: fieldError('montant'),
-        ),
+        decoration: V2InputDecoration(
+          labelText: 'Montant exact',prefixIcon:const Icon(Icons.payments_outlined),
+          errorText: fieldError('montant'),),
       )),
       V2Field(child:TextField(
         key: const Key('expense-note'),
         controller: note,
         enabled: editable,
-        decoration: InputDecoration(
-          labelText: 'Note facultative',
-          errorText: fieldError('note'),
-        ),
+        decoration: V2InputDecoration(
+          labelText: 'Note facultative',prefixIcon:const Icon(Icons.note_alt_outlined),
+          errorText: fieldError('note'),),
       )),
-      TextButton(
-        onPressed: null,
-        child: Text(
-          'Date : ${day.day}/${day.month}/${day.year}',
-        ),
-      ),
+      V2Field(child:V2PickerTile(label:'Date',value:'${day.day.toString().padLeft(2,'0')}/${day.month.toString().padLeft(2,'0')}/${day.year}',icon:Icons.calendar_month_outlined)),
     ],
   );
 }

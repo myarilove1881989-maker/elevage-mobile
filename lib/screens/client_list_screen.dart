@@ -79,20 +79,19 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
               children: [
                 V2Field(child:TextField(
                   controller: nomController,
-                  decoration: InputDecoration(hintText: context.tr('name')),
+                  decoration: V2InputDecoration(hintText: context.tr('name'),),
                 )),
                 V2Field(child:TextField(
                   controller: telController,
-                  decoration: InputDecoration(hintText: context.tr('phone')),
+                  decoration: V2InputDecoration(hintText: context.tr('phone'),),
                 )),
                 const SizedBox(height: 12),
                 V2Field(child:DropdownButtonFormField<String>(
                   value: pays.isEmpty ? null : pays,
                   isExpanded: true,
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText:
-                        '${context.tr('country')} (${context.tr('optional')})',
-                  ),
+                        '${context.tr('country')} (${context.tr('optional')})',),
                   items:
                       AppSettings.sortedCountries(
                             AppSettings.instance.languageCode,
@@ -111,10 +110,9 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
                 )),
                 V2Field(child:TextField(
                   controller: villeController,
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     hintText:
-                        '${context.tr('city')} (${context.tr('optional')})',
-                  ),
+                        '${context.tr('city')} (${context.tr('optional')})',),
                 )),
               ],
             ),
@@ -195,11 +193,9 @@ class _ClientListScreenState extends State<ClientListScreen> with MutationRefres
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: V2Field(child:TextField(
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         hintText: context.tr('search_customer'),
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
-                      ),
+                        prefixIcon: Icon(Icons.search),),
                       onChanged: (value) {
                         setState(() {
                           search = value.toLowerCase();

@@ -108,3 +108,70 @@ ThemeData designSystemV2([ThemeData? source]) {
     ),
   );
 }
+
+/// Explicit decoration used by each operation field, including modal forms.
+/// It keeps business validation and controllers owned by the existing form.
+class V2InputDecoration extends InputDecoration {
+  static const outline = OutlineInputBorder(
+    borderRadius: BorderRadius.all(Radius.circular(16)),
+    borderSide: BorderSide(color: V2Colors.border, width: 1.25),
+  );
+  static const focusOutline = OutlineInputBorder(
+    borderRadius: BorderRadius.all(Radius.circular(16)),
+    borderSide: BorderSide(color: V2Colors.green, width: 2),
+  );
+  static const errorOutline = OutlineInputBorder(
+    borderRadius: BorderRadius.all(Radius.circular(16)),
+    borderSide: BorderSide(color: Color(0xFFB3261E), width: 1.5),
+  );
+  const V2InputDecoration({
+    String? labelText,
+    String? hintText,
+    String? helperText,
+    String? errorText,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+    String? suffixText,
+    EdgeInsetsGeometry contentPadding = const EdgeInsets.symmetric(
+      horizontal: 18,
+      vertical: 20,
+    ),
+    bool filled = true,
+    Color? fillColor = Colors.white,
+    bool? isDense,
+    int? helperMaxLines = 4,
+    int? errorMaxLines = 4,
+  }) : super(
+         labelText: labelText ?? hintText,
+         hintText: hintText,
+         helperText: helperText,
+         errorText: errorText,
+         prefixIcon: prefixIcon,
+         suffixIcon: suffixIcon,
+         suffixText: suffixText,
+         contentPadding: contentPadding,
+         filled: filled,
+         fillColor: fillColor,
+         isDense: isDense,
+         helperMaxLines: helperMaxLines,
+         errorMaxLines: errorMaxLines,
+         floatingLabelBehavior: FloatingLabelBehavior.always,
+         labelStyle: const TextStyle(
+           color: V2Colors.navy,
+           fontWeight: FontWeight.w600,
+         ),
+         floatingLabelStyle: const TextStyle(
+           fontFamily: 'Roboto',
+           fontSize: 18.67,
+           color: V2Colors.navy,
+           fontWeight: FontWeight.w600,
+         ),
+         prefixIconColor: V2Colors.green,
+         border: outline,
+         enabledBorder: outline,
+         focusedBorder: focusOutline,
+         disabledBorder: outline,
+         errorBorder: errorOutline,
+         focusedErrorBorder: errorOutline,
+       );
+}
