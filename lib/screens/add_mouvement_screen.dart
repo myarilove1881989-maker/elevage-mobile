@@ -1,3 +1,5 @@
+import '../services/money_input.dart';
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../widgets/operation_status.dart';
 import '../l10n/app_localizations.dart';
@@ -187,32 +189,31 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
     await showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
+        builder: (dialogContext, setDialogState) => V2AlertDialog(
           title: Text(context.tr('new_customer')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                V2Field(child:TextField(
                   controller: nomController,
-                  decoration: InputDecoration(labelText: context.tr('name')),
-                ),
-                TextField(
+                  decoration: V2InputDecoration(labelText: context.tr('name'),),
+                )),
+                V2Field(child:TextField(
                   controller: telController,
                   keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(labelText: context.tr('phone')),
-                ),
+                  decoration: V2InputDecoration(labelText: context.tr('phone'),),
+                )),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
+                V2Field(child:DropdownButtonFormField<String>(
 
                   isExpanded: true,
 
                   value: pays.isEmpty ? null : pays,
 
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText:
-                        '${context.tr('country')} (${context.tr('optional')})',
-                  ),
+                        '${context.tr('country')} (${context.tr('optional')})',),
                   items:
                       AppSettings.sortedCountries(
                             AppSettings.instance.languageCode,
@@ -231,14 +232,13 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                   onChanged: (value) {
                     setDialogState(() => pays = value ?? '');
                   },
-                ),
-                TextField(
+                )),
+                V2Field(child:TextField(
                   controller: villeController,
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText:
-                        '${context.tr('city')} (${context.tr('optional')})',
-                  ),
-                ),
+                        '${context.tr('city')} (${context.tr('optional')})',),
+                )),
               ],
             ),
           ),
@@ -281,6 +281,36 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
     nomController.dispose();
     telController.dispose();
     villeController.dispose();
+  }
+
+  String? automaticPrice;
+  String? originPriceMessage;
+  Future<void> prefillOriginPrice() async {
+    if(!{'MORTALITE','DON','VOL'}.contains(selectedType) || selectedLotId==null)return;
+    if(prixController.text.isNotEmpty && prixController.text!=automaticPrice)return;
+    final id=selectedLotId,type=selectedType,identity=ApiService.sessionIdentity;
+    try {
+      final detail=await widget.apiService.getLotDetail(id!);
+      if(!mounted || selectedLotId!=id || selectedType!=type || identity!=ApiService.sessionIdentity)return;
+      if(prixController.text.isNotEmpty && prixController.text!=automaticPrice)return;
+      final value=detail['prix_unitaire_origine'];
+      setState(() {automaticPrice=value==null?null:MoneyInput.display('$value');
+        prixController.text=automaticPrice??'';
+        originPriceMessage=value==null?'Prix d’origine non déterminable. Renseignez une valeur si nécessaire.':null;});
+    }catch(_) {if(mounted)setState(()=>originPriceMessage='Prix d’origine indisponible. Vérifiez la connexion.');}
+  }
+
+  Future<void> movementConfirmed() async {
+    if(widget.apiService.lastOperationMessage!=null) {
+      showMessage(widget.apiService.lastOperationMessage!);return;
+    }
+    V2DraftScope.maybeOf(context)?.confirmed();
+    setState(() {quantiteController.clear();prixController.clear();totalPriceController.clear();
+      traysController.text='0';extraEggsController.text='0';isSubmitting=false;});
+    showMessage('Mouvement enregistré. Vous pouvez saisir le suivant.');
+    await fetchData();
+    await prefillOriginPrice();
+    if(mounted && selectedProduct=='OEUFS' && selectedLotId!=null)await loadEggStock(selectedLotId!);
   }
 
   // ================= SUBMIT =================
@@ -331,13 +361,13 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
         if (mounted) {
           if(saved['local_only']==true) {
             showMessage(widget.apiService.operationFeedback('Naissance enregistrée.'));
-            Navigator.pop(context,true);return;
+            return;
           }
           setState(() => isSubmitting = false);
           await showDialog<void>(
             context: context,
             barrierDismissible: false,
-            builder: (dialogContext) => AlertDialog(
+            builder: (dialogContext) => V2AlertDialog(
               title: Text(context.tr('birth_saved')),
               content: Text(
                 '${saved['nouveau_lot']['nom']} : '
@@ -352,7 +382,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
               ],
             ),
           );
-          if (mounted) Navigator.pop(context, true);
+          if (mounted) await movementConfirmed();
         }
       } catch (error) {
         if (mounted)
@@ -375,7 +405,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
         showMessage(context.tr('sale_invalid_quantity'));
         return;
       }
-      final price = totalPriceController.text.trim().replaceAll(',', '.');
+      final price = MoneyInput.canonical(totalPriceController.text);
       if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(price) ||
           (double.tryParse(price) ?? 0) <= 0) {
         showMessage(context.tr('sale_invalid_total'));
@@ -406,7 +436,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
           totalPrice: price,
           date: DateTime.now(),
         );
-        if (mounted) Navigator.pop(context, true);
+        if (mounted) await movementConfirmed();
       } catch (error) {
         if (mounted)
           showMessage(unconfirmedOperationMessage);
@@ -422,7 +452,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
     }
 
     final quantite = int.tryParse(quantiteController.text.trim());
-    final prix = double.tryParse(prixController.text.trim());
+    final prix = MoneyInput.number(prixController.text)?.toDouble();
 
     if (quantite == null || prix == null) {
       showMessage("Valeurs invalides");
@@ -434,7 +464,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
       return;
     }
 
-    if (prix <= 0) {
+    if (selectedType == 'VENTE' ? prix <= 0 : prix < 0) {
       showMessage("Prix invalide");
       return;
     }
@@ -459,7 +489,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
       if (!mounted) return;
 
       if (success) {
-        Navigator.pop(context, true);
+        await movementConfirmed();
       } else {
         showMessage("Erreur création mouvement");
       }
@@ -488,15 +518,15 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(protectDraft:true,body: Center(child: CircularProgressIndicator()));
     }
 
     return AbsorbPointer(
       absorbing: isSubmitting,
       child: Theme(
         data: terreEtOrTheme(context),
-        child: Scaffold(
-          appBar: AppBar(title: Text(context.tr('add_movement'))),
+        child: V2Scaffold(protectDraft:true,
+          appBar: V2AppBar(title: Text(context.tr('add_movement'))),
           body: Padding(
             padding: const EdgeInsets.all(16),
             child: SingleChildScrollView(
@@ -513,7 +543,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                     child: Column(
                       children: [
                         // TYPE
-                        DropdownButtonFormField<String>(
+                        V2Field(child:DropdownButtonFormField<String>(
 
                           isExpanded: true,
 
@@ -529,30 +559,26 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             setState(() {
                               selectedType = value!;
                               selectedClientId = null;
-                              selectedLotId = null;
                               eggStockAvailable = null;
                               eggOriginsComplete = false;
                             });
+                            prefillOriginPrice();
                           },
-                          decoration: InputDecoration(
-                            labelText: context.tr('movement_type'),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
+                          decoration: V2InputDecoration(
+                            labelText: context.tr('movement_type'),),
+                        )),
 
                         const SizedBox(height: 16),
 
                         if (selectedType == 'VENTE') ...[
-                          DropdownButtonFormField<String>(
+                          V2Field(child:DropdownButtonFormField<String>(
 
                             isExpanded: true,
 
                             key: const Key('saleProductDropdown'),
                             value: selectedProduct,
-                            decoration: InputDecoration(
-                              labelText: context.tr('sale_product'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('sale_product'),),
                             items: [
                               DropdownMenuItem(
                                 value: 'ANIMAUX',
@@ -571,12 +597,12 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                 eggOriginsComplete = false;
                               });
                             },
-                          ),
+                          )),
                           const SizedBox(height: 16),
                         ],
 
                         // LOT
-                        DropdownButtonFormField<int>(
+                        V2Field(child:DropdownButtonFormField<int>(
 
                           isExpanded: true,
 
@@ -594,19 +620,18 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               eggStockAvailable = null;
                               eggOriginsComplete = false;
                             });
+                            prefillOriginPrice();
                             if (value != null &&
                                 selectedType == 'VENTE' &&
                                 selectedProduct == 'OEUFS') {
                               loadEggStock(value);
                             }
                           },
-                          decoration: InputDecoration(
+                          decoration: V2InputDecoration(
                             labelText: selectedType == 'NAISSANCE'
                                 ? context.tr('birth_parent')
-                                : context.tr('batch'),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
+                                : context.tr('batch'),),
+                        )),
                         if (selectedType == 'NAISSANCE' && selectedLot != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
@@ -629,7 +654,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               Row(
                                 children: [
                                   Expanded(
-                                    child: DropdownButtonFormField<int>(
+                                    child: V2Field(child:DropdownButtonFormField<int>(
 
                                       isExpanded: true,
 
@@ -646,11 +671,9 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                                           selectedClientId = value;
                                         });
                                       },
-                                      decoration: InputDecoration(
-                                        labelText: context.tr('customer'),
-                                        border: OutlineInputBorder(),
-                                      ),
-                                    ),
+                                      decoration: V2InputDecoration(
+                                        labelText: context.tr('customer'),),
+                                    )),
                                   ),
                                   const SizedBox(width: 10),
                                   IconButton(
@@ -722,7 +745,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                         // DATE
                         TerreEtOrDateTile(
                           label:
-                              "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
+                              "${context.tr('date')} : ${v2Day(selectedDate.toLocal().toIso8601String())}",
                           onTap: null,
                         ),
 
@@ -731,27 +754,23 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                         // QUANTITE
                         if (selectedType == 'VENTE' &&
                             selectedProduct == 'OEUFS') ...[
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('eggSaleTrays'),
                             controller: traysController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('egg_full_trays'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('egg_full_trays'),),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('eggSaleExtra'),
                             controller: extraEggsController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('sale_extra_eggs'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('sale_extra_eggs'),),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 8),
                           Text(
                             '${context.tr('sale_total_eggs')} : '
@@ -760,41 +779,36 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             key: const Key('eggSaleTotalEggs'),
                           ),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('eggSaleTotalPrice'),
-                            controller: totalPriceController,
+                            inputFormatters: [MoneyInputFormatter()],
+                  controller: totalPriceController,
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
-                            decoration: InputDecoration(
+                            decoration: V2InputDecoration(
                               labelText:
                                   '${context.tr('sale_total_price')} '
-                                  '(${AppSettings.instance.currency.symbol})',
-                              border: const OutlineInputBorder(),
-                            ),
-                          ),
+                                  '(${AppSettings.instance.currency.symbol})',),
+                          )),
                         ] else if (selectedType == 'NAISSANCE') ...[
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthTotal'),
                             controller: quantiteController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_total'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_total'),),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthStillborn'),
                             controller: stillbornController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_stillborn'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_stillborn'),),
                             onChanged: (_) => setState(() {}),
-                          ),
+                          )),
                           const SizedBox(height: 8),
                           Text(
                             '${context.tr('birth_live')} : '
@@ -802,25 +816,21 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             key: const Key('birthCalculatedLive'),
                           ),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthNewLotName'),
                             controller: birthLotNameController,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_new_lot'),
-                              border: const OutlineInputBorder(),
-                            ),
-                          ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_new_lot'),),
+                          )),
                           const SizedBox(height: 16),
-                          DropdownButtonFormField<String>(
+                          V2Field(child:DropdownButtonFormField<String>(
 
                             isExpanded: true,
 
                             key: const Key('birthProductionType'),
                             initialValue: birthProductionType,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_new_lot_type'),
-                              border: const OutlineInputBorder(),
-                            ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_new_lot_type'),),
                             items: ['CHAIR', 'OEUFS', 'REPRODUCTION', 'AUTRE']
                                 .map(
                                   (type) => DropdownMenuItem<String>(
@@ -842,40 +852,36 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             onChanged: (value) => setState(
                               () => birthProductionType = value ?? 'CHAIR',
                             ),
-                          ),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('birthNote'),
                             controller: birthNoteController,
-                            decoration: InputDecoration(
-                              labelText: context.tr('birth_note'),
-                              border: const OutlineInputBorder(),
-                            ),
-                          ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('birth_note'),),
+                          )),
                         ] else ...[
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('animalSaleQuantity'),
                             controller: quantiteController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: context.tr('quantity'),
-                              border: const OutlineInputBorder(),
-                            ),
-                          ),
+                            decoration: V2InputDecoration(
+                              labelText: context.tr('quantity'),),
+                          )),
                           const SizedBox(height: 16),
-                          TextField(
+                          V2Field(child:TextField(
                             key: const Key('animalSalePrice'),
-                            controller: prixController,
+                            inputFormatters: [MoneyInputFormatter()],
+                  controller: prixController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
+                            decoration: V2InputDecoration(
                               labelText:
                                   '${context.tr('unit_price_auto')} '
-                                  '(${AppSettings.instance.currency.symbol})',
-                              border: const OutlineInputBorder(),
-                            ),
-                          ),
+                                  '(${AppSettings.instance.currency.symbol})',),
+                          )),
                         ],
 
+                        if(originPriceMessage!=null)Text(originPriceMessage!),
                         const SizedBox(height: 20),
 
                         // BOUTON

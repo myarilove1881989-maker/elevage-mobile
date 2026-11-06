@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -155,7 +156,13 @@ class ConsumablesApi extends AuthApiFake {
 }
 
 void main() {
-  setUpAll(tzdata.initializeTimeZones);
+  setUpAll(() async {
+    tzdata.initializeTimeZones();
+    if(const bool.fromEnvironment('AUDIT_CAPTURE')) {
+      await (FontLoader('Roboto')..addFont(rootBundle.load('assets/fonts/Roboto-Regular.ttf'))).load();
+      await (FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+    }
+  });
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     ApiService.token = 'synthetic-ux';
@@ -301,6 +308,10 @@ void main() {
   testWidgets(
     'history hides transport identifiers and formats quantities and dates',
     (t) async {
+      if(const bool.fromEnvironment('AUDIT_CAPTURE')) {
+        t.view.physicalSize=const Size(900,900);t.view.devicePixelRatio=1;
+        addTearDown(t.view.resetPhysicalSize);addTearDown(t.view.resetDevicePixelRatio);
+      }
       final api = ConsumablesApi()
         ..pending = true
         ..review = true;
@@ -318,7 +329,20 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Croissance').last);
       await t.pumpAndSettle();
-      expect(find.text('Entrée · 500'), findsOneWidget);
+      expect(find.textContaining('Achats, distributions, vaccinations et corrections.'), findsNothing);
+      expect(find.byTooltip('Informations : Historique des consommables'), findsOneWidget);
+      if(const bool.fromEnvironment('AUDIT_CAPTURE')) {
+        await expectLater(find.byType(MaterialApp),matchesGoldenFile(Uri.file('D:/ElevAge-Dev/mobile/.local/user-corrections/history-main.png')));
+      }
+      await t.tap(find.byTooltip('Informations : Historique des consommables'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('Les opérations en attente restent visibles'), findsOneWidget);
+      if(const bool.fromEnvironment('AUDIT_CAPTURE')) {
+        await expectLater(find.byType(MaterialApp),matchesGoldenFile(Uri.file('D:/ElevAge-Dev/mobile/.local/user-corrections/history-help.png')));
+      }
+      await t.tap(find.text('Fermer'));
+      await t.pumpAndSettle();
+      expect(find.text('Entrée — Croissance — 500 kg'), findsOneWidget);
       expect(find.textContaining('03/11/2026'), findsOneWidget);
       expect(find.textContaining('private-'), findsNothing);
       expect(find.textContaining('opérateur 42'), findsNothing);

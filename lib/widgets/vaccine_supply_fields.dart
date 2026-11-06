@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../offline/outbox.dart' show newOperationUuid;
 
@@ -25,21 +26,21 @@ class VaccineSupplyFields extends StatefulWidget {
 class _VaccineSupplyFieldsState extends State<VaccineSupplyFields> {
   @override Widget build(BuildContext context) {
     final d=widget.draft;
-    Widget text(String key,String label,TextEditingController controller)=>TextField(key:Key(key),controller:controller,enabled:widget.editable,decoration:InputDecoration(labelText:label));
+    Widget text(String key,String label,TextEditingController controller)=>[d.expiry,d.received].contains(controller)?V2DateField(key:Key(key),controller:controller,label:controller==d.expiry?'Péremption':'Date d’approvisionnement',enabled:widget.editable):V2Field(child:TextField(key:Key(key),controller:controller,enabled:widget.editable,decoration:V2InputDecoration(labelText:label,)));
     return Column(spacing:16,crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-      DropdownButtonFormField<String>(key:const Key('vaccine-product'),initialValue:d.create?'new':d.product,isExpanded:true,
-        decoration:const InputDecoration(labelText:'Vaccin du référentiel'),items:[
+      V2Field(child:DropdownButtonFormField<String>(key:const Key('vaccine-product'),initialValue:d.create?'new':d.product,isExpanded:true,
+        decoration:const V2InputDecoration(labelText:'Vaccin du référentiel',),items:[
           for(final p in widget.catalog['products'] as List)if(p['archived']!=true)DropdownMenuItem(value:p['id'] as String,child:Text('${p['name']}',maxLines:1,overflow:TextOverflow.ellipsis)),
           const DropdownMenuItem(value:'new',child:Text('Ajouter un vaccin'))],
-        onChanged:widget.editable?(v)=>setState(() {d.create=v=='new';d.product=d.create?null:v;}):null),
+        onChanged:widget.editable?(v)=>setState(() {d.create=v=='new';d.product=d.create?null:v;}):null)),
       if(d.create)text('vaccine-name','Nom du vaccin',d.name),
-      DropdownButtonFormField<int>(key:const Key('vaccine-species'),initialValue:d.species,isExpanded:true,decoration:const InputDecoration(labelText:'Espèce'),
+      V2Field(child:DropdownButtonFormField<int>(key:const Key('vaccine-species'),initialValue:d.species,isExpanded:true,decoration:const V2InputDecoration(labelText:'Espèce',),
         items:[for(final s in widget.catalog['species'] as List)DropdownMenuItem(value:s['id'] as int,child:Text('${s['nom']}',maxLines:1,overflow:TextOverflow.ellipsis))],
-        onChanged:widget.editable?(v)=>setState(() {d.species=v;d.lot=null;}):null),
-      DropdownButtonFormField<int>(key:ValueKey('vaccine-lot-${d.species}'),initialValue:d.lot??0,isExpanded:true,
-        decoration:const InputDecoration(labelText:'Lot destinataire facultatif'),items:[const DropdownMenuItem(value:0,child:Text('Partagé entre lots de cette espèce',maxLines:1,overflow:TextOverflow.ellipsis)),
+        onChanged:widget.editable?(v)=>setState(() {d.species=v;d.lot=null;}):null)),
+      V2Field(child:DropdownButtonFormField<int>(key:ValueKey('vaccine-lot-${d.species}'),initialValue:d.lot??0,isExpanded:true,
+        decoration:const V2InputDecoration(labelText:'Lot destinataire facultatif',),items:[const DropdownMenuItem(value:0,child:Text('Partagé entre lots de cette espèce',maxLines:1,overflow:TextOverflow.ellipsis)),
           for(final lot in widget.catalog['lots'] as List)if(lot['espece_id']==d.species)DropdownMenuItem(value:lot['id'] as int,child:Text('${lot['nom']}',maxLines:1,overflow:TextOverflow.ellipsis))],
-        onChanged:widget.editable?(v)=>setState(()=>d.lot=v==0?null:v):null),
+        onChanged:widget.editable?(v)=>setState(()=>d.lot=v==0?null:v):null)),
       text('vaccine-count','Nombre de flacons',d.count),text('vaccine-doses','Doses par flacon',d.doses),
       text('vaccine-batch','Lot fabricant',d.batch),text('vaccine-expiry','Péremption (AAAA-MM-JJ)',d.expiry),
       text('vaccine-received','Approvisionnement (AAAA-MM-JJ)',d.received),

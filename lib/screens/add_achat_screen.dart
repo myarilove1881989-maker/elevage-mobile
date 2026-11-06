@@ -1,3 +1,5 @@
+import '../services/money_input.dart';
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../widgets/operation_status.dart';
 import '../l10n/app_localizations.dart';
@@ -90,11 +92,11 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
   // ================= CALCUL PRIX =================
   void calculatePrixUnitaire() {
     final q = int.tryParse(quantiteController.text.trim());
-    final total = double.tryParse(prixTotalController.text.trim());
+    final total = MoneyInput.number(prixTotalController.text)?.toDouble();
 
     if (q != null && q > 0 && total != null && total > 0) {
       final pu = total / q;
-      prixUnitaireController.text = pu.toStringAsFixed(2);
+      prixUnitaireController.text = MoneyInput.display(pu.toStringAsFixed(2));
     } else {
       prixUnitaireController.clear();
     }
@@ -116,8 +118,8 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
     }
 
     final quantite = int.tryParse(quantiteController.text.trim());
-    final prixTotal = double.tryParse(prixTotalController.text.trim());
-    final prixUnitaire = double.tryParse(prixUnitaireController.text.trim());
+    final prixTotal = MoneyInput.number(prixTotalController.text)?.toDouble();
+    final prixUnitaire = MoneyInput.number(prixUnitaireController.text)?.toDouble();
 
     if (quantite == null || quantite <= 0) {
       showMessage("Quantité invalide");
@@ -154,7 +156,10 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
 
       if (success) {
         showMessage(widget.apiService.operationFeedback(context.tr('purchase_created')));
-        Navigator.pop(context, true);
+        if(!(widget.apiService.hasUnifiedOfflineSession && widget.apiService.lastOperationMessage!=null)) {
+          V2DraftScope.maybeOf(context)?.confirmed();
+          nomLotController.clear();quantiteController.clear();prixTotalController.clear();prixUnitaireController.clear();
+        }
       } else {
         showMessage("Erreur création ❌");
       }
@@ -179,13 +184,13 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return V2Scaffold(protectDraft:true,busy:isSubmitting,body: Center(child: CircularProgressIndicator()));
     }
 
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('new_purchase'))),
+      child: V2Scaffold(protectDraft:true,busy:isSubmitting,
+        appBar: V2AppBar(title: Text(context.tr('new_purchase'))),
         body: Padding(
           padding: const EdgeInsets.all(16),
           child: Form(
@@ -203,16 +208,14 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                   child: Column(
                     children: [
                       // ================= NOM LOT =================
-                      TextFormField(
+                      V2Field(child:TextFormField(
                         controller: nomLotController,
-                        decoration: InputDecoration(
-                          labelText: context.tr('lot_name'),
-                          border: const OutlineInputBorder(),
-                        ),
+                        decoration: V2InputDecoration(
+                          labelText: context.tr('lot_name'),prefixIcon:const Icon(Icons.inventory_2_outlined),),
                         validator: (value) => value == null || value.isEmpty
                             ? context.tr('required')
                             : null,
-                      ),
+                      )),
 
                       const SizedBox(height: 16),
 
@@ -241,36 +244,33 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                               focusNode,
                               onFieldSubmitted,
                             ) {
-                              return TextFormField(
+                              return V2Field(child:TextFormField(
                                 controller: textEditingController,
                                 focusNode: focusNode,
                                 onChanged: (_) =>
                                     setState(() => selectedEspece = null),
-                                decoration: InputDecoration(
+                                decoration: V2InputDecoration(
                                   labelText: context.tr('choose_species'),
                                   hintText: context.tr('search_species'),
                                   prefixIcon: const Icon(Icons.pets_outlined),
-                                  suffixIcon: const Icon(Icons.arrow_drop_down),
-                                  border: const OutlineInputBorder(),
-                                ),
+                                  suffixIcon: const Icon(Icons.arrow_drop_down),),
                                 validator: (_) => selectedEspece == null
                                     ? context.tr('species_required')
                                     : null,
-                              );
+                              ));
                             },
                       ),
 
                       const SizedBox(height: 16),
 
-                      DropdownButtonFormField<String>(
+                      V2Field(child:DropdownButtonFormField<String>(
 
                         isExpanded: true,
 
                         initialValue: selectedProductionType,
-                        decoration: const InputDecoration(
+                        decoration: const V2InputDecoration(
                           labelText: 'Type de production',
-                          prefixIcon: Icon(Icons.category_outlined),
-                        ),
+                          prefixIcon: Icon(Icons.category_outlined),),
                         items: const [
                           DropdownMenuItem(
                             value: 'CHAIR',
@@ -299,18 +299,17 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                             if (value != 'OEUFS') layingStartDate = null;
                           });
                         },
-                      ),
+                      )),
 
                       if (selectedProductionType == 'OEUFS') ...[
                         const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
+                        V2Field(child:DropdownButtonFormField<String>(
 
                           isExpanded: true,
 
                           initialValue: selectedProductionStatus,
-                          decoration: const InputDecoration(
-                            labelText: 'Statut du lot',
-                          ),
+                          decoration: const V2InputDecoration(
+                            labelText: 'Statut du lot',),
                           items: const [
                             DropdownMenuItem(
                               value: 'ELEVAGE',
@@ -334,12 +333,12 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                               setState(() => selectedProductionStatus = value);
                             }
                           },
-                        ),
+                        )),
                         const SizedBox(height: 16),
                         TerreEtOrDateTile(
                           label: layingStartDate == null
                               ? 'Date de début de ponte (facultative)'
-                              : 'Début de ponte : ${layingStartDate!.toIso8601String().split('T')[0]}',
+                              : 'Début de ponte : ${v2Day(layingStartDate!.toIso8601String())}',
                           onTap: () async {
                             final picked = await showDatePicker(
                               context: context,
@@ -357,55 +356,51 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
                       const SizedBox(height: 16),
 
                       // ================= QUANTITE =================
-                      TextFormField(
+                      V2Field(child:TextFormField(
                         controller: quantiteController,
                         keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: context.tr('quantity'),
-                          border: const OutlineInputBorder(),
-                        ),
+                        decoration: V2InputDecoration(
+                          labelText: context.tr('quantity'),prefixIcon:const Icon(Icons.numbers),),
                         onChanged: (_) => calculatePrixUnitaire(),
                         validator: (value) => value == null || value.isEmpty
                             ? context.tr('required')
                             : null,
-                      ),
+                      )),
 
                       const SizedBox(height: 16),
 
                       // ================= PRIX TOTAL =================
-                      TextFormField(
-                        controller: prixTotalController,
+                      V2Field(child:TextFormField(
+                        inputFormatters: [MoneyInputFormatter()],
+                  controller: prixTotalController,
                         keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText:
-                              '${context.tr('total_price')} (${AppSettings.instance.currency.symbol})',
-                          border: const OutlineInputBorder(),
-                        ),
+                              '${context.tr('total_price')} (${AppSettings.instance.currency.symbol})',),
                         onChanged: (_) => calculatePrixUnitaire(),
                         validator: (value) => value == null || value.isEmpty
                             ? context.tr('required')
                             : null,
-                      ),
+                      )),
 
                       const SizedBox(height: 16),
 
                       // ================= PRIX UNITAIRE =================
-                      TextFormField(
-                        controller: prixUnitaireController,
+                      V2Field(child:TextFormField(
+                        inputFormatters: [MoneyInputFormatter()],
+                  controller: prixUnitaireController,
                         readOnly: true,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText:
-                              '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',
-                          border: const OutlineInputBorder(),
-                        ),
-                      ),
+                              '${context.tr('unit_price_auto')} (${AppSettings.instance.currency.symbol})',),
+                      )),
 
                       const SizedBox(height: 16),
 
                       // ================= DATE =================
                       TerreEtOrDateTile(
                         label:
-                            "${context.tr('date')} : ${selectedDate.toLocal().toString().split(' ')[0]}",
+                            "${context.tr('date')} : ${v2Day(selectedDate.toLocal().toIso8601String())}",
                         onTap: null,
                       ),
 

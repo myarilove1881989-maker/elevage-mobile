@@ -1,3 +1,7 @@
+import 'package:flutter/services.dart';
+import '../services/payment_reminder.dart';
+import '../services/money_input.dart';
+import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
 import 'dart:async';
@@ -169,12 +173,12 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
       barrierDismissible:false,
       builder: (_) => StatefulBuilder(
         builder: (context, setStateDialog) {
-          return PopScope(canPop:!isPaying,child:AlertDialog(
+          return PopScope(canPop:!isPaying,child:V2AlertDialog(
             title: Row(
               children: [
                 const Icon(Icons.payment),
                 const SizedBox(width: 10),
-                Text(context.tr('save_payment')),
+                Expanded(child:Text(context.tr('save_payment'))),
               ],
             ),
             content: SingleChildScrollView(child:Column(
@@ -207,28 +211,27 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                V2Field(child:TextField(
+                  inputFormatters: [MoneyInputFormatter()],
                   controller: controller,
                   enabled:!isPaying,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText: context.tr('amount'),
                     hintText: "Ex : 50000",
-                    prefixIcon: Icon(Icons.euro),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+                    prefixIcon: Icon(Icons.euro),),
+                )),
                 if(api.hasUnifiedOfflineSession) ...[
                   const SizedBox(height:14),
-                  DropdownButtonFormField<String>(initialValue:paymentMode,
-                    decoration:const InputDecoration(labelText:'Mode de paiement'),
+                  V2Field(child:DropdownButtonFormField<String>(initialValue:paymentMode,
+                    decoration:const V2InputDecoration(labelText:'Mode de paiement',),
                     items:const [DropdownMenuItem(value:'ESPECES',child:Text('Espèces')),
                       DropdownMenuItem(value:'MOBILE_MONEY',child:Text('Mobile Money')),
                       DropdownMenuItem(value:'VIREMENT',child:Text('Virement')),
                       DropdownMenuItem(value:'CHEQUE',child:Text('Chèque'))],
-                    onChanged:isPaying?null:(value)=>setStateDialog(()=>paymentMode=value)),
+                    onChanged:isPaying?null:(value)=>setStateDialog(()=>paymentMode=value))),
                 ],
                 const SizedBox(height: 10),
                 SizedBox(
@@ -261,7 +264,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                         if(api.hasUnifiedOfflineSession && paymentMode==null) {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Choisissez le mode de paiement.')));return;
                         }
-                        final montant = double.tryParse(controller.text.trim());
+                        final montant = MoneyInput.number(controller.text)?.toDouble();
 
                         if (montant == null || montant <= 0) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -360,14 +363,28 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
   }
 
   Future<void> sms() async {
-    if (!Config.current.externalLinksAllowed) return;
-    if (widget.telephone.trim().isEmpty) return;
-
-    final uri = Uri.parse("sms:${widget.telephone}");
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    final unpaid=ventes.where((v)=>(v['reste'] as num? ?? 0)>0).toList();
+    if(unpaid.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Aucune facture restant à régler.')));return;}
+    final sale=await showDialog<Map>(context:context,builder:(dialog)=>V2AlertDialog(title:const Text('Choisir la facture à relancer'),content:SizedBox(width:500,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+      for(final v in unpaid)ListTile(title:Text('${v['lot_nom']??v['espece_nom']??'Achat'} — ${formatMoney(v['montant_total'])}'),
+        subtitle:Text('Reste : ${formatMoney(v['reste'])}'),onTap:()=>Navigator.pop(dialog,Map.from(v))),
+    ]))),actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Annuler'))]));
+    if(sale==null || !mounted)return;
+    final text=TextEditingController(text:paymentReminder(customer:widget.nom,
+      description:sale['produit_vendu']=='OEUFS'?'${sale['nombre_oeufs']} œufs (${sale['lot_nom']??'lot'})':'${sale['quantite']} animaux (${sale['lot_nom']??sale['espece_nom']??'lot'})',
+      total:sale['montant_total'] as num,paid:sale['montant_paye'] as num? ?? 0,remaining:sale['reste'] as num,
+      farm:sale['exploitation_nom']?.toString()??'Mon exploitation'));
+    final reminderRoute=DialogRoute<void>(context:context,builder:(dialog)=>V2AlertDialog(title:const Text('Message de relance modifiable'),content:SizedBox(width:600,child:SingleChildScrollView(child:V2Field(child:TextField(key:const Key('payment-reminder'),controller:text,maxLines:14,decoration:const V2InputDecoration(labelText:'Message'))))),actions:[
+      TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),
+      TextButton(onPressed:()=>Clipboard.setData(ClipboardData(text:text.text)),child:const Text('Copier')),
+      if(Config.current.externalLinksAllowed && widget.telephone.trim().isNotEmpty)...[
+        TextButton(onPressed:()=>launchUrl(Uri.parse('sms:${widget.telephone}?body=${Uri.encodeComponent(text.text)}')),child:const Text('Ouvrir SMS')),
+        TextButton(onPressed:()=>launchUrl(Uri.https('wa.me','/${widget.telephone.replaceAll(RegExp(r'[^0-9]'),'')}',{'text':text.text}),mode:LaunchMode.externalApplication),child:const Text('Ouvrir WhatsApp')),
+      ],
+    ]));
+    await Navigator.of(context).push(reminderRoute);
+    await reminderRoute.completed;
+    text.dispose();
   }
 
   // ================= HEADER CLIENT =================
@@ -474,7 +491,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
               OutlinedButton.icon(
                 onPressed: sms,
                 icon: const Icon(Icons.sms, size: 18),
-                label: const Text("SMS"),
+                label: const Text("Message"),
               ),
             ],
           ),
@@ -783,7 +800,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  date.toString(),
+                  v2Day(date),
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
@@ -807,7 +824,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
               SizedBox(
                 width: double.infinity,
                 child: BusinessCommand(api: api, actions: const {'cash.create'}, child: ElevatedButton.icon(
-                  onPressed: () => payer((venteId as num).toInt(), reste),
+                  onPressed: () => payer(venteId.toInt(), reste),
                   icon: const Icon(Icons.payment, size: 18),
                   label: Text(context.tr('pay')),
                 )),
@@ -890,7 +907,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    date.toString(),
+                    v2Day(date),
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   if (note != null && note.toString().trim().isNotEmpty) ...[
@@ -916,8 +933,8 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.nom), elevation: 0),
+    return V2Scaffold(
+      appBar: V2AppBar(title: Text(widget.nom), elevation: 0),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : loadError != null

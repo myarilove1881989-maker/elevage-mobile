@@ -155,15 +155,15 @@ void main() {
       expect(h.originals,hasLength(1));expect(h.effects,hasLength(1));expect(rows.single.businessStatus,'CONFIRMED');
     } finally {await close(h,runtime);}
   });
-  test('historical online-only mutation stays online and is never falsely queued offline',() async {
+  test('historical task title edit stays online and is never falsely queued offline',() async {
     final h=UnifiedAccessHarness();await h.start();final runtime=await h.runtime();
     try {
       await runtime.signIn('synthetic','1234');
-      final online=http.Request('PATCH',Uri.parse('${Config.apiUrl}/tasks/1/'))..body=jsonEncode({'status':'DONE','expected_version':1});
+      final online=http.Request('PATCH',Uri.parse('${Config.apiUrl}/tasks/1/'))..body=jsonEncode({'title':'Titre historique','expected_version':1});
       expect((await runtime.request(online)).statusCode,200);
       expect(h.onlineWrites,hasLength(1));expect(await h.db.listOutbox(),isEmpty);
       h.down=true;await runtime.connection.probe();
-      final offline=http.Request('PATCH',Uri.parse('${Config.apiUrl}/tasks/1/'))..body=jsonEncode({'status':'DONE','expected_version':1});
+      final offline=http.Request('PATCH',Uri.parse('${Config.apiUrl}/tasks/1/'))..body=jsonEncode({'title':'Titre historique','expected_version':1});
       expect((await runtime.request(offline)).statusCode,409);
       expect(h.onlineWrites,hasLength(1));expect(await h.db.listOutbox(),isEmpty);
     } finally {await close(h,runtime);}

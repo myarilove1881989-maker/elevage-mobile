@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'terrain_entry_gate.dart';
@@ -103,24 +104,24 @@ class _MaintenanceDialogState extends State<_MaintenanceDialog> {
       if(mounted)Navigator.pop(context,true);
     }catch(problem){if(mounted)setState((){error='$problem';submitting=false;});}
   }
-  @override Widget build(BuildContext context)=>PopScope(canPop:!submitting,child:AlertDialog(
+  @override Widget build(BuildContext context)=>PopScope(canPop:!submitting,child:V2AlertDialog(
     title:Text('${widget.deleting?'Supprimer':widget.creating?'Créer':'Modifier'} ${widget.label}'),
     content:SizedBox(width:480,child:Form(key:form,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
       if(widget.schema['closed']==true) CheckboxListTile(value:allowClosed,onChanged:submitting?null:(v)=>setState(()=>allowClosed=v??false),title:const Text('J’autorise cette correction exceptionnelle sur le lot clôturé.')),
       if(widget.deleting)Text('${widget.schema['consequences']}'),
       if(!widget.deleting)for(final field in fields)Padding(padding:const EdgeInsets.only(bottom:12),child:
-        field['type']=='choice'?DropdownButtonFormField<String>(initialValue:choices[field['name']]!.isEmpty?null:choices[field['name']],
-          decoration:InputDecoration(labelText:'${field['label']}'),
+        field['type']=='choice'?V2Field(child:DropdownButtonFormField<String>(initialValue:choices[field['name']]!.isEmpty?null:choices[field['name']],
+          decoration:V2InputDecoration(labelText:'${field['label']}',),
           items:[for(final option in field['choices'])DropdownMenuItem(value:'${option['value']}',child:Text('${option['label']}'))],
           onChanged:submitting?null:(value)=>setState(()=>choices[field['name']]=value??''),
-          validator:(value)=>value==null||value.isEmpty?'Choisissez une valeur.':null):
-        TextFormField(controller:controllers[field['name']],enabled:!submitting,
-          decoration:InputDecoration(labelText:'${field['label']}'),
+          validator:(value)=>value==null||value.isEmpty?'Choisissez une valeur.':null)):
+        V2Field(child:TextFormField(controller:controllers[field['name']],enabled:!submitting,
+          decoration:V2InputDecoration(labelText:'${field['label']}',),
           keyboardType:field['type']=='integer'||field['type']=='decimal'?const TextInputType.numberWithOptions(decimal:true):TextInputType.text,
-          validator:(value)=>field['name']!='note' && (value==null||value.trim().isEmpty)?'Champ requis.':null)),
+          validator:(value)=>field['name']!='note' && (value==null||value.trim().isEmpty)?'Champ requis.':null))),
       const SizedBox(height:12),
-      TextFormField(controller:reason,enabled:!submitting,decoration:const InputDecoration(labelText:'Motif'),
-        validator:(value)=>(value??'').trim().length<3?'Précisez un motif (3 caractères minimum).':null),
+      V2Field(child:TextFormField(controller:reason,enabled:!submitting,decoration:const V2InputDecoration(labelText:'Motif',),
+        validator:(value)=>(value??'').trim().length<3?'Précisez un motif (3 caractères minimum).':null)),
       if(error!=null)Padding(padding:const EdgeInsets.only(top:12),child:Text(error!,style:TextStyle(color:Theme.of(context).colorScheme.error))),
     ])))),
     actions:[TextButton(onPressed:submitting?null:()=>Navigator.pop(context,false),child:const Text('Annuler')),

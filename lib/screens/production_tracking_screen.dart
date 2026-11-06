@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
@@ -234,8 +235,8 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
     final currentLot = selectedLot;
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('production_tracking'))),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('production_tracking'))),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
@@ -256,13 +257,12 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                         message: errorMessage!,
                       )
                     else ...[
-                      DropdownButtonFormField<int>(
+                      V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionSpeciesDropdown'),
                         initialValue: selectedSpeciesId,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText: context.tr('species'),
-                          prefixIcon: const Icon(Icons.pets_outlined),
-                        ),
+                          prefixIcon: const Icon(Icons.pets_outlined),),
                         items: species
                             .map(
                               (item) => DropdownMenuItem<int>(
@@ -277,15 +277,14 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                             selectedLotId = null;
                           });
                         },
-                      ),
+                      )),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<int>(
+                      V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionLotDropdown'),
                         initialValue: selectedLotId,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText: context.tr('batch'),
-                          prefixIcon: const Icon(Icons.inventory_2_outlined),
-                        ),
+                          prefixIcon: const Icon(Icons.inventory_2_outlined),),
                         items: filteredLots
                             .map(
                               (item) => DropdownMenuItem<int>(
@@ -298,7 +297,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                                 filteredLots.isEmpty
                             ? null
                             : (value) => setState(() => selectedLotId = value),
-                      ),
+                      )),
                       if (selectedSpeciesId != null && filteredLots.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 10),
@@ -312,10 +311,9 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                       if (currentLot != null) ...[
                         const SizedBox(height: 14),
                         InputDecorator(
-                          decoration: InputDecoration(
+                          decoration: V2InputDecoration(
                             labelText: context.tr('production_type'),
-                            prefixIcon: const Icon(Icons.category_outlined),
-                          ),
+                            prefixIcon: const Icon(Icons.category_outlined),),
                           child: Text(
                             _productionTypeLabel(
                               context,

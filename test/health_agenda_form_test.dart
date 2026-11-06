@@ -1,3 +1,4 @@
+import 'package:app_elevage/widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app_elevage/services/api_service.dart';
@@ -32,7 +33,7 @@ class HealthAgendaApi extends ApiService {
   @override Future<List<dynamic>> getTasks()async=>tasks;
   @override Future<dynamic> post(String path,Map<String,dynamic> data)async {
     requests.add({...data});if(lose)throw const ApiConnectionException();
-    if(path=='/tasks/health-plan/')return [healthTask()];
+    if(path=='/tasks/health-plan/')return [for(final _ in data['dates'] as List? ?? [data['date']])healthTask()];
     return {'id':55,'operation_uuid':data['operation_uuid']};
   }
 }
@@ -54,13 +55,24 @@ void main(){
     api.lose=false;await revealHealth(tester,'health-save');await tester.tap(find.byKey(const Key('health-save')));await tester.pumpAndSettle();
     expect(api.requests,hasLength(2));expect(api.requests[0],api.requests[1]);await tester.pumpWidget(const SizedBox());api.close();
   });
-  testWidgets('explicit interval and end are the only source of recurrence',(tester)async{
+  testWidgets('single-date planning preserves the published backend contract',(tester)async{
+    final api=HealthAgendaApi();await tester.pumpWidget(testApp(HealthPlanForm(api:api,lotId:10)));await tester.pumpAndSettle();
+    await chooseHealth(tester);await revealHealth(tester,'health-save');await tester.tap(find.byKey(const Key('health-save')));await tester.pumpAndSettle();
+    expect(api.requests,hasLength(1));final body=api.requests.single;
+    expect(body.keys.toSet(),{'operation_uuid','date','planned_time','assigned_to','observations','product','lot','species'});
+    expect(body['date'],matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));expect(body.containsKey('dates'),isFalse);
+    expect(body['planned_time'],isNull);expect(find.textContaining('Planification non confirmée'),findsNothing);
+    await tester.pumpWidget(const SizedBox());api.close();
+  });
+  testWidgets('explicit selected dates are submitted once without time or recurrence',(tester)async{
     final api=HealthAgendaApi();await tester.pumpWidget(testApp(HealthPlanForm(api:api,lotId:10)));await tester.pumpAndSettle();await chooseHealth(tester);
-    await revealHealth(tester,'health-date');await tester.enterText(find.byKey(const Key('health-date')),'2030-05-01');
-    await revealHealth(tester,'health-interval');await tester.enterText(find.byKey(const Key('health-interval')),'7');
-    await revealHealth(tester,'health-end');await tester.enterText(find.byKey(const Key('health-end')),'2030-05-22');
+    await revealHealth(tester,'health-dates');
+    final calendar=tester.widget<V2DateSelection>(find.byKey(const Key('health-dates')));
+    calendar.onChanged({'2030-05-01','2030-05-12','2030-05-22'});await tester.pumpAndSettle();
     await revealHealth(tester,'health-save');await tester.tap(find.byKey(const Key('health-save')));await tester.pumpAndSettle();
-    expect(api.requests.single['interval_days'],7);expect(api.requests.single['end_date'],'2030-05-22');
+    expect(api.requests.single['dates'],['2030-05-01','2030-05-12','2030-05-22']);
+    expect(api.requests.single['planned_time'],isNull);expect(api.requests.single.containsKey('interval_days'),false);
+    expect(find.byKey(const Key('health-time')),findsNothing);
     await tester.pumpWidget(const SizedBox());api.close();
   });
   testWidgets('DONE and a local vaccination remain visibly unconfirmed',(tester)async{

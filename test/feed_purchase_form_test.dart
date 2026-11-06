@@ -7,18 +7,22 @@ import 'package:app_elevage/screens/add_depense_screen.dart';
 import 'online_expense_form_test.dart' show OnlineExpenseServer,selectExpense;
 import 'production_tracking_test.dart' show testApp;
 
+Future<void> revealFeedField(WidgetTester tester,Finder finder)async{
+  if(finder.evaluate().isEmpty)await tester.scrollUntilVisible(finder,100,maxScrolls:100,scrollable:find.byType(Scrollable).first);
+  await tester.ensureVisible(finder);await tester.pumpAndSettle();
+}
 Future<void> fillFeed(WidgetTester tester)async{
   await selectExpense(tester);
-  await tester.ensureVisible(find.byKey(const Key('feed-product')));
+  await revealFeedField(tester,find.byKey(const Key('feed-product')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('feed-product')));await tester.pumpAndSettle();
   await tester.tap(find.text('Croissance test').last);await tester.pumpAndSettle();
-  await tester.ensureVisible(find.byKey(const Key('feed-species')));
+  await revealFeedField(tester,find.byKey(const Key('feed-species')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('feed-species')));await tester.pumpAndSettle();
   await tester.tap(find.text('Poulet').last);await tester.pumpAndSettle();
   await tester.enterText(find.byKey(const Key('feed-quantity')),'500');
-  await tester.ensureVisible(find.byKey(const Key('expense-submit')));
+  await revealFeedField(tester,find.byKey(const Key('expense-submit')));
   await tester.pumpAndSettle();
 }
 

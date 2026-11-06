@@ -31,7 +31,7 @@ void main(){
     final api=StockApi();await t.pumpWidget(app(api));await t.pumpAndSettle();expect(find.text('Stock d’aliments'),findsOneWidget);expect(find.text('Stock de vaccins'),findsOneWidget);
     expect(find.text('710.125 kg confirmés'),findsOneWidget);expect(find.text('Estimé : 630.125 kg'),findsOneWidget);expect(find.textContaining('Synchronisation en attente'),findsOneWidget);expect(find.textContaining('XOF'),findsNothing);
     await t.tap(find.text('Stock d’aliments'));await t.pumpAndSettle();expect(find.textContaining('Partagé : 600 kg'),findsOneWidget);expect(find.text('Configurer le seuil'),findsOneWidget);
-    await t.tap(find.text('Historique'));await t.pumpAndSettle();expect(find.text('Entrée · 500'),findsOneWidget);expect(t.takeException(),null);await t.pumpWidget(const SizedBox());api.close();
+    await t.tap(find.text('Historique'));await t.pumpAndSettle();expect(find.text('Entrée — Croissance — 500 kg'),findsOneWidget);expect(t.takeException(),null);await t.pumpWidget(const SizedBox());api.close();
   });
   testWidgets('selected lot shows shared plus reserved without another lot',(t)async{final api=StockApi();await t.pumpWidget(app(api,species:4,lot:10));await t.pumpAndSettle();expect(find.text('550.125 kg confirmés'),findsOneWidget);await t.pumpWidget(const SizedBox());api.close();});
   testWidgets('revoked permission and foreign farm do not disclose stock',(t)async{final api=StockApi()..allowed=false;await t.pumpWidget(app(api));await t.pumpAndSettle();expect(find.textContaining('Stocks indisponibles'),findsOneWidget);expect(api.calls.contains('/feed-supplies/?presentation=1'),false);await t.pumpWidget(const SizedBox());api.close();

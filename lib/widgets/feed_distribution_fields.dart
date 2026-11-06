@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../offline/feed_stock_projection.dart';
 
@@ -23,7 +24,8 @@ class FeedDistributionDraft {
 }
 
 class FeedDistributionFields extends StatefulWidget {
-  const FeedDistributionFields({super.key,required this.draft,required this.catalog,required this.lotId,required this.editable});
+  const FeedDistributionFields({super.key,required this.draft,required this.catalog,required this.lotId,required this.editable,this.quantityField});
+  final Widget? quantityField;
   final FeedDistributionDraft draft;final Map<String,dynamic> catalog;final int lotId;final bool editable;
   @override State<FeedDistributionFields> createState()=>_FeedDistributionFieldsState();
 }
@@ -34,20 +36,24 @@ class _FeedDistributionFieldsState extends State<FeedDistributionFields> {
     final species=targets.isEmpty?null:targets.single['espece_id'];
     final names=(c['species'] as List).where((row)=>row['id']==species).toList();
     return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-      Text('Espèce : ${names.isEmpty?'indisponible':names.single['nom']} - lot destinataire sélectionné'),
-      DropdownButtonFormField<String>(key:const Key('distribution-stock-product'),initialValue:d.product,isExpanded:true,
-        decoration:const InputDecoration(labelText:'Aliment du référentiel'),
+      Text('${names.isEmpty?'Espèce non renseignée':names.single['nom']} · ${targets.isEmpty?'Lot non renseigné':targets.single['nom']}'),
+      V2Field(child:DropdownButtonFormField<String>(key:const Key('distribution-stock-product'),initialValue:d.product,isExpanded:true,
+        decoration:const V2InputDecoration(labelText:'Aliment *',prefixIcon:Icon(Icons.grass_outlined),),
         items:[for(final p in c['products'] as List)if(p['archived']!=true)
           DropdownMenuItem(value:p['id'] as String,child:Text(p['name'] as String))],
-        onChanged:widget.editable?(v)=>setState(()=>d.product=v):null),
-      DropdownButtonFormField<int>(key:const Key('distribution-stock-source'),initialValue:d.sourceLot??0,
-        decoration:const InputDecoration(labelText:'Stock à utiliser'),items:[
-          const DropdownMenuItem(value:0,child:Text('Stock partagé de cette espèce')),
+        onChanged:widget.editable?(v)=>setState(()=>d.product=v):null)),
+      if(widget.quantityField==null) V2Field(child:DropdownButtonFormField<int>(key:const Key('distribution-stock-source'),initialValue:d.sourceLot??0,isExpanded:true,isDense:false,itemHeight:null,
+        decoration:const V2InputDecoration(labelText:'Stock à utiliser *',prefixIcon:Icon(Icons.inventory_2_outlined),),items:[
+          const DropdownMenuItem(value:0,child:Text('Stock partagé de cette espèce',maxLines:2,softWrap:true)),
           DropdownMenuItem(value:widget.lotId,child:const Text('Stock réservé à ce lot'))],
-        onChanged:widget.editable?(v)=>setState(()=>d.sourceLot=v==0?null:v):null),
+        onChanged:widget.editable?(v)=>setState(()=>d.sourceLot=v==0?null:v):null)) else V2Pair(first:V2Field(child:DropdownButtonFormField<int>(key:const Key('distribution-stock-source'),initialValue:d.sourceLot??0,isExpanded:true,isDense:false,itemHeight:null,
+        decoration:const V2InputDecoration(labelText:'Stock à utiliser *',prefixIcon:Icon(Icons.inventory_2_outlined),),items:[
+          const DropdownMenuItem(value:0,child:Text('Stock partagé de cette espèce',maxLines:2,softWrap:true)),
+          DropdownMenuItem(value:widget.lotId,child:const Text('Stock réservé à ce lot'))],
+        onChanged:widget.editable?(v)=>setState(()=>d.sourceLot=v==0?null:v):null)),second:widget.quantityField!),
       for(final p in c['products'] as List)if(p['id']==d.product)
         for(final position in p['positions'] as List)if(position['species_id']==species && position['lot_id']==d.sourceLot)
-          Text('Confirmé : ${position['kg']} kg\nOpérations locales non incluses : ${position['pending_kg']??'0.000'} kg\nDisponible estimé : ${position['estimated_kg']??position['kg']} kg',key:const Key('distribution-stock-values')),
+          V2Help(title:'Stock disponible',child:Text('Confirmé : ${position['kg']} kg\nOpérations locales non incluses : ${position['pending_kg']??'0.000'} kg\nDisponible estimé : ${position['estimated_kg']??position['kg']} kg',key:const Key('distribution-stock-values'))),
       if(c['local_estimate']==true) const Text('Estimation sur cet appareil. Le serveur validera les conflits et les droits à la synchronisation.'),
       if((c['review_operations'] as List? ?? const []).isNotEmpty) const Text('Des opérations restent à examiner dans l’historique ; elles sont conservées.'),
     ]);

@@ -75,6 +75,7 @@ Widget _app(Widget home) => MaterialApp(
     );
 
 Future<void> _choose(WidgetTester tester, String key, String value) async {
+  await tester.ensureVisible(find.byKey(Key(key)));await tester.pumpAndSettle();
   await tester.tap(find.byKey(Key(key)));
   await tester.pumpAndSettle();
   await tester.tap(find.text(value).last);
@@ -89,6 +90,7 @@ void main() {
     await _choose(tester, 'productionSpeciesDropdown', 'Poulet');
     await _choose(tester, 'productionLotDropdown', 'Poulets chair');
     expect(find.byKey(const Key('openEggTrackingButton')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('openFeedTrackingButton')));await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('openFeedTrackingButton')));
     await tester.pumpAndSettle();
     expect(find.byType(FeedDistributionScreen), findsOneWidget);
@@ -99,6 +101,7 @@ void main() {
     await tester.pumpAndSettle();
     await _choose(tester, 'productionLotDropdown', 'Pondeuses');
     expect(find.byKey(const Key('openEggTrackingButton')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('openFeedTrackingButton')));await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('openFeedTrackingButton')));
     await tester.pumpAndSettle();
     expect(find.byType(FeedDistributionScreen), findsOneWidget);
