@@ -1,3 +1,4 @@
+import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
@@ -371,6 +372,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                 if (packaging == 'CARTON')
                   _numberField(cartonSize, 'Œufs par carton'),
                 V2Field(child:TextField(
+                  inputFormatters: [MoneyInputFormatter()],
                   controller: packagePrice,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -398,7 +400,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                     packaging: packaging,
                     packageCount: int.parse(packageCount.text),
                     packagePrice: double.parse(
-                      packagePrice.text.replaceAll(',', '.'),
+                      MoneyInput.canonical(packagePrice.text),
                     ),
                     eggsPerPackage: packaging == 'CARTON'
                         ? int.parse(cartonSize.text)

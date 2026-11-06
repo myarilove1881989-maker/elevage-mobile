@@ -1,3 +1,4 @@
+import 'widgets/v2_components.dart';
 import 'theme/design_system_v2.dart';
 import 'widgets/mutation_refresh.dart';
 import 'services/health_notifications.dart';
@@ -138,6 +139,7 @@ class _ElevageAppState extends State<ElevageApp> {
   void _onSessionExpired() {
     if (_redirectPending || ApiService.farmerSession) return;
     _redirectPending = true;
+    V2ScaffoldState.preserveExpiredDrafts(ApiService.lastExpiredUsername);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _navigatorKey.currentState?.pushAndRemoveUntil(

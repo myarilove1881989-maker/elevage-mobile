@@ -72,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   }
   Widget _expenseScreen()=>apiService is FarmerApiService && apiService.hasUnifiedOfflineSession
     ?AddDepenseScreen(tablet:(apiService as FarmerApiService).runtime.tablet,simple:true)
-    :AddDepenseScreen(apiService:apiService);
+    :AddDepenseScreen(apiService:apiService,stayAfterSuccess:true);
   late final ServerConnection serverConnection;
   Widget _connectionIndicator()=>AnimatedBuilder(animation:Listenable.merge([
     serverConnection,if(apiService is FarmerApiService) (apiService as FarmerApiService).runtime.tablet]),

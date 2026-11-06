@@ -1,3 +1,6 @@
+import 'package:flutter/services.dart';
+import '../services/payment_reminder.dart';
+import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
@@ -209,6 +212,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                 ),
                 const SizedBox(height: 16),
                 V2Field(child:TextField(
+                  inputFormatters: [MoneyInputFormatter()],
                   controller: controller,
                   enabled:!isPaying,
                   keyboardType: const TextInputType.numberWithOptions(
@@ -260,7 +264,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
                         if(api.hasUnifiedOfflineSession && paymentMode==null) {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Choisissez le mode de paiement.')));return;
                         }
-                        final montant = double.tryParse(controller.text.trim());
+                        final montant = MoneyInput.number(controller.text)?.toDouble();
 
                         if (montant == null || montant <= 0) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -359,14 +363,28 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
   }
 
   Future<void> sms() async {
-    if (!Config.current.externalLinksAllowed) return;
-    if (widget.telephone.trim().isEmpty) return;
-
-    final uri = Uri.parse("sms:${widget.telephone}");
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    final unpaid=ventes.where((v)=>(v['reste'] as num? ?? 0)>0).toList();
+    if(unpaid.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Aucune facture restant à régler.')));return;}
+    final sale=await showDialog<Map>(context:context,builder:(dialog)=>V2AlertDialog(title:const Text('Choisir la facture à relancer'),content:SizedBox(width:500,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+      for(final v in unpaid)ListTile(title:Text('${v['lot_nom']??v['espece_nom']??'Achat'} — ${formatMoney(v['montant_total'])}'),
+        subtitle:Text('Reste : ${formatMoney(v['reste'])}'),onTap:()=>Navigator.pop(dialog,Map.from(v))),
+    ]))),actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Annuler'))]));
+    if(sale==null || !mounted)return;
+    final text=TextEditingController(text:paymentReminder(customer:widget.nom,
+      description:sale['produit_vendu']=='OEUFS'?'${sale['nombre_oeufs']} œufs (${sale['lot_nom']??'lot'})':'${sale['quantite']} animaux (${sale['lot_nom']??sale['espece_nom']??'lot'})',
+      total:sale['montant_total'] as num,paid:sale['montant_paye'] as num? ?? 0,remaining:sale['reste'] as num,
+      farm:sale['exploitation_nom']?.toString()??'Mon exploitation'));
+    final reminderRoute=DialogRoute<void>(context:context,builder:(dialog)=>V2AlertDialog(title:const Text('Message de relance modifiable'),content:SizedBox(width:600,child:SingleChildScrollView(child:V2Field(child:TextField(key:const Key('payment-reminder'),controller:text,maxLines:14,decoration:const V2InputDecoration(labelText:'Message'))))),actions:[
+      TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),
+      TextButton(onPressed:()=>Clipboard.setData(ClipboardData(text:text.text)),child:const Text('Copier')),
+      if(Config.current.externalLinksAllowed && widget.telephone.trim().isNotEmpty)...[
+        TextButton(onPressed:()=>launchUrl(Uri.parse('sms:${widget.telephone}?body=${Uri.encodeComponent(text.text)}')),child:const Text('Ouvrir SMS')),
+        TextButton(onPressed:()=>launchUrl(Uri.https('wa.me','/${widget.telephone.replaceAll(RegExp(r'[^0-9]'),'')}',{'text':text.text}),mode:LaunchMode.externalApplication),child:const Text('Ouvrir WhatsApp')),
+      ],
+    ]));
+    await Navigator.of(context).push(reminderRoute);
+    await reminderRoute.completed;
+    text.dispose();
   }
 
   // ================= HEADER CLIENT =================
@@ -473,7 +491,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
               OutlinedButton.icon(
                 onPressed: sms,
                 icon: const Icon(Icons.sms, size: 18),
-                label: const Text("SMS"),
+                label: const Text("Message"),
               ),
             ],
           ),

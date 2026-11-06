@@ -145,7 +145,7 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
           validator:(value)=>kind=='VENTE_OEUFS' && pack=='COMPOSE'?RegExp(r'^[0-9]{1,9}$').hasMatch(value??'')?null:'Nombre d’alvéoles positif ou nul requis.':integer(value))),
         if(kind=='VENTE_OEUFS' && pack=='COMPOSE') V2Field(child:TextFormField(controller:extraEggs,keyboardType:TextInputType.number,decoration:const V2InputDecoration(labelText:'Œufs supplémentaires (0 à 29)',),
           validator:(value)=>RegExp(r'^[0-9]{1,2}$').hasMatch(value??'') && (int.tryParse(value??'')??30)<=29?null:'Indiquez de 0 à 29 œufs.')),
-        V2Field(child:TextFormField(key:const ValueKey('sale-price'),controller:price,keyboardType:const TextInputType.numberWithOptions(decimal:true),
+        V2Field(child:TextFormField(key:const ValueKey('sale-price'),controller:price,inputFormatters:[MoneyInputFormatter()],keyboardType:const TextInputType.numberWithOptions(decimal:true),
           decoration:V2InputDecoration(labelText:kind=='VENTE_OEUFS' && pack=='COMPOSE'?'Prix total de la vente':'Prix unitaire du conditionnement / animal',),validator:decimal)),
         if(lot!=null) Text('Dernier stock confirmé : ${(lot!['data'] as Map)[kind=='VENTE_OEUFS'?'stock_oeufs':'stock']} • stock projeté : ${(lot!['data'] as Map)[kind=='VENTE_OEUFS'?'projected_egg_stock':'projected_stock']}'),
         if(shortage) const Text('Alerte : cette vente dépasse le stock projeté. Indiquez le motif ; le serveur devra rapprocher ce constat.',style:TextStyle(color:Colors.red,fontWeight:FontWeight.bold)),
@@ -155,7 +155,7 @@ class _TerrainSaleDialogState extends State<_TerrainSaleDialog> {
       ] else ...[
         V2Field(child:DropdownButtonFormField<Map<String,dynamic>>(isExpanded:true,key:ValueKey('cash-sale-$version'),initialValue:sale,decoration:const V2InputDecoration(labelText:'Vente visée (facultative)',),
           items:[const DropdownMenuItem(value:null,child:Text('Encaissement sans vente visée')),for(final row in sales)DropdownMenuItem(value:row,child:Text((row['data'] as Map)['nom'].toString()))],onChanged:(value)=>setState(()=>sale=value))),
-        V2Field(child:TextFormField(key:const ValueKey('cash-amount'),controller:amount,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const V2InputDecoration(labelText:'Montant physiquement reçu',),validator:decimal)),
+        V2Field(child:TextFormField(key:const ValueKey('cash-amount'),controller:amount,inputFormatters:[MoneyInputFormatter()],keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const V2InputDecoration(labelText:'Montant physiquement reçu',),validator:decimal)),
         V2Field(child:DropdownButtonFormField<String>(isExpanded:true,initialValue:mode,decoration:const V2InputDecoration(labelText:'Mode de réception',),
           items:const [DropdownMenuItem(value:'ESPECES',child:Text('Espèces')),DropdownMenuItem(value:'MOBILE_MONEY',child:Text('Mobile money')),DropdownMenuItem(value:'VIREMENT',child:Text('Virement')),DropdownMenuItem(value:'CHEQUE',child:Text('Chèque'))],
           onChanged:(value) {if(value!=null) {setState(()=>mode=value);}})),

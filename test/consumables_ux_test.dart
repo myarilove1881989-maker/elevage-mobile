@@ -318,6 +318,13 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('Croissance').last);
       await t.pumpAndSettle();
+      expect(find.textContaining('Achats, distributions, vaccinations et corrections.'), findsNothing);
+      expect(find.byTooltip('Informations : Historique des consommables'), findsOneWidget);
+      await t.tap(find.byTooltip('Informations : Historique des consommables'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('Les opérations en attente restent visibles'), findsOneWidget);
+      await t.tap(find.text('Fermer'));
+      await t.pumpAndSettle();
       expect(find.text('Entrée — Croissance — 500 kg'), findsOneWidget);
       expect(find.textContaining('03/11/2026'), findsOneWidget);
       expect(find.textContaining('private-'), findsNothing);

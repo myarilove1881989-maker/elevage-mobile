@@ -13,6 +13,9 @@ class SaleApiFake extends ApiService {
         'exploitation':1,'role':'OPERATEUR','rights_version':1,
         'permissions':['finance.read','animal_sales.create','egg_sales.create','births.create','clients.create','mortality.create','donations.create','thefts.create']}};
   }
+  @override
+  Future<Map<String, dynamic>> getLotDetail(int id) async => {'id': id, 'prix_unitaire_origine': '1200.00'};
+
   int? animalLot;
   String? movementType;
   int? animalQuantity;

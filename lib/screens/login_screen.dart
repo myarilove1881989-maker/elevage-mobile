@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import '../services/expired_draft.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'farmer_access_screen.dart';
@@ -70,6 +72,15 @@ class _LoginScreenState extends State<LoginScreen> {
           } catch (_) {runtime.dispose();rethrow;}
           return;
         }
+        final recovered=ExpiredDraft.take(usernameController.text.trim());
+        if(recovered!=null && mounted)await showDialog<void>(context:context,builder:(dialog)=>AlertDialog(
+          title:const Text('Saisies récupérées après expiration'),
+          content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+            const Text('Ces textes n’ont pas été renvoyés. Vérifiez les opérations déjà reçues avant toute nouvelle saisie ; les références du lot et du client sont à rechoisir.'),
+            const SizedBox(height:12),SelectableText(recovered),
+          ])),actions:[TextButton(onPressed:()=>Clipboard.setData(ClipboardData(text:recovered)),child:const Text('Copier mes saisies')),
+            FilledButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Continuer'))]));
+        if(!mounted)return;
         ApiService.farmerSession=false;
         final prefs=await SharedPreferences.getInstance();await prefs.setString('session_kind','owner');
         if(!mounted) return;

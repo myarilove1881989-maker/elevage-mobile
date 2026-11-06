@@ -3,8 +3,8 @@ part of 'add_depense_screen.dart';
 /// HTTP adapter of the shared expense fields and input contract. No local
 /// outbox, grant, new endpoint, automatic retry or alternative business ledger.
 class _OnlineExpenseForm extends StatefulWidget {
-  const _OnlineExpenseForm({required this.api,this.readOnly=false,this.procurementKind});
-  final bool readOnly;
+  const _OnlineExpenseForm({required this.api,this.readOnly=false,this.procurementKind,this.stayAfterSuccess=false});
+  final bool readOnly,stayAfterSuccess;
   final String? procurementKind;
   final ApiService api;
   @override
@@ -60,7 +60,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         setState(()=>feedCatalog=fresh);
       }
     } catch(_) {if(mounted && sameToken)setState(()=>feedCatalog=null);}
-    if(mounted && sameToken)v2Confirmed(context,message:'Achat enregistré');
+    if(mounted && sameToken) expenseConfirmed('Achat enregistré');
 
   }
 
@@ -241,7 +241,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
     final input = ExpenseInputContract.validate(
       lotRef: lot?.reference,
       categoryId: categoryId,
-      amount: amount.text,
+      amount: MoneyInput.canonical(amount.text),
       note: note.text,
     );
     setState(() => errors = input.errors);
@@ -292,7 +292,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         throw StateError('Unconfirmed response');
       }
       setState(() => confirmed = true);
-      if(result['local_only']!=true)v2Confirmed(context,message:'Dépense enregistrée');
+      if(result['local_only']!=true)expenseConfirmed('Dépense enregistrée');
     } catch (e) {
       if (mounted && !handlePurchaseRejection(e)) {
         setState(() {
@@ -307,6 +307,16 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
     }
   }
 
+  void expenseConfirmed(String message) {
+    if(!widget.stayAfterSuccess){v2Confirmed(context,message:message);return;}
+    V2DraftScope.maybeOf(context)?.confirmed();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(message)));
+  }
+  void nextExpense() {
+    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder:(_)=>AddDepenseScreen(
+      apiService:widget.api,procurementKind:widget.procurementKind,stayAfterSuccess:true)));
+  }
+
   @override
   Widget build(BuildContext context) => Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>V2Scaffold(protectDraft:true,busy:busy,
     appBar: V2AppBar(title: const Text('Nouvelle dépense')),
@@ -319,6 +329,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         if (error != null) Text(error!, key: const Key('expense-error')),
         if (confirmed)
           Text(widget.api.operationFeedback(feedLocalRecorded?'Enregistré sur cet appareil. Stock estimé ; confirmation serveur en attente.':pendingFeed!=null?'Dépense et approvisionnement confirmés par le serveur.':'Dépense confirmée par le serveur.'),key:const Key('expense-status')),
+        if(confirmed && !feedLocalRecorded) OutlinedButton.icon(key:const Key('expense-next'),onPressed:busy?null:nextExpense,icon:const Icon(Icons.add),label:const Text('Nouvelle dépense')),
         if (!blocked && sameToken) ...[
           ExpenseFields(
             lots: lots,

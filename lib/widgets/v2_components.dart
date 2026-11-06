@@ -1,3 +1,4 @@
+import '../services/expired_draft.dart';
 export '../theme/design_system_v2.dart' show V2InputDecoration;
 import 'package:table_calendar/table_calendar.dart';
 import 'package:flutter/material.dart';
@@ -83,6 +84,25 @@ class V2Scaffold extends StatefulWidget {
 class V2ScaffoldState extends State<V2Scaffold> implements V2DraftActions {
   static final _homes = <NavigatorState, Route<dynamic>>{};
   static final _pages = <Route<dynamic>?, V2DraftActions>{};
+  static void preserveExpiredDrafts(String? username) {
+    if(username==null)return;
+    final lines=<String>[];
+    for(final page in _pages.values.whereType<V2ScaffoldState>()) {
+      if(!page.mounted || !page.changed || !page.widget.protectDraft)continue;
+      void visit(Element element) {
+        final field=element.widget;
+        if(field is TextField && !field.obscureText && field.controller!=null && field.controller!.text.isNotEmpty) {
+          final label=field.decoration?.labelText??'Champ';
+          if(!RegExp('password|mot de passe|code personnel|jeton',caseSensitive:false).hasMatch(label)) {
+            lines.add('$label : ${field.controller!.text}');
+          }
+        }
+        element.visitChildren(visit);
+      }
+      (page.context as Element).visitChildren(visit);
+    }
+    if(lines.isNotEmpty)ExpiredDraft.remember(username,lines.take(50).join('\n'));
+  }
   Route<dynamic>? _route;
   @override
   void initState() {

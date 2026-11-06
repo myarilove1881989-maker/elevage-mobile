@@ -95,7 +95,7 @@ class _HealthAgendaScreenState extends State<HealthAgendaScreen> {
       for(final task in rows)...[
         Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('${task['title']}',style:Theme.of(context).textTheme.titleMedium),
-          Text('Prévu : ${v2Day(task['date'])}${task['health']['planned_time']==null?'':' · ${task['health']['planned_time'].toString().substring(0,5)}'}\nLot : ${task['health']['lot_name']} — responsable : ${task['assigned_to']}\nÉtat de tâche : ${{'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée','CANCELLED':'Annulée'}[task['status']]??task['status']}'),
+          Text('Prévu : ${v2Day(task['date'])}${task['health']['planned_time']==null?'':' · ${task['health']['planned_time'].toString().substring(0,5)}'}\nLot : ${task['health']['lot_name']} — responsable : ${task['health']['responsible']?['name']??task['health']['assigned_name']??task['assigned_to']??'Non renseigné'}\nÉtat de tâche : ${{'TODO':'À faire','IN_PROGRESS':'En cours','DONE':'Terminée','CANCELLED':'Annulée'}[task['status']]??task['status']}'),
           if(task['status']=='CANCELLED')Text('Motif : ${task['cancellation_reason']??''}'),
           if(healthTaskOverdue(task,DateTime.now().toUtc()))const Text('Vaccination en retard'),
           if(task['health']['actual'] is Map)Text('Réalisée : ${v2Day(task['health']['actual']['date'])} par ${task['health']['actual']['operator_name']}\nÉcart : ${task['health']['actual']['difference_days']} jour(s)'),
@@ -133,17 +133,43 @@ class _HealthPlanFormState extends State<HealthPlanForm> {
   final date=TextEditingController(text:DateTime.now().toIso8601String().split('T').first),time=TextEditingController(),
     interval=TextEditingController(),end=TextEditingController(),notes=TextEditingController(),reason=TextEditingController();
   @override void initState(){super.initState();lot=widget.lotId;final task=widget.initial;
-    if(task!=null){lot=task['health']['lot'] as int;product=task['health']['product'] as String;assignee=task['assigned_to'] as int?;date.text='${task['date']}';time.text='${task['health']['planned_time']??''}';notes.text='${task['description']??''}';}else{selectedDates.add(date.text);}load();}
+    if(task!=null){lot=task['health']['lot'] as int;product=task['health']['product'] as String;assignee=task['health']?['responsible']?['id'] is int?-(task['health']['responsible']['id'] as int):task['assigned_to'] as int?;date.text='${task['date']}';time.text='${task['health']['planned_time']??''}';notes.text='${task['description']??''}';}else{selectedDates.add(date.text);}load();}
   Future<void> load()async {
     try {
       final data=await widget.api.get('/vaccine-supplies/'),people=await widget.api.get('/tasks/health-assignees/');
+      List<dynamic> contacts=[];
+      try {final rows=await widget.api.get('/tasks/health-responsibles/');if(rows is List)contacts=rows;}catch(_){}
       if(!mounted || !sameIdentity)return;
       if(data is! Map || data['products'] is! List || data['lots'] is! List || people is! List)throw StateError('Références sanitaires indisponibles.');
-      setState(() {catalog=Map<String,dynamic>.from(data);assignees=people;
+      setState(() {catalog=Map<String,dynamic>.from(data);assignees=[...people,for(final c in contacts){'user':-(c['id'] as int),'name':'${c['name']} (${c['profession']=='VETERINAIRE'?'Vétérinaire':'Opérateur externe'})'}];
         if(!assignees.any((r)=>r['user']==assignee))assignee=null;
         if(widget.initial==null && !(catalog!['lots'] as List).any((r)=>r['id']==lot))lot=null;});
     }catch(_){if(mounted)setState(()=>error='La planification nécessite des références et des responsables autorisés chargés avec Internet.');}
   }
+  Future<void> addResponsible() async {
+    final name=TextEditingController();String profession='VETERINAIRE';Map<String,dynamic>? intent;bool sending=false;String? problem;
+    final contactRoute=DialogRoute<Map<String,dynamic>>(context:context,barrierDismissible:false,builder:(dialog)=>StatefulBuilder(builder:(dialog,update)=>V2AlertDialog(
+      title:const Text('Ajouter un responsable sanitaire'),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        const Text('Contact de planification uniquement. Aucun compte, accès ou droit de vaccination ne sera créé.'),
+        if(problem!=null)Text(problem!,style:const TextStyle(color:Colors.red)),
+        V2Field(child:TextField(key:const Key('responsible-name'),controller:name,enabled:intent==null && !sending,maxLength:150,decoration:const V2InputDecoration(labelText:'Nom du responsable'))),
+        V2Field(child:DropdownButtonFormField<String>(initialValue:profession,decoration:const V2InputDecoration(labelText:'Fonction'),items:const [DropdownMenuItem(value:'VETERINAIRE',child:Text('Vétérinaire')),DropdownMenuItem(value:'OPERATEUR',child:Text('Opérateur'))],onChanged:intent==null && !sending?(v)=>update(()=>profession=v!):null)),
+      ])),actions:[TextButton(onPressed:sending?null:()=>Navigator.pop(dialog),child:const Text('Fermer')),
+        FilledButton(key:const Key('responsible-save'),onPressed:sending?null:() async {
+          if(!sameIdentity || name.text.trim().isEmpty){update(()=>problem='Indiquez le nom et vérifiez votre session.');return;}
+          intent??={'operation_uuid':newOperationUuid(),'name':name.text.trim(),'profession':profession};update(()=>sending=true);
+          try {final value=await widget.api.post('/tasks/health-responsibles/',intent!);
+            if(value is! Map || value['id'] is! int)throw StateError('Non confirmé');
+            if(dialog.mounted && sameIdentity)Navigator.pop(dialog,Map<String,dynamic>.from(value));
+          }catch(_){if(dialog.mounted)update(()=>problem='Ajout non confirmé. Les mêmes informations sont conservées pour vérification.');}
+          finally{if(dialog.mounted)update(()=>sending=false);}
+        },child:Text(intent==null?'Ajouter':'Vérifier le même ajout'))])));
+    final row=await Navigator.of(context).push(contactRoute);
+    await contactRoute.completed;
+    name.dispose();
+    if(row!=null && mounted && sameIdentity)setState(() {assignees=[...assignees,{'user':-(row['id'] as int),'name':'${row['name']}'}];assignee=-(row['id'] as int);});
+  }
+
   Future<void> save()async {
     if(!sameIdentity){setState(()=>error='Profil modifié. Rouvrez le formulaire avec l’identité d’origine.');return;}
     if(busy)return;setState(()=>busy=true);
@@ -158,7 +184,7 @@ class _HealthPlanFormState extends State<HealthPlanForm> {
         if(widget.initial==null && selectedDates.isEmpty)throw StateError('Choisissez au moins une date.');
         pending={'operation_uuid':uuid,if(widget.initial!=null)'date':date.text.trim(),
           'planned_time':widget.initial==null?null:time.text.trim().isEmpty?null:time.text.trim(),
-          'assigned_to':assignee,'observations':notes.text,
+          if(assignee!>0)'assigned_to':assignee else 'responsible_id':-assignee!,'observations':notes.text,
           if(widget.initial==null)...{if(selectedDates.length==1)'date':selectedDates.single else 'dates':selectedDates.toList()..sort(),'product':product,'lot':lot,'species':target.single['espece_id']}
           else ...{'expected_version':widget.initial!['version'],'reason':reason.text.trim()}};
       }
@@ -182,8 +208,10 @@ class _HealthPlanFormState extends State<HealthPlanForm> {
           items:[for(final l in catalog!['lots'] as List)DropdownMenuItem(value:l['id'] as int,child:Text('${l['nom']} — ${((catalog!['species'] as List? ?? const []).where((s)=>s['id']==l['espece_id']).map((s)=>s['nom']).firstOrNull)??'Espèce non renseignée'}'))],onChanged:editable?(v)=>setState(()=>lot=v):null)),
         if(widget.initial==null)V2DateSelection(key:const Key('health-dates'),selected:selectedDates,enabled:editable,onChanged:(value)=>setState((){selectedDates..clear()..addAll(value);})),
         if(widget.initial!=null)V2DateField(key:const Key('health-date'),controller:date,label:'Date prévue',enabled:editable),
-        V2Field(child:DropdownButtonFormField<int>(key:const Key('health-assignee'),initialValue:assignee,isExpanded:true,decoration:const V2InputDecoration(labelText:'Responsable autorisé',),
-          items:[for(final p in assignees)DropdownMenuItem(value:p['user'] as int,child:Text('${p['name']}'))],onChanged:editable?(v)=>setState(()=>assignee=v):null)),
+        Row(crossAxisAlignment:CrossAxisAlignment.center,children:[Expanded(child:V2Field(child:DropdownButtonFormField<int>(key:const Key('health-assignee'),initialValue:assignee,isExpanded:true,decoration:const V2InputDecoration(labelText:'Responsable autorisé',),
+          items:[for(final p in assignees)DropdownMenuItem(value:p['user'] as int,child:Text('${p['name']}',maxLines:2,overflow:TextOverflow.ellipsis))],onChanged:editable?(v)=>setState(()=>assignee=v):null))),
+          IconButton(key:const Key('health-add-responsible'),tooltip:'Ajouter un responsable sanitaire',onPressed:editable?addResponsible:null,icon:const Icon(Icons.add_circle_outline)),]),
+        if(assignees.isEmpty)const Text('Aucun opérateur éligible. Ajoutez un responsable sanitaire avec le bouton +. Ce contact ne crée pas de compte utilisateur.'),
         field('health-notes','Observations facultatives',notes),if(widget.initial!=null)field('health-reason','Motif obligatoire',reason),
         const V2Help(title:'Programmation sanitaire',child:Text('Une échéance est une intervention prévue. Elle ne déclare aucune vaccination et ne consomme aucune dose. La programmation nécessite Internet.')),
         ElevatedButton(key:const Key('health-save'),onPressed:busy?null:save,child:Text(pending==null?'Enregistrer':'Renvoyer les mêmes informations')),
