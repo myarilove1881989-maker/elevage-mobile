@@ -1,3 +1,4 @@
+import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../offline/expense_business_date.dart';
@@ -82,7 +83,8 @@ class ExpenseFields extends StatelessWidget {
       )),
       V2Field(child:TextField(
         key: const Key('expense-amount'),
-        controller: amount,
+        inputFormatters: [MoneyInputFormatter()],
+                  controller: amount,
         enabled: editable,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: V2InputDecoration(

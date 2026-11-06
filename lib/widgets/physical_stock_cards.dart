@@ -522,10 +522,10 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    Text('Historique · ${product['name']}'),
-                    const Text(
-                      'Achats, distributions, vaccinations et corrections. Les opérations en attente restent visibles dans l’historique des opérations.',
-                    ),
+                    Row(children: [Expanded(child:Text('Historique · ${product['name']}')),
+                      const V2Help(title:'Historique des consommables',child:Text(
+                        'Achats, distributions, vaccinations et corrections. Les opérations en attente restent visibles dans l’historique des opérations.')),
+                    ]),
                     for (final row in rows)
                       ListTile(
                         title: Text(
@@ -1407,8 +1407,8 @@ class ConsumablesScreen extends StatelessWidget {
   final ApiService api;
   final int? species, lot;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Suivi des consommables')),
+  Widget build(BuildContext context) => V2Scaffold(
+    appBar: V2AppBar(title: const Text('Suivi des consommables')),
     body: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1000),
@@ -1501,8 +1501,8 @@ class ConsumableTrackingScreen extends StatelessWidget {
   final bool isFeed;
   final int? species, lot;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+  Widget build(BuildContext context) => V2Scaffold(
+    appBar: V2AppBar(
       title: Text(isFeed ? 'Suivi des aliments' : 'Suivi des vaccins'),
     ),
     body: Align(

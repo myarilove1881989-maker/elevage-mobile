@@ -203,7 +203,7 @@ void main() {
     globalToken = null;
     ApiService.clearLocalPresentationIdentity();
   });
-  for (final width in [360.0, 1440.0]) {
+  for (final width in [360.0, 768.0, 1440.0]) {
     void screen(String family, Future<void> Function(WidgetTester) body) {
       testWidgets('$phase $family $width', (t) async {
         t.view.physicalSize = Size(width, 1000);
@@ -383,7 +383,7 @@ void main() {
     if(phase=='after')screen('agenda_general',(t)async{
       final api=AuditApi()..owner=true;addTearDown(api.close);
       await t.pumpWidget(app(DashboardScreen(apiService:api)));await t.pumpAndSettle();
-      await tap(t,width<600?find.byTooltip('Ajouter une tâche'):find.text('Ajouter').last);await tap(t,find.text('Répéter sur plusieurs jours'));
+      await tap(t,width<1100?find.byTooltip('Ajouter une tâche'):find.text('Ajouter').last);await tap(t,find.text('Répéter sur plusieurs jours'));
       await t.enterText(find.byKey(const Key('agendaTaskTitle')),'Contrôle fictif des abreuvoirs');
       expect(api.writes,0);
     });

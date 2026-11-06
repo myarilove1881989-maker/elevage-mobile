@@ -1,3 +1,4 @@
+import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../widgets/operation_status.dart';
@@ -282,6 +283,36 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
     villeController.dispose();
   }
 
+  String? automaticPrice;
+  String? originPriceMessage;
+  Future<void> prefillOriginPrice() async {
+    if(!{'MORTALITE','DON','VOL'}.contains(selectedType) || selectedLotId==null)return;
+    if(prixController.text.isNotEmpty && prixController.text!=automaticPrice)return;
+    final id=selectedLotId,type=selectedType,identity=ApiService.sessionIdentity;
+    try {
+      final detail=await widget.apiService.getLotDetail(id!);
+      if(!mounted || selectedLotId!=id || selectedType!=type || identity!=ApiService.sessionIdentity)return;
+      if(prixController.text.isNotEmpty && prixController.text!=automaticPrice)return;
+      final value=detail['prix_unitaire_origine'];
+      setState(() {automaticPrice=value==null?null:MoneyInput.display('$value');
+        prixController.text=automaticPrice??'';
+        originPriceMessage=value==null?'Prix d’origine non déterminable. Renseignez une valeur si nécessaire.':null;});
+    }catch(_) {if(mounted)setState(()=>originPriceMessage='Prix d’origine indisponible. Vérifiez la connexion.');}
+  }
+
+  Future<void> movementConfirmed() async {
+    if(widget.apiService.lastOperationMessage!=null) {
+      showMessage(widget.apiService.lastOperationMessage!);return;
+    }
+    V2DraftScope.maybeOf(context)?.confirmed();
+    setState(() {quantiteController.clear();prixController.clear();totalPriceController.clear();
+      traysController.text='0';extraEggsController.text='0';isSubmitting=false;});
+    showMessage('Mouvement enregistré. Vous pouvez saisir le suivant.');
+    await fetchData();
+    await prefillOriginPrice();
+    if(mounted && selectedProduct=='OEUFS' && selectedLotId!=null)await loadEggStock(selectedLotId!);
+  }
+
   // ================= SUBMIT =================
   Future<void> submit() async {
     final action = selectedType == 'VENTE'
@@ -330,7 +361,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
         if (mounted) {
           if(saved['local_only']==true) {
             showMessage(widget.apiService.operationFeedback('Naissance enregistrée.'));
-            Navigator.pop(context,true);return;
+            return;
           }
           setState(() => isSubmitting = false);
           await showDialog<void>(
@@ -351,7 +382,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
               ],
             ),
           );
-          if (mounted) Navigator.pop(context, true);
+          if (mounted) await movementConfirmed();
         }
       } catch (error) {
         if (mounted)
@@ -374,7 +405,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
         showMessage(context.tr('sale_invalid_quantity'));
         return;
       }
-      final price = totalPriceController.text.trim().replaceAll(',', '.');
+      final price = MoneyInput.canonical(totalPriceController.text);
       if (!RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(price) ||
           (double.tryParse(price) ?? 0) <= 0) {
         showMessage(context.tr('sale_invalid_total'));
@@ -405,7 +436,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
           totalPrice: price,
           date: DateTime.now(),
         );
-        if (mounted) Navigator.pop(context, true);
+        if (mounted) await movementConfirmed();
       } catch (error) {
         if (mounted)
           showMessage(unconfirmedOperationMessage);
@@ -421,7 +452,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
     }
 
     final quantite = int.tryParse(quantiteController.text.trim());
-    final prix = double.tryParse(prixController.text.trim());
+    final prix = MoneyInput.number(prixController.text)?.toDouble();
 
     if (quantite == null || prix == null) {
       showMessage("Valeurs invalides");
@@ -433,7 +464,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
       return;
     }
 
-    if (prix <= 0) {
+    if (selectedType == 'VENTE' ? prix <= 0 : prix < 0) {
       showMessage("Prix invalide");
       return;
     }
@@ -458,7 +489,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
       if (!mounted) return;
 
       if (success) {
-        Navigator.pop(context, true);
+        await movementConfirmed();
       } else {
         showMessage("Erreur création mouvement");
       }
@@ -528,10 +559,10 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                             setState(() {
                               selectedType = value!;
                               selectedClientId = null;
-                              selectedLotId = null;
                               eggStockAvailable = null;
                               eggOriginsComplete = false;
                             });
+                            prefillOriginPrice();
                           },
                           decoration: V2InputDecoration(
                             labelText: context.tr('movement_type'),),
@@ -589,6 +620,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                               eggStockAvailable = null;
                               eggOriginsComplete = false;
                             });
+                            prefillOriginPrice();
                             if (value != null &&
                                 selectedType == 'VENTE' &&
                                 selectedProduct == 'OEUFS') {
@@ -749,7 +781,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                           const SizedBox(height: 16),
                           V2Field(child:TextField(
                             key: const Key('eggSaleTotalPrice'),
-                            controller: totalPriceController,
+                            inputFormatters: [MoneyInputFormatter()],
+                  controller: totalPriceController,
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
@@ -838,7 +871,8 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                           const SizedBox(height: 16),
                           V2Field(child:TextField(
                             key: const Key('animalSalePrice'),
-                            controller: prixController,
+                            inputFormatters: [MoneyInputFormatter()],
+                  controller: prixController,
                             keyboardType: TextInputType.number,
                             decoration: V2InputDecoration(
                               labelText:
@@ -847,6 +881,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
                           )),
                         ],
 
+                        if(originPriceMessage!=null)Text(originPriceMessage!),
                         const SizedBox(height: 20),
 
                         // BOUTON

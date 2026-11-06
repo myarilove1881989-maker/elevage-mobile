@@ -1,3 +1,4 @@
+import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
@@ -321,7 +322,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
         quantityKg: double.parse(quantity.text.trim().replaceAll(',', '.')),
         pricePerKg: price.text.trim().isEmpty
             ? null
-            : double.parse(price.text.trim().replaceAll(',', '.')),
+            : double.parse(MoneyInput.canonical(price.text)),
         expenseId: selectedExpenseId,
         note: note.text.trim(),
       );
@@ -365,7 +366,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: V2InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined),),
                     validator: (value) {
-                      final parsed = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
+                      final parsed = MoneyInput.number(value??'')?.toDouble();
                       return parsed == null || !parsed.isFinite || parsed <= 0
                           ? context.tr('feed_invalid_quantity')
                           : null;
@@ -387,7 +388,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: V2InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined),),
                     validator: (value) {
-                      final parsed = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
+                      final parsed = MoneyInput.number(value??'')?.toDouble();
                       return parsed == null || !parsed.isFinite || parsed <= 0
                           ? context.tr('feed_invalid_quantity')
                           : null;
@@ -428,7 +429,8 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                         )),
                       V2Field(child:TextFormField(
                         key: const Key('feedPriceField'),
-                        controller: price,
+                        inputFormatters: [MoneyInputFormatter()],
+                  controller: price,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: V2InputDecoration(labelText: context.tr('feed_price_kg'),),
                         validator: (value) {

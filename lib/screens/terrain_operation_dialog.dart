@@ -23,7 +23,7 @@ const _terrainFields={
 };
 
 String? _fixedDecimal(String text,int scale) {
-  final value=text.trim().replaceAll(',','.');
+  final value=MoneyInput.canonical(text);
   final match=RegExp('^([0-9]{1,8})(?:\\.([0-9]{1,$scale}))?\$').firstMatch(value);
   if(match==null) {return null;}
   return '${BigInt.parse(match[1]!)}.${(match[2]??'').padRight(scale,'0')}';
@@ -158,7 +158,7 @@ class _TerrainOperationDialogState extends State<_TerrainOperationDialog> {
       if(kind=='ALIMENTATION') V2Field(child:DropdownButtonFormField<OutboxEntry>(isExpanded:true,key:ValueKey('expense-${lot==null?'none':(lot!['data'] as Map)['id']}'),initialValue:expense,decoration:const V2InputDecoration(labelText:'Dépense associée (facultative)',),
         items:[const DropdownMenuItem(value:null,child:Text('Sans dépense associée')),for(final entry in widget.expenses.where(expenseMatchesLot))DropdownMenuItem(value:entry,
           child:Text('Dépense ${(entry.declaration['payload'] as Map)['montant']}'))],onChanged:(value)=>setState(()=>expense=value))),
-      for(final spec in _terrainFields[kind]!) V2Field(child:TextFormField(key:ValueKey('$kind-${spec.key}'),controller:fields[spec.key],maxLength:spec.maxLength,
+      for(final spec in _terrainFields[kind]!) V2Field(child:TextFormField(key:ValueKey('$kind-${spec.key}'),controller:fields[spec.key],inputFormatters:spec.scale==2?[MoneyInputFormatter()]:null,maxLength:spec.maxLength,
         keyboardType:spec.integer?TextInputType.number:spec.scale!=null?const TextInputType.numberWithOptions(decimal:true):TextInputType.text,
         decoration:V2InputDecoration(labelText:spec.label,),validator:(value)=>validate(spec,value))),
       if(shortage) const Text('Alerte : ce constat dépasse le stock projeté. Il sera conservé avec votre motif et peut nécessiter un rapprochement.',style:TextStyle(color:Colors.red)),

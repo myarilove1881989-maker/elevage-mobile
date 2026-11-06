@@ -1,3 +1,4 @@
+import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../widgets/operation_status.dart';
@@ -91,11 +92,11 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
   // ================= CALCUL PRIX =================
   void calculatePrixUnitaire() {
     final q = int.tryParse(quantiteController.text.trim());
-    final total = double.tryParse(prixTotalController.text.trim());
+    final total = MoneyInput.number(prixTotalController.text)?.toDouble();
 
     if (q != null && q > 0 && total != null && total > 0) {
       final pu = total / q;
-      prixUnitaireController.text = pu.toStringAsFixed(2);
+      prixUnitaireController.text = MoneyInput.display(pu.toStringAsFixed(2));
     } else {
       prixUnitaireController.clear();
     }
@@ -117,8 +118,8 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
     }
 
     final quantite = int.tryParse(quantiteController.text.trim());
-    final prixTotal = double.tryParse(prixTotalController.text.trim());
-    final prixUnitaire = double.tryParse(prixUnitaireController.text.trim());
+    final prixTotal = MoneyInput.number(prixTotalController.text)?.toDouble();
+    final prixUnitaire = MoneyInput.number(prixUnitaireController.text)?.toDouble();
 
     if (quantite == null || quantite <= 0) {
       showMessage("Quantité invalide");
@@ -155,7 +156,10 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
 
       if (success) {
         showMessage(widget.apiService.operationFeedback(context.tr('purchase_created')));
-        if(!(widget.apiService.hasUnifiedOfflineSession && widget.apiService.lastOperationMessage!=null))v2Confirmed(context,message:context.tr('purchase_created'));
+        if(!(widget.apiService.hasUnifiedOfflineSession && widget.apiService.lastOperationMessage!=null)) {
+          V2DraftScope.maybeOf(context)?.confirmed();
+          nomLotController.clear();quantiteController.clear();prixTotalController.clear();prixUnitaireController.clear();
+        }
       } else {
         showMessage("Erreur création ❌");
       }
@@ -367,7 +371,8 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
 
                       // ================= PRIX TOTAL =================
                       V2Field(child:TextFormField(
-                        controller: prixTotalController,
+                        inputFormatters: [MoneyInputFormatter()],
+                  controller: prixTotalController,
                         keyboardType: TextInputType.number,
                         decoration: V2InputDecoration(
                           labelText:
@@ -382,7 +387,8 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
 
                       // ================= PRIX UNITAIRE =================
                       V2Field(child:TextFormField(
-                        controller: prixUnitaireController,
+                        inputFormatters: [MoneyInputFormatter()],
+                  controller: prixUnitaireController,
                         readOnly: true,
                         decoration: V2InputDecoration(
                           labelText:

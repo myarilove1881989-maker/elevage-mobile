@@ -1,3 +1,4 @@
+import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import 'dart:async';
 import '../widgets/feed_supply_fields.dart';
@@ -20,8 +21,8 @@ import '../theme/terre_et_or_theme.dart';
 part 'online_expense_form.dart';
 
 class AddDepenseScreen extends StatefulWidget {
-  const AddDepenseScreen({super.key, this.tablet,this.apiService,this.simple=false,this.procurementKind});
-  final bool simple;
+  const AddDepenseScreen({super.key, this.tablet,this.apiService,this.simple=false,this.procurementKind,this.stayAfterSuccess=false});
+  final bool simple,stayAfterSuccess;
   final String? procurementKind;
   final TabletController? tablet;
   final ApiService? apiService;
@@ -70,7 +71,7 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
         }
       } catch(e) {ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString())));return;}
     }
-    await model!.submit(lot:lot,categoryId:categoryId,amount:amount.text,note:note.text,
+    await model!.submit(lot:lot,categoryId:categoryId,amount:MoneyInput.canonical(amount.text),note:note.text,
       day:model!.dates.businessDayOf(model!.tablet.clock().toUtc()),feedSupply:supply,vaccineSupply:vaccineSupply,feedDependencies:dependencies);
   }
   final amount = TextEditingController(), note = TextEditingController();
@@ -148,8 +149,8 @@ class _AddDepenseScreenState extends State<AddDepenseScreen> {
     final m = model;
     if(m==null) {
       return TerrainEntryGate(api:onlineApi!,actions:const {'expenses.create'},
-        ownerBuilder:(_)=>_OnlineExpenseForm(api:onlineApi!,readOnly:true,procurementKind:widget.procurementKind),
-        builder:(_)=>_OnlineExpenseForm(api:onlineApi!,procurementKind:widget.procurementKind));
+        ownerBuilder:(_)=>_OnlineExpenseForm(api:onlineApi!,readOnly:true,procurementKind:widget.procurementKind,stayAfterSuccess:widget.stayAfterSuccess),
+        builder:(_)=>_OnlineExpenseForm(api:onlineApi!,procurementKind:widget.procurementKind,stayAfterSuccess:widget.stayAfterSuccess));
     }
     return Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>V2Scaffold(protectDraft:true,
       appBar: V2AppBar(title: const Text('Nouvelle dépense')),

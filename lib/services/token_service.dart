@@ -12,7 +12,12 @@ abstract interface class TokenStore {
 
 /// Android utilise un stockage chiffré protégé par Android Keystore.
 /// Le Web conserve son stockage SharedPreferences existant.
-class TokenService implements TokenStore {
+abstract interface class RefreshTokenStore {
+  Future<void> saveRefreshToken(String value);
+  Future<String?> getRefreshToken();
+}
+
+class TokenService implements TokenStore, RefreshTokenStore {
   TokenService({bool? useSecureStorage, FlutterSecureStorage? secureStorage})
     : _secure =
           useSecureStorage ??
@@ -58,9 +63,22 @@ class TokenService implements TokenStore {
   }
 
   @override
+  Future<void> saveRefreshToken(String value) async {
+    final prefs=await SharedPreferences.getInstance();
+    if(_secure) {await _storage.write(key:'${_key}_refresh',value:value);await prefs.remove('${_key}_refresh');}
+    else {await prefs.setString('${_key}_refresh',value);}
+  }
+  @override
+  Future<String?> getRefreshToken() async => _secure
+      ? _storage.read(key:'${_key}_refresh')
+      : (await SharedPreferences.getInstance()).getString('${_key}_refresh');
+
+  @override
   Future<void> clearToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
+    await prefs.remove('${_key}_refresh');
+    if (_secure) await _storage.delete(key:'${_key}_refresh');
     if (!(Config.isPilot || Config.current.isLab)) {
       await prefs.remove('auth_token');
     }
