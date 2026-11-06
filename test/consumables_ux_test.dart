@@ -320,9 +320,15 @@ void main() {
       await t.pumpAndSettle();
       expect(find.textContaining('Achats, distributions, vaccinations et corrections.'), findsNothing);
       expect(find.byTooltip('Informations : Historique des consommables'), findsOneWidget);
+      if(const bool.fromEnvironment('AUDIT_CAPTURE')) {
+        await expectLater(find.byType(MaterialApp),matchesGoldenFile(Uri.file('D:/ElevAge-Dev/mobile/.local/user-corrections/history-main.png')));
+      }
       await t.tap(find.byTooltip('Informations : Historique des consommables'));
       await t.pumpAndSettle();
       expect(find.textContaining('Les opérations en attente restent visibles'), findsOneWidget);
+      if(const bool.fromEnvironment('AUDIT_CAPTURE')) {
+        await expectLater(find.byType(MaterialApp),matchesGoldenFile(Uri.file('D:/ElevAge-Dev/mobile/.local/user-corrections/history-help.png')));
+      }
       await t.tap(find.text('Fermer'));
       await t.pumpAndSettle();
       expect(find.text('Entrée — Croissance — 500 kg'), findsOneWidget);
