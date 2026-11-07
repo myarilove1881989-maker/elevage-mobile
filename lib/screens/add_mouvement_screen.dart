@@ -1,3 +1,4 @@
+import '../widgets/micro_feedback.dart';
 import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
@@ -300,10 +301,12 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
     }catch(_) {if(mounted)setState(()=>originPriceMessage='Prix d’origine indisponible. Vérifiez la connexion.');}
   }
 
+  Object _confirmationCue = Object();
   Future<void> movementConfirmed() async {
     if(widget.apiService.lastOperationMessage!=null) {
       showMessage(widget.apiService.lastOperationMessage!);return;
     }
+    MicroFeedback.confirmed(context, operation: _confirmationCue);
     V2DraftScope.maybeOf(context)?.confirmed();
     setState(() {quantiteController.clear();prixController.clear();totalPriceController.clear();
       traysController.text='0';extraEggsController.text='0';isSubmitting=false;});
@@ -320,6 +323,7 @@ class _AddMouvementScreenState extends State<_ClassicMouvementScreen> {
       : {'MORTALITE':'mortality.create','DON':'donations.create','VOL':'thefts.create','NAISSANCE':'births.create'}[selectedType];
     if(widget.readOnly || action==null || !await TerrainEntryGate.allowClassic(context,widget.apiService,{action}) || !mounted) return;
     if (isSubmitting) return;
+    _confirmationCue = Object();
 
     if (selectedLotId == null) {
       showMessage("Sélectionnez un lot");

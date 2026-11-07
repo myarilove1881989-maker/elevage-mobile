@@ -80,6 +80,8 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
       final tablet=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.tablet:null;
       return ConnectionIndicator(networkAvailable:tablet?.sync?.networkAvailable,lastSuccess:serverConnection.lastSuccess,
         serverUnavailable:serverConnection.available==false,syncing:tablet?.sync?.busy??false,
+        syncSource:tablet?.sync,syncSummary:tablet?.sync?.summary,
+        syncUnavailable:tablet?.sync?.error!=null,
         pending:tablet?.sync?.summary.pending,conflicts:tablet?.sync?.summary.conflicts,onSummary:_openHistory);
     });
   FarmSession? commonSession;

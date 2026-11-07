@@ -194,6 +194,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 .toList(),
             onChanged: (value) => setState(() => currency = value ?? 'XAF'),
           )),
+          SwitchListTile.adaptive(
+            key: const Key('micro-animations-setting'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Micro-animations'),
+            subtitle: const Text('Respecte aussi la réduction des animations du système.'),
+            value: settings.animationsEnabled,
+            onChanged: (value) async {
+              await settings.setAnimationsEnabled(value);
+              if (mounted) setState(() {});
+            },
+          ),
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: saving ? null : save,

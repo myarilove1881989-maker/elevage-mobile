@@ -115,7 +115,7 @@ class _VaccinationFormState extends State<VaccinationForm> {
       }
       final result=widget.initial==null?await widget.api.post('/vaccinations/',pending!):await widget.api.patch('/vaccinations/${widget.initial!['id']}/',pending!);
       if(result is! Map || (result['id']==null && result['local_only']!=true))throw StateError('Enregistrement non confirmé.');
-      if(mounted && sameIdentity) {if(result['local_only']==true){setState(()=>error='Enregistré sur cet appareil · confirmation en attente.');}else{v2Confirmed(context,message:'Vaccination enregistrée');}}
+      if(mounted && sameIdentity) {if(result['local_only']==true){setState(()=>error='Enregistré sur l’appareil — synchronisation en attente');}else{v2Confirmed(context,message:'Vaccination enregistrée');}}
     }catch(e){if(mounted)setState(()=>error=pending==null?'$e':'Résultat à vérifier. La même opération sera renvoyée. $e');}
     finally{if(mounted)setState(()=>busy=false);}
   }

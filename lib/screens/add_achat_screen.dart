@@ -1,3 +1,4 @@
+import '../widgets/micro_feedback.dart';
 import '../services/money_input.dart';
 import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
@@ -108,6 +109,7 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
   }
 
   // ================= SUBMIT =================
+  Object _confirmationCue = Object();
   Future<void> submit() async {
     if(widget.readOnly || !await TerrainEntryGate.allowClassic(context,widget.apiService,{'purchases.create'}) || !mounted) return;
     if (!_formKey.currentState!.validate()) return;
@@ -136,6 +138,7 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
       return;
     }
 
+    _confirmationCue = Object();
     setState(() => isSubmitting = true);
 
     try {
@@ -157,6 +160,7 @@ class _AddAchatScreenState extends State<_ClassicAchatScreen> {
       if (success) {
         showMessage(widget.apiService.operationFeedback(context.tr('purchase_created')));
         if(!(widget.apiService.hasUnifiedOfflineSession && widget.apiService.lastOperationMessage!=null)) {
+          MicroFeedback.confirmed(context, operation: _confirmationCue);
           V2DraftScope.maybeOf(context)?.confirmed();
           nomLotController.clear();quantiteController.clear();prixTotalController.clear();prixUnitaireController.clear();
         }

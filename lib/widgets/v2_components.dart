@@ -1,3 +1,4 @@
+import 'micro_feedback.dart';
 import '../services/expired_draft.dart';
 export '../theme/design_system_v2.dart' show V2InputDecoration;
 import 'package:table_calendar/table_calendar.dart';
@@ -331,6 +332,7 @@ void v2Confirmed(
   String message = 'Enregistrement confirmé',
   Object? result = true,
 }) {
+  MicroFeedback.confirmed(context);
   V2DraftScope.maybeOf(context)?.confirmed();
   final navigator = Navigator.of(context),
       messenger = ScaffoldMessenger.maybeOf(context);

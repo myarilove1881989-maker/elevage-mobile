@@ -1,3 +1,4 @@
+import '../widgets/farm_login_loading.dart';
 import 'package:flutter/services.dart';
 import '../services/expired_draft.dart';
 import 'package:flutter/material.dart';
@@ -239,17 +240,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: isLoading
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              context.tr('login'),
+                      child: Text(
+                              isLoading ? 'Connexion…' : context.tr('login'),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -257,6 +249,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                     ),
                   ),
+                  FarmLoginLoading(active: isLoading),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: isLoading

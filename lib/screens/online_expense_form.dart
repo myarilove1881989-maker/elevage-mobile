@@ -309,6 +309,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
 
   void expenseConfirmed(String message) {
     if(!widget.stayAfterSuccess){v2Confirmed(context,message:message);return;}
+    MicroFeedback.confirmed(context);
     V2DraftScope.maybeOf(context)?.confirmed();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(message)));
   }
@@ -328,7 +329,7 @@ class _OnlineExpenseFormState extends State<_OnlineExpenseForm> {
         if (busy) const LinearProgressIndicator(),
         if (error != null) Text(error!, key: const Key('expense-error')),
         if (confirmed)
-          Text(widget.api.operationFeedback(feedLocalRecorded?'Enregistré sur cet appareil. Stock estimé ; confirmation serveur en attente.':pendingFeed!=null?'Dépense et approvisionnement confirmés par le serveur.':'Dépense confirmée par le serveur.'),key:const Key('expense-status')),
+          Text(widget.api.operationFeedback(feedLocalRecorded?'Enregistré sur l’appareil — synchronisation en attente. Stock estimé.':pendingFeed!=null?'Dépense et approvisionnement confirmés par le serveur.':'Dépense confirmée par le serveur.'),key:const Key('expense-status')),
         if(confirmed && !feedLocalRecorded) OutlinedButton.icon(key:const Key('expense-next'),onPressed:busy?null:nextExpense,icon:const Icon(Icons.add),label:const Text('Nouvelle dépense')),
         if (!blocked && sameToken) ...[
           ExpenseFields(

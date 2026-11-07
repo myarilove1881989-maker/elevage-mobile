@@ -46,6 +46,7 @@ void main() {
         if(vaccine) {await fillVaccine(tester);} else {await fillFeed(tester);}
         await tester.tap(find.byKey(const Key('expense-submit')));await tester.pumpAndSettle();
         expect(server.posts,1);
+        expect(find.byKey(const Key('micro-confirmation')),findsNothing);
         final original={...server.saved!};
         if(status==500) {
           await reveal(tester,'feed-retry');
