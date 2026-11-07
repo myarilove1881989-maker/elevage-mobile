@@ -370,6 +370,7 @@ class _OfflineTabletScreenState extends State<OfflineTabletScreen> with WidgetsB
       ConnectionIndicator(networkAvailable:tablet.sync?.networkAvailable,
         lastSuccess:tablet.sync?.networkAvailable==true?tablet.sync?.summary.lastSuccess:null,
         syncing:manualSyncBusy || tablet.sync?.busy==true,syncUnavailable:tablet.sync?.error!=null,
+        syncSource:tablet.sync,syncSummary:tablet.sync?.summary,
         pending:tablet.sync?.summary.pending,conflicts:tablet.sync?.summary.conflicts,
         onSummary:()=>Scrollable.ensureVisible(summaryKey.currentContext!,duration:const Duration(milliseconds:200))),
       if(session!=null) IconButton(tooltip:'Verrouiller / changer d’opérateur',icon:const Icon(Icons.lock_outline),

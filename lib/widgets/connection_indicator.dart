@@ -1,3 +1,7 @@
+import '../offline/sync_state.dart';
+import '../services/app_settings.dart';
+import 'sync_feedback_tracker.dart';
+import 'micro_feedback.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -12,12 +16,16 @@ class ConnectionIndicator extends StatefulWidget {
     this.syncing = false,
     this.pending,
     this.conflicts,
+    this.syncSource,
+    this.syncSummary,
     this.onSummary,
     this.freshness = const Duration(minutes: 2),
     this.showLabel = false,
     this.clock,
   });
 
+  final Object? syncSource;
+  final SyncSummary? syncSummary;
   final bool? networkAvailable;
   final DateTime? lastSuccess;
   final bool serverUnavailable, syncUnavailable, syncing, showLabel;
@@ -30,17 +38,51 @@ class ConnectionIndicator extends StatefulWidget {
 }
 
 class _ConnectionIndicatorState extends State<ConnectionIndicator> {
-  Timer? _expiry;
+  Timer? _expiry, _cueExpiry;
+  bool _syncCueVisible = false;
+  int _cueGeneration = 0;
+  static final _trackers = Expando<SyncFeedbackTracker>();
+  void _motionChanged() { if (mounted) setState(() {}); }
+  void _observeSync() {
+    final source = widget.syncSource, summary = widget.syncSummary;
+    final invalid = source == null || summary == null || widget.syncing ||
+        widget.serverUnavailable || widget.syncUnavailable || widget.networkAvailable == false ||
+        summary.pending > 0 || summary.awaitingValidation > 0 || summary.conflicts > 0 || summary.blocked > 0;
+    if (invalid) {
+      _cueGeneration++;
+      if (_syncCueVisible) {
+        _syncCueVisible = false; _cueExpiry?.cancel();
+        WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) MicroFeedback.dismissSync(context); });
+      }
+    }
+    if (source == null || summary == null) { return; }
+    final tracker = _trackers[source] ??= SyncFeedbackTracker();
+    if (!tracker.observe(summary: summary, busy: widget.syncing,
+        unavailable: widget.serverUnavailable || widget.syncUnavailable,
+        networkAvailable: widget.networkAvailable)) { return; }
+    _syncCueVisible = true;
+    final generation = ++_cueGeneration;
+    _cueExpiry?.cancel();
+    _cueExpiry = Timer(const Duration(milliseconds: 2200), () { if (mounted) setState(() => _syncCueVisible = false); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && generation == _cueGeneration && _syncCueVisible) {
+        MicroFeedback.synchronized(context, operation: (source, summary.lastSuccess));
+      }
+    });
+  }
   DateTime get _now => widget.clock?.call() ?? DateTime.now();
   @override
   void initState() {
     super.initState();
     _scheduleExpiry();
+    AppSettings.instance.addListener(_motionChanged);
+    _observeSync();
   }
 
   @override
   void didUpdateWidget(ConnectionIndicator oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _observeSync();
     if (oldWidget.lastSuccess != widget.lastSuccess ||
         oldWidget.freshness != widget.freshness) {
       _scheduleExpiry();
@@ -65,7 +107,8 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator> {
 
   @override
   void dispose() {
-    _expiry?.cancel();
+    _expiry?.cancel(); _cueExpiry?.cancel();
+    AppSettings.instance.removeListener(_motionChanged);
     super.dispose();
   }
 
@@ -115,7 +158,13 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator> {
               width: 40,
               height: 48,
               child: Center(
-                child: widget.syncing
+                child: _syncCueVisible
+                    ? TweenAnimationBuilder<double>(
+                        tween: Tween(begin: microMotionAllowed(context) ? 0 : 1, end: 1),
+                        duration: microMotionAllowed(context) ? const Duration(milliseconds: 700) : Duration.zero,
+                        builder: (_, value, _) => ConfirmationFrame(progress: value, size: 24),
+                      )
+                    : widget.syncing
                     ? const SizedBox(
                         width: 18,
                         height: 18,

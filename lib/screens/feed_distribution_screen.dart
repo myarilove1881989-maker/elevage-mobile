@@ -275,7 +275,7 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
       stockAttempted=true;
       final value=await widget.apiService.post('/alimentation/distributions/',stockRequest!);
       if(value is! Map || (value['id']==null && value['local_only']!=true))throw StateError('Résultat non confirmé.');
-      if(mounted) {if(value['local_only']==true){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Enregistré sur cet appareil · confirmation en attente.')));}else{v2Confirmed(context,message:'Distribution enregistrée');}}
+      if(mounted) {if(value['local_only']==true){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Enregistré sur l’appareil — synchronisation en attente')));}else{v2Confirmed(context,message:'Distribution enregistrée');}}
     } catch(e) {if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(stockAttempted?'Résultat à vérifier. Renvoyer conservera la même opération, sans double sortie.':e.toString())));}
     finally {if(mounted)setState(()=>saving=false);}
   }

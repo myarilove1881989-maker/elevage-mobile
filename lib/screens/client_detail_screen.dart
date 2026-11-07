@@ -1,3 +1,4 @@
+import '../widgets/micro_feedback.dart';
 import 'package:flutter/services.dart';
 import '../services/payment_reminder.dart';
 import '../services/money_input.dart';
@@ -162,6 +163,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
   // ================= PAIEMENT =================
 
   Future<void> payer(int venteId, double resteVente) async {
+    final confirmationCue = Object();
     if(isPaying) return;
     if(!await TerrainEntryGate.allowClassic(context,api,{'cash.create'}) || !mounted) return;
     final controller = TextEditingController();
@@ -304,6 +306,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
 
                           if (!mounted) return;
 
+                          if (api.lastOperationMessage == null) {
+                            MicroFeedback.confirmed(this.context, operation: confirmationCue);
+                          }
                           isPaying=false;
                           Navigator.pop(context);
 
