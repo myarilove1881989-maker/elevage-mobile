@@ -39,6 +39,8 @@ La recette historique 117 → 118 confirme le remplacement sans désinstallation
 
 La compilation native et une ouverture réelle du navigateur sur Android restent à vérifier avec le prochain candidat. Les tests Flutter avec canal natif simulé ne remplacent pas cette qualification. Le binaire 118 signé public reste inchangé.
 
+Contrôle Chrome final avec le lanceur du projet : trois tests réussis, deux cas réservés à Android ignorés. Le test Web simule aussi la plateforme Android et vérifie qu’aucun appel de recherche de version n’a lieu et qu’aucune annonce ne paraît. Le moteur graphique exact est servi localement et les requêtes externes sont bloquées par le lanceur. Après correction du cas numérique portable (118.5 est non entier sur toutes les plateformes), la relance native confirme encore six tests réussis et un cas Web ignoré.
+
 Backend : branche GitHub `codex/android-users-compatibility-20261027` toujours à `c14f4899c06087508aa4ba7604de35decc74f94a`, cohérente avec la référence historique. La sélection de l’espace Render reste nécessaire pour confirmer le déploiement actuellement servi ; ne pas confondre branche GitHub et état de production. `master` Flutter et `main` backend sont des branches anciennes et ne doivent pas être supposées être les sources actuellement déployées.
 
 ## Publication et retour arrière

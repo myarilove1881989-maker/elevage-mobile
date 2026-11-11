@@ -34,7 +34,7 @@ void main() {
       for (final change in <Map<String, Object>>[
         {'published': false},
         {'versionCode': '118'},
-        {'versionCode': 118.0},
+        {'versionCode': 118.5},
         {'applicationId': 'other.app'},
         {'schemaVersion': 2},
         {'downloadUrl': 'https://example.com/app.apk'},
