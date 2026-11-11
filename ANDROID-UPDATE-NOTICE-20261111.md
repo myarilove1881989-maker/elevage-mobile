@@ -41,10 +41,14 @@ La compilation native et une ouverture réelle du navigateur sur Android restent
 
 Contrôle Chrome final avec le lanceur du projet : trois tests réussis, deux cas réservés à Android ignorés. Le test Web simule aussi la plateforme Android et vérifie qu’aucun appel de recherche de version n’a lieu et qu’aucune annonce ne paraît. Le moteur graphique exact est servi localement et les requêtes externes sont bloquées par le lanceur. Après correction du cas numérique portable (118.5 est non entier sur toutes les plateformes), la relance native confirme encore six tests réussis et un cas Web ignoré.
 
-Backend : branche GitHub `codex/android-users-compatibility-20261027` toujours à `c14f4899c06087508aa4ba7604de35decc74f94a`, cohérente avec la référence historique. La sélection de l’espace Render reste nécessaire pour confirmer le déploiement actuellement servi ; ne pas confondre branche GitHub et état de production. `master` Flutter et `main` backend sont des branches anciennes et ne doivent pas être supposées être les sources actuellement déployées.
+La vérification des déploiements est consignée dans le rapport local. Aucune configuration ni aucun déploiement backend ou Web modifié par cette mission.
 
 ## Publication et retour arrière
 
 Aucun changement du manifeste public, de la page officielle, des branches de production, de Render, des migrations ou de la base de production. Aucun envoi utilisateur. Une proposition locale rétablit l’avertissement de test de la page ; elle n’est pas publiée.
 
 Pour le prochain candidat : désactiver l’annonce en conservant une version publiée inférieure ou égale, ou `published:false`, sans toucher aux données. Vérifier d’abord le binaire téléchargeable, puis seulement publier son manifeste après accord. Sur Android, corriger avec un build supérieur ; aucune désinstallation, rétrogradation ou restauration d’ancienne base. Une page restaurée n’annule pas les installations déjà faites.
+
+## Revue autorisée
+
+L’utilisateur a autorisé l’envoi public de cette branche et de son rapport pour revue uniquement, sans fusion ni déploiement. Les détails opérationnels de la vérification Render restent dans le rapport local. Aucune nouvelle APK ni annonce générale publiée.
