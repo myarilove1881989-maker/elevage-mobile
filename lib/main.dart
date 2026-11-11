@@ -1,4 +1,5 @@
 import 'widgets/mutation_refresh.dart';
+import 'widgets/android_update_notice.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -225,7 +226,7 @@ class _ElevageAppState extends State<ElevageApp> {
                     Expanded(child: child!),
                   ],
                 )
-              : child!,
+              : AndroidUpdateNotice(child: child!),
         ),
         home: !widget.startFarmer && ApiService.token != null
             ? DashboardScreen(apiService: widget.apiService)

@@ -20,6 +20,16 @@ class MainActivity : FlutterActivity() {
     }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "elevage/app_version")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "versionCode") {
+                    // Read the installed APK, never pubspec or a cached preference.
+                    val info = packageManager.getPackageInfo(packageName, 0)
+                    val code = if (android.os.Build.VERSION.SDK_INT >= 28)
+                        info.longVersionCode else info.versionCode.toLong()
+                    result.success(code.toString())
+                } else result.notImplemented()
+            }
         val identity = DeviceIdentity(applicationContext)
         connectivity = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "elevage/network_state")
