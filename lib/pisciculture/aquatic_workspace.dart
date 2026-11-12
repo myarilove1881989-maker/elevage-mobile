@@ -5,6 +5,7 @@ import '../theme/design_system_v2.dart';
 import '../services/api_service.dart';
 import 'aquatic_service.dart';
 import 'aquatic_forms.dart';
+import 'observation_panel.dart';
 
 class AquaticWorkspace extends StatefulWidget {
   const AquaticWorkspace({
@@ -280,6 +281,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       'installations': 'Installations',
                       'cohorts': 'Cohortes',
                       'history': 'Historique',
+                      'weights': 'Pesées',
+                      'water': 'Eau',
+                      'rules': 'Règles',
                     }.entries)
                       OutlinedButton(
                         onPressed: () => setState(() => page = p.key),
@@ -461,6 +465,21 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                 ],
+                if (['weights', 'water', 'rules'].contains(page))
+                  ObservationPanel(
+                    key: ValueKey(page),
+                    service: widget.service,
+                    kind: page == 'weights'
+                        ? 'WEIGHT'
+                        : page == 'water'
+                        ? 'WATER'
+                        : 'RULE',
+                    rights: List<String>.from(
+                      widget.capabilities['write'] as List? ?? [],
+                    ),
+                    installations: installations,
+                    cohorts: cohorts,
+                  ),
                 if (page == 'history') ...[
                   const Text(
                     'Affectations et transferts — historique conservé',
@@ -470,7 +489,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   for (final row in events)
                     Card(
                       child: ListTile(
-                        title: Text('${label(row['type'])} · ${row['reason']}'),
+                        title: Text(
+                          '${label(row['type'])} · ${row['reason']}',
+                        ),
                         subtitle: Text(
                           '${date(row['occurred_at'])}\nAuteur : ${row['actor_name'] ?? 'Utilisateur ${row['actor']}'}\n${eventLines(row['lines'])}',
                         ),
@@ -517,7 +538,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       Text('${cohort['name']} : ${p['gross_count']} poissons'),
               ],
               const SizedBox(height: 12),
-              const Text('Biomasse, eau et alimentation : Non disponible.'),
+              const Text(
+                'Pesées et eau : historiques dans les onglets dédiés. Alimentation : phase suivante.',
+              ),
             ],
           ),
         ),
