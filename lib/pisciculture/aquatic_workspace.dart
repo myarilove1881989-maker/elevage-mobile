@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import 'aquatic_service.dart';
 import 'aquatic_forms.dart';
 import 'observation_panel.dart';
+import 'stock_panel.dart';
 
 class AquaticWorkspace extends StatefulWidget {
   const AquaticWorkspace({
@@ -238,17 +239,41 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
   );
   Widget metric(String name, String title, IconData icon) {
     final value = (dashboard?['metrics'] as Map?)?[name] as Map?;
+    final uncertain = value?['quality'] == 'UNRECONCILED';
     return SizedBox(
       width: 280,
-      height: 180 + (MediaQuery.textScalerOf(context).scale(16) / 16 - 1) * 100,
-      child: DashboardKpiCard(
-        title: title,
-        icon: icon,
-        color: V2Colors.green,
-        content: Text(
-          value?['value']?.toString() ?? 'Non disponible',
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height:
+                180 +
+                (MediaQuery.textScalerOf(context).scale(16) / 16 - 1) * 100,
+            child: DashboardKpiCard(
+              title: title,
+              icon: icon,
+              color: V2Colors.green,
+              content: Text(
+                value?['value']?.toString() ?? 'Non disponible',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          if (uncertain) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'Brut non rapproché',
+              style: TextStyle(fontSize: 14, color: V2Colors.navy),
+            ),
+            Text(
+              'Plage ${value?['lower']} à ${value?['upper']}',
+              style: const TextStyle(fontSize: 14, color: V2Colors.navy),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -284,6 +309,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       'weights': 'Pesées',
                       'water': 'Eau',
                       'rules': 'Règles',
+                      'stock': 'Pertes et inventaires',
                     }.entries)
                       OutlinedButton(
                         onPressed: () => setState(() => page = p.key),
@@ -355,6 +381,10 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                         ),
                       ],
                     ),
+                  if (dashboard?['unassigned_losses'] != null)
+                    Text(
+                      'Pertes à rapprocher : ${dashboard?['unassigned_losses']} · Crédits non affectés : ${dashboard?['unassigned_credits'] ?? 0}',
+                    ),
                   const SizedBox(height: 20),
                   Wrap(
                     spacing: 12,
@@ -395,7 +425,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   for (final row in (dashboard?['by_species'] as List? ?? []))
                     ListTile(
                       title: Text('${row['cohort__species__nom']}'),
-                      trailing: Text('${row['count']} poissons'),
+                      trailing: Text(
+                        '${row['count']} poissons${row['quality'] == 'UNRECONCILED' ? ' (brut non rapproché)' : ''}',
+                      ),
                     ),
                   const Text(
                     'Répartition par installation',
@@ -405,7 +437,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       in (dashboard?['by_installation'] as List? ?? []))
                     ListTile(
                       title: Text('${row['installation__name']}'),
-                      trailing: Text('${row['count']} poissons'),
+                      trailing: Text(
+                        '${row['count']} poissons${row['quality'] == 'UNRECONCILED' ? ' (brut non rapproché)' : ''}',
+                      ),
                     ),
                   const SizedBox(height: 16),
                   const Text(
@@ -465,6 +499,17 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                 ],
+                if (page == 'stock')
+                  StockPanel(
+                    service: widget.service,
+                    owner: widget.capabilities['can_enable'] == true,
+                    rights: List<String>.from(
+                      widget.capabilities['write'] as List? ?? [],
+                    ),
+                    installations: installations,
+                    cohorts: cohorts,
+                    onChanged: reload,
+                  ),
                 if (['weights', 'water', 'rules'].contains(page))
                   ObservationPanel(
                     key: ValueKey(page),
@@ -489,9 +534,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   for (final row in events)
                     Card(
                       child: ListTile(
-                        title: Text(
-                          '${label(row['type'])} · ${row['reason']}',
-                        ),
+                        title: Text('${label(row['type'])} · ${row['reason']}'),
                         subtitle: Text(
                           '${date(row['occurred_at'])}\nAuteur : ${row['actor_name'] ?? 'Utilisateur ${row['actor']}'}\n${eventLines(row['lines'])}',
                         ),

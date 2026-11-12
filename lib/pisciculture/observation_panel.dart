@@ -217,6 +217,16 @@ class _ObservationPanelState extends State<ObservationPanel> {
                   '${name(row['cohort'] ?? row['installation'] ?? row['system_code'] ?? row['scope'])} · ${row['occurred_at'] ?? row['valid_from']}',
                 ),
                 if (widget.kind == 'WEIGHT') ...[
+                  if (row['current_effectif_quality'] != null &&
+                      row['current_effectif_quality'] != 'EXACT')
+                    const Text(
+                      'Effectif actuel incertain : cette estimation historique ne doit pas être utilisée comme biomasse actuelle.',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  if (row['current_reference_changed'] == true)
+                    const Text(
+                      'La référence d’effectif a changé depuis cette pesée.',
+                    ),
                   Text('Poids moyen : ${row['result']['mean_g']['decimal']} g'),
                   Text(
                     'Biomasse estimée : ${row['result']['biomass_kg']?['decimal'] ?? 'Indisponible — effectif non rapproché'}${row['result']['biomass_kg'] == null ? '' : ' kg'}',
