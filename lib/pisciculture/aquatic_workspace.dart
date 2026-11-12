@@ -7,6 +7,7 @@ import 'aquatic_service.dart';
 import 'aquatic_forms.dart';
 import 'observation_panel.dart';
 import 'stock_panel.dart';
+import 'feeding_panel.dart';
 
 class AquaticWorkspace extends StatefulWidget {
   const AquaticWorkspace({
@@ -310,6 +311,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       'water': 'Eau',
                       'rules': 'Règles',
                       'stock': 'Pertes et inventaires',
+                      'feeding': 'Alimentation',
                     }.entries)
                       OutlinedButton(
                         onPressed: () => setState(() => page = p.key),
@@ -442,8 +444,14 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                   const SizedBox(height: 16),
+                  if (dashboard?['feeding_unavailable_reason'] != null)
+                    const Text(
+                      'Alimentation par espèce : Données insuffisantes. Consultez les distributions par bassin ou cohorte dans Alimentation.',
+                    ),
+                  if (dashboard?['feeding_overview'] is Map)
+                    feedingOverview(dashboard!['feeding_overview'] as Map),
                   const Text(
-                    'Biomasse · Alimentation · Eau · Mortalités · Récoltes · Finances : Non disponible (phases suivantes).',
+                    'Récoltes et finances piscicoles : Non disponible (phases suivantes).',
                   ),
                 ],
                 if (page == 'installations') ...[
@@ -499,6 +507,17 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                 ],
+                if (page == 'feeding')
+                  FeedingPanel(
+                    service: widget.service,
+                    owner: widget.capabilities['can_enable'] == true,
+                    rights: List<String>.from(
+                      widget.capabilities['write'] as List? ?? [],
+                    ),
+                    installations: installations,
+                    cohorts: cohorts,
+                    onChanged: reload,
+                  ),
                 if (page == 'stock')
                   StockPanel(
                     service: widget.service,
@@ -582,7 +601,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
               ],
               const SizedBox(height: 12),
               const Text(
-                'Pesées et eau : historiques dans les onglets dédiés. Alimentation : phase suivante.',
+                'Pesées et eau : historiques dans les onglets dédiés. Alimentation : stock et distributions dans l’onglet dédié.',
               ),
             ],
           ),
