@@ -1,4 +1,7 @@
 import '../widgets/v2_components.dart';
+import '../pisciculture/aquatic_workspace.dart';
+import '../pisciculture/aquatic_service.dart';
+import '../pisciculture/activity_selector.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'dart:async';
@@ -56,6 +59,28 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<DashboardScreen> {
+  bool _aquatic=false;
+  Map<String,dynamic>? _aquaticCapabilities;
+  final _aquaticKey=GlobalKey<AquaticWorkspaceState>();
+  Future<void> _loadAquaticCapabilities() async {
+    final identity=ApiService.sessionIdentity;
+    try{
+      final result=await AquaticService(apiService).read('capabilities/');
+      if(mounted&&identity==ApiService.sessionIdentity)setState(()=>_aquaticCapabilities=result);
+    }catch(_){if(mounted&&identity==ApiService.sessionIdentity)setState((){_aquaticCapabilities=null;_aquatic=false;});}
+  }
+  Future<void> _selectActivity(bool aquatic) async {
+    if(!aquatic){setState(()=>_aquatic=false);return;}
+    if(_aquaticCapabilities?['enabled']!=true){
+      final confirm=await showDialog<bool>(context:context,builder:(c)=>V2AlertDialog(title:const Text('Activer la Pisciculture ?'),
+        content:const Text('Active cet espace pour votre exploitation sans modifier les lots ni les données d’élevage.'),
+        actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('Annuler')),ElevatedButton(onPressed:()=>Navigator.pop(c,true),child:const Text('Activer'))]));
+      if(confirm!=true)return;
+      try{final service=AquaticService(apiService);await service.send('activation/',service.command({'enabled':true}));await _loadAquaticCapabilities();}
+      catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Activation non confirmée. Vérifiez la connexion et actualisez avant de réessayer.')));return;}
+    }
+    if(mounted&&_aquaticCapabilities?['enabled']==true)setState(()=>_aquatic=true);
+  }
   @override
   Future<void> refreshAfterMutation() async { await _reload(includeTasks: true); }
   late ApiService apiService;
@@ -223,6 +248,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
       :ServerConnection(baseUrl:ApiService.baseUrl,check:apiService.probeServer);
     if(apiService is! FarmerApiService) serverConnection.start();
     _loadCommonSession();
+    _loadAquaticCapabilities();
     loadUsername();
     initData();
   }
@@ -757,9 +783,18 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     FarmDestination.billing:_openClients,FarmDestination.history:_openHistory,FarmDestination.agenda:_showAgenda,
     FarmDestination.settings:_openSettings,FarmDestination.tutorial:_chooseTutorialLanguage,FarmDestination.logout:_logout};
   FarmSession? get _navigationSession=>commonSessionToken==ApiService.sessionIdentity?commonSession:null;
+  Map<FarmDestination,VoidCallback> get _workspaceNavigationActions=>_aquatic?{
+    ..._navigationActions,
+    FarmDestination.lots:()=>_aquaticKey.currentState?.showPage('cohorts'),
+    FarmDestination.production:()=>_aquaticKey.currentState?.showDashboard(),
+    FarmDestination.movements:()=>_aquaticKey.currentState?.form('transfer'),
+    FarmDestination.history:()=>_aquaticKey.currentState?.showPage('history'),
+  }:_navigationActions;
   Widget _navigationDrawer()=>Drawer(child:SafeArea(child:ListView(children:[
     Container(color:const Color(0xFF063B63),padding:const EdgeInsets.all(20),child:_brandTitle()),
-    FarmNavigation(session:_navigationSession,actions:_navigationActions,beforeNavigate:()=>Navigator.pop(context)),
+    if(_aquatic)ListTile(leading:const Icon(Icons.pool),title:const Text('Installations'),onTap:(){Navigator.pop(context);_aquaticKey.currentState?.showPage('installations');}),
+    FarmNavigation(session:_navigationSession,actions:_workspaceNavigationActions,
+      labels:_aquatic?{FarmDestination.lots:'Cohortes'}:const {},beforeNavigate:()=>Navigator.pop(context)),
   ])));
 
   @override
@@ -777,9 +812,20 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
     return V2Scaffold(isDashboard:true,
       drawer: _navigationDrawer(),
-      appBar: FarmTopBar(actions:_navigationActions,session:_navigationSession,connection:_connectionIndicator(),
-        onRefresh:isLoading?null:_refreshAll,onLogout:_logout),
-      body: LayoutBuilder(builder: (context, constraints) => Column(children: [
+      appBar: FarmTopBar(actions:_workspaceNavigationActions,
+        session:_navigationSession,connection:_connectionIndicator(),
+        onRefresh:_aquatic?()=>_aquaticKey.currentState?.reload():isLoading?null:_refreshAll,onLogout:_logout),
+      body:_aquatic?Column(children:[
+        ActivitySelector(aquatic:true,onSelect:_selectActivity),
+        Expanded(child:AquaticWorkspace(key:_aquaticKey,service:AquaticService(apiService),capabilities:_aquaticCapabilities!)),
+      ]):_terrestrialBody(kpis,filteredLots),
+    );
+  }
+
+  Widget _terrestrialBody(dynamic kpis,List filteredLots) =>
+      LayoutBuilder(builder: (context, constraints) => Column(children: [
+        if(_aquaticCapabilities?['can_enable']==true||(_aquaticCapabilities?['read'] as List? ?? []).contains('aquatic.read'))
+          ActivitySelector(aquatic:false,onSelect:_selectActivity),
         if(apiService is FarmerApiService && (apiService as FarmerApiService).runtime.warning!=null)
           Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),
             color:const Color(0xFFFFF4DF),child:Text((apiService as FarmerApiService).runtime.warning!,
@@ -1468,7 +1514,5 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
           ),
         ),
       )),
-      ])),
-    );
-  }
+      ]));
 }

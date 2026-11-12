@@ -232,7 +232,9 @@ class ApiService {
         }
 
         if (data.containsKey("error")) {
-          return await Future.error(ApiHttpException(response.statusCode, data["error"]));
+          final error=data['error'];
+          return await Future.error(ApiHttpException(response.statusCode,
+            error is Map ? '${error['message']??error['code']??'Erreur API'}' : error.toString()));
         }
 
         if (data.containsKey("errors")) {
@@ -405,6 +407,13 @@ class ApiService {
   Future<dynamic> patch(String endpoint, Map<String,dynamic> data) async {
     final response=await _client.patch(Uri.parse('$baseUrl${endpoint.startsWith('/')?'':'/'}$endpoint'),
       headers:_headers(),body:jsonEncode(data));
+    return _handleResponse(response);
+  }
+
+  /// Conditional update for additive online resources; same authenticated client.
+  Future<dynamic> patchWithVersion(String endpoint, Map<String,dynamic> data, String etag) async {
+    final response=await _client.patch(Uri.parse('$baseUrl$endpoint'),
+      headers:{..._headers(),'If-Match':etag},body:jsonEncode(data));
     return _handleResponse(response);
   }
 

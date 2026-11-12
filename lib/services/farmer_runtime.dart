@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 
 import '../offline/tablet_controller.dart';
+import '../offline/device_identity.dart' show deviceProofHeaders;
 
 import '../offline/foundation_api.dart';
 
@@ -807,7 +808,7 @@ class FarmerRuntime extends ChangeNotifier {
 
     final canCache=request.method=='GET' && snapshot!=null && current?.credentialVersion!=null &&
 
-      !RegExp(r'(token|password|devices|memberships|capabilities|audit)').hasMatch(path);
+      !RegExp(r'(token|password|devices|memberships|capabilities|audit|pisciculture)').hasMatch(path);
 
     if(connection.available!=false || !prepared) {
 
@@ -816,6 +817,21 @@ class FarmerRuntime extends ChangeNotifier {
         await _checkOnline();check();
 
         request.headers['Authorization']='Bearer ${tablet.api.personal!.access}';
+
+        // New aquatic actions are online-only and retain the primary-device
+        // proof when the farm's existing offline security policy requires it.
+        if(endpoint.startsWith('/pisciculture/v1/') && request.method!='GET' &&
+            _onlineCaps?['offline_policy_enabled']==true && tablet.api.personal?.role=='OPERATEUR') {
+          final device=_onlineCaps?['primary_device'] as Map?;
+          if(device==null || request is! http.Request)throw StateError('Tablette principale active requise.');
+          final challenge=await tablet.api.request('POST','/devices/challenge/',data:{'device_id':device['id'],'purpose':'WRITE'});
+          check();
+          request.headers.addAll(await deviceProofHeaders(identity:tablet.api.deviceIdentity,
+            challengeId:challenge['id'] as String,deviceId:device['id'] as int,
+            userId:tablet.api.personal!.userId,purpose:'WRITE',method:request.method,
+            pathAndQuery:request.url.path+(request.url.hasQuery?'?${request.url.query}':''),body:request.bodyBytes));
+          check();
+        }
 
         final response=await http.Response.fromStream(await _online.send(request).timeout(const Duration(seconds:5))).timeout(const Duration(seconds:5));
 

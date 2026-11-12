@@ -103,9 +103,11 @@ class FarmTopBar extends StatelessWidget implements PreferredSizeWidget {
         final painter=TextPainter(text:TextSpan(text:text,style:TextStyle(fontFamily:'Roboto',fontSize:size,fontWeight:FontWeight.w600)),textDirection:Directionality.of(context),textScaler:MediaQuery.textScalerOf(context))..layout();
         return painter.width;
       }
-      final requiredWidth=48+labelWidth('Elev’Age',24)+32+88+48+12+labelWidth('Quitter',14)+64+
-        farmHorizontalNavigationOrder.where(visible).fold<double>(0,(sum,d)=>sum+labelWidth(navigationLabel(context,d),16)+54);
-      final wide=box.maxWidth>=1080 && box.maxWidth>=requiredWidth && MediaQuery.textScalerOf(context).scale(16)<=20;
+      final compact=MediaQuery.sizeOf(context).width<1280;
+      final navigationFont=compact?14.0:16.0;
+      final requiredWidth=48+labelWidth('Elev’Age',24)+16+88+48+12+labelWidth('Quitter',14)+48+
+        farmHorizontalNavigationOrder.where(visible).fold<double>(0,(sum,d)=>sum+labelWidth(navigationLabel(context,d),navigationFont)+(compact?42:54));
+      final wide=MediaQuery.sizeOf(context).width>=1080 && box.maxWidth>=requiredWidth && MediaQuery.textScalerOf(context).scale(16)<=20;
       final showBrand=box.maxWidth>=600;
       return Row(children:[
         IconButton(tooltip:AppLocalizations.of(context).languageCode=='en'?'Open menu':'Ouvrir le menu',icon:const Icon(Icons.menu),onPressed:()=>Scaffold.of(context).openDrawer()),
@@ -113,8 +115,8 @@ class FarmTopBar extends StatelessWidget implements PreferredSizeWidget {
           TextSpan(text:'Elev’',style:TextStyle(color:Colors.white)),TextSpan(text:'Age',style:TextStyle(color:Color(0xFF4CAF50)))]),style:TextStyle(fontSize:24,fontWeight:FontWeight.bold))),
         if(wide)...[const Spacer(),for(final d in farmHorizontalNavigationOrder)if(visible(d))TextButton.icon(
           key:d==FarmDestination.production?const Key('topProductionTrackingButton'):ValueKey('navigation-${d.name}-horizontal'),
-          style:TextButton.styleFrom(foregroundColor:Colors.white,padding:const EdgeInsets.symmetric(horizontal:12),textStyle:const TextStyle(fontFamily:'Roboto',fontSize:16,fontWeight:FontWeight.w600)),
-          onPressed:actions[d],icon:Icon(farmDestinationIcons[d],size:22),label:Text(navigationLabel(context,d)))],
+          style:TextButton.styleFrom(foregroundColor:Colors.white,padding:EdgeInsets.symmetric(horizontal:compact?6:12),textStyle:TextStyle(fontFamily:'Roboto',fontSize:navigationFont,fontWeight:FontWeight.w600)),
+          onPressed:actions[d],icon:Icon(farmDestinationIcons[d],size:compact?18:22),label:Text(navigationLabel(context,d)))],
         const Spacer(),connection,
         IconButton(tooltip:AppLocalizations.of(context).languageCode=='en'?'Refresh':'Actualiser',onPressed:onRefresh,icon:const Icon(Icons.refresh)),
         const SizedBox(height:32,child:VerticalDivider(color:Colors.white70,width:12)),

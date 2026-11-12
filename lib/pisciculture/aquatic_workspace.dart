@@ -1,0 +1,533 @@
+import 'package:flutter/material.dart';
+import '../widgets/v2_components.dart';
+import '../widgets/dashboard_kpi_card.dart';
+import '../theme/design_system_v2.dart';
+import '../services/api_service.dart';
+import 'aquatic_service.dart';
+import 'aquatic_forms.dart';
+
+class AquaticWorkspace extends StatefulWidget {
+  const AquaticWorkspace({
+    super.key,
+    required this.service,
+    required this.capabilities,
+    this.onReturn,
+  });
+  final AquaticService service;
+  final Map<String, dynamic> capabilities;
+  final VoidCallback? onReturn;
+  @override
+  State<AquaticWorkspace> createState() => AquaticWorkspaceState();
+}
+
+class AquaticWorkspaceState extends State<AquaticWorkspace> {
+  void showDashboard() {
+    setState(() => page = 'dashboard');
+    reload();
+  }
+
+  void showPage(String destination) {
+    setState(() => page = destination);
+  }
+
+  int generation = 0;
+  bool loading = true;
+  String? error;
+  Map<String, dynamic>? dashboard;
+  List<Map<String, dynamic>> installations = [],
+      cohorts = [],
+      species = [],
+      events = [];
+  String page = 'dashboard';
+  String? speciesFilter, installationFilter, cohortFilter;
+  bool allows(String right) =>
+      (widget.capabilities['write'] as List? ?? const []).contains(right);
+  String label(dynamic value) =>
+      {
+        'ACTIVE': 'Actif',
+        'INACTIVE': 'Inactif',
+        'OPEN': 'En cours',
+        'CLOSED': 'Clôturée',
+        'INITIAL': 'Affectation initiale',
+        'TRANSFER': 'Transfert',
+        'PURCHASE': 'Achat déclaré',
+        'HATCH': 'Alevinage',
+        'TRANSFER_IN': 'Origine externe',
+        'OTHER': 'Autre',
+        'BASSIN': 'Bassin',
+        'ETANG': 'Étang',
+        'CAGE': 'Cage',
+        'BAC': 'Bac',
+      }[value] ??
+      '$value';
+  String date(dynamic value) {
+    final parsed = DateTime.tryParse('$value');
+    return parsed == null
+        ? '$value'
+        : parsed.toLocal().toString().substring(0, 16);
+  }
+
+  String installationName(dynamic id) =>
+      installations
+          .where((i) => i['id'] == id)
+          .map((i) => '${i['name']}')
+          .firstOrNull ??
+      'Installation';
+  String eventLines(dynamic value) => (value as List? ?? [])
+      .map(
+        (line) =>
+            '${line['delta_count'] > 0 ? '+' : ''}${line['delta_count']} poissons · ${installationName(line['installation'])}',
+      )
+      .join('\n');
+  @override
+  void initState() {
+    super.initState();
+    reload();
+  }
+
+  @override
+  void dispose() {
+    generation++;
+    super.dispose();
+  }
+
+  Future<void> reload() async {
+    final epoch = ++generation;
+    final identity = ApiService.sessionIdentity;
+    setState(() {
+      loading = true;
+      error = null;
+      dashboard = null;
+    });
+    try {
+      final parts = <String, String>{
+        'species': ?speciesFilter,
+        'installation': ?installationFilter,
+        'cohort': ?cohortFilter,
+      };
+      final query = Uri(queryParameters: parts).query;
+      final result = await Future.wait<dynamic>([
+        widget.service.read('dashboard/${query.isEmpty ? '' : '?$query'}'),
+        widget.service.list('installations/'),
+        widget.service.list('cohorts/'),
+        widget.service.list('species/'),
+        widget.service.list('events/'),
+      ]);
+      if (!mounted ||
+          generation != epoch ||
+          identity != ApiService.sessionIdentity) {
+        return;
+      }
+      setState(() {
+        dashboard = result[0] as Map<String, dynamic>;
+        installations = result[1] as List<Map<String, dynamic>>;
+        cohorts = result[2] as List<Map<String, dynamic>>;
+        species = result[3] as List<Map<String, dynamic>>;
+        events = result[4] as List<Map<String, dynamic>>;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted ||
+          generation != epoch ||
+          identity != ApiService.sessionIdentity) {
+        return;
+      }
+      setState(() {
+        loading = false;
+        if (e is ApiHttpException && (e.status == 401 || e.status == 403)) {
+          installations = [];
+          cohorts = [];
+          species = [];
+          events = [];
+          speciesFilter = null;
+          installationFilter = null;
+          cohortFilter = null;
+        }
+        error = e is ApiHttpException
+            ? 'Accès ou données refusés : ${e.message}'
+            : 'Connexion indisponible. Aucune nouvelle opération piscicole ne peut être enregistrée hors ligne.';
+      });
+    }
+  }
+
+  Future<void> form(String kind, {Map<String, dynamic>? entity}) async {
+    if (loading || error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Actualisez les données avec une connexion avant cette opération.',
+          ),
+        ),
+      );
+      return;
+    }
+    final permission = kind == 'installation'
+        ? 'aquatic.installations.manage'
+        : kind == 'transfer'
+        ? 'aquatic.transfers.create'
+        : 'aquatic.cohorts.manage';
+    if (!allows(permission) ||
+        (kind == 'onboarding' && !allows('aquatic.installations.manage'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Cette opération n’est pas autorisée pour votre compte.',
+          ),
+        ),
+      );
+      return;
+    }
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AquaticForm(
+          service: widget.service,
+          kind: kind,
+          installations: installations,
+          cohorts: cohorts,
+          species: species,
+          entity: entity,
+        ),
+      ),
+    );
+    if (changed == true && mounted) await reload();
+  }
+
+  Widget action(String text, String kind, String permission) => OutlinedButton(
+    onPressed:
+        allows(permission) &&
+            (kind != 'onboarding' || allows('aquatic.installations.manage')) &&
+            error == null &&
+            !loading
+        ? () => form(kind)
+        : null,
+    child: Text(text),
+  );
+  Widget picker(
+    String label,
+    String? selected,
+    List<Map<String, dynamic>> rows,
+    String valueKey,
+    ValueChanged<String?> change,
+  ) => SizedBox(
+    width: 260,
+    child: DropdownButtonFormField<String>(
+      key: ValueKey('$label:$selected'),
+      initialValue: selected,
+      decoration: V2InputDecoration(labelText: label),
+      isExpanded: true,
+      items: [
+        const DropdownMenuItem<String>(value: null, child: Text('Tous')),
+        ...rows.map(
+          (r) => DropdownMenuItem(
+            value: '${r[valueKey]}',
+            child: Text(
+              '${r['name'] ?? r['code']}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ],
+      onChanged: loading
+          ? null
+          : (value) {
+              change(value);
+              reload();
+            },
+    ),
+  );
+  Widget metric(String name, String title, IconData icon) {
+    final value = (dashboard?['metrics'] as Map?)?[name] as Map?;
+    return SizedBox(
+      width: 280,
+      height: 180 + (MediaQuery.textScalerOf(context).scale(16) / 16 - 1) * 100,
+      child: DashboardKpiCard(
+        title: title,
+        icon: icon,
+        color: V2Colors.green,
+        content: Text(
+          value?['value']?.toString() ?? 'Non disponible',
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      if (loading) const LinearProgressIndicator(),
+      Expanded(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pisciculture',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const Text(
+                  'Effectifs aquatiques séparés de l’élevage terrestre. Nouvelles opérations en ligne uniquement.',
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final p in {
+                      'dashboard': 'Tableau de bord',
+                      'installations': 'Installations',
+                      'cohorts': 'Cohortes',
+                      'history': 'Historique',
+                    }.entries)
+                      OutlinedButton(
+                        onPressed: () => setState(() => page = p.key),
+                        child: Text(p.value),
+                      ),
+                    IconButton(
+                      onPressed: reload,
+                      tooltip: 'Actualiser',
+                      icon: const Icon(Icons.refresh),
+                    ),
+                  ],
+                ),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error!,
+                        style: const TextStyle(color: Colors.deepOrange),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
+                if (page == 'dashboard') ...[
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 20,
+                    children: [
+                      picker(
+                        'Espèce',
+                        speciesFilter,
+                        species,
+                        'species',
+                        (v) => speciesFilter = v,
+                      ),
+                      picker(
+                        'Installation',
+                        installationFilter,
+                        installations,
+                        'id',
+                        (v) => installationFilter = v,
+                      ),
+                      picker(
+                        'Cohorte',
+                        cohortFilter,
+                        cohorts,
+                        'id',
+                        (v) => cohortFilter = v,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  if (dashboard != null)
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        metric('live_count', 'Poissons vivants', Icons.water),
+                        metric(
+                          'active_installations',
+                          'Installations actives',
+                          Icons.pool,
+                        ),
+                        metric(
+                          'active_cohorts',
+                          'Cohortes actives',
+                          Icons.layers,
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      action(
+                        'Premier démarrage',
+                        'onboarding',
+                        'aquatic.cohorts.manage',
+                      ),
+                      action(
+                        'Créer une installation',
+                        'installation',
+                        'aquatic.installations.manage',
+                      ),
+                      action(
+                        'Créer une cohorte',
+                        'cohort',
+                        'aquatic.cohorts.manage',
+                      ),
+                      action(
+                        'Transférer des poissons',
+                        'transfer',
+                        'aquatic.transfers.create',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  if (cohorts.isEmpty && !loading)
+                    const Text(
+                      'Aucune cohorte. Commencez par une installation, une espèce et sa première affectation.',
+                    ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Répartition par espèce',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  for (final row in (dashboard?['by_species'] as List? ?? []))
+                    ListTile(
+                      title: Text('${row['cohort__species__nom']}'),
+                      trailing: Text('${row['count']} poissons'),
+                    ),
+                  const Text(
+                    'Répartition par installation',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  for (final row
+                      in (dashboard?['by_installation'] as List? ?? []))
+                    ListTile(
+                      title: Text('${row['installation__name']}'),
+                      trailing: Text('${row['count']} poissons'),
+                    ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Biomasse · Alimentation · Eau · Mortalités · Récoltes · Finances : Non disponible (phases suivantes).',
+                  ),
+                ],
+                if (page == 'installations') ...[
+                  action(
+                    'Créer une installation',
+                    'installation',
+                    'aquatic.installations.manage',
+                  ),
+                  if (installations.isEmpty && !loading)
+                    const Text('Aucune installation.'),
+                  for (final row in installations)
+                    Card(
+                      child: ListTile(
+                        title: Text('${row['name']} · ${row['code']}'),
+                        subtitle: Text(
+                          '${label(row['type'])} · ${label(row['status'])}\nCapacité : ${row['capacity'] ?? 'Non renseignée'} ${row['capacity_unit'] ?? ''}\n${row['location'] ?? ''}',
+                        ),
+                        isThreeLine: true,
+                        onTap: () => detail('installation', row),
+                        trailing: IconButton(
+                          tooltip: 'Modifier',
+                          onPressed: allows('aquatic.installations.manage')
+                              ? () => form('installation', entity: row)
+                              : null,
+                          icon: const Icon(Icons.edit),
+                        ),
+                      ),
+                    ),
+                ],
+                if (page == 'cohorts') ...[
+                  action(
+                    'Créer une cohorte',
+                    'cohort',
+                    'aquatic.cohorts.manage',
+                  ),
+                  if (cohorts.isEmpty && !loading)
+                    const Text('Aucune cohorte.'),
+                  for (final row in cohorts)
+                    Card(
+                      child: ListTile(
+                        title: Text('${row['name']} · ${row['code']}'),
+                        subtitle: Text(
+                          '${row['gross_count']} poissons · ${label(row['status'])}',
+                        ),
+                        onTap: () => detail('cohort', row),
+                        trailing: IconButton(
+                          tooltip: 'Modifier',
+                          onPressed: allows('aquatic.cohorts.manage')
+                              ? () => form('cohort_edit', entity: row)
+                              : null,
+                          icon: const Icon(Icons.edit),
+                        ),
+                      ),
+                    ),
+                ],
+                if (page == 'history') ...[
+                  const Text(
+                    'Affectations et transferts — historique conservé',
+                  ),
+                  if (events.isEmpty && !loading)
+                    const Text('Aucun événement.'),
+                  for (final row in events)
+                    Card(
+                      child: ListTile(
+                        title: Text('${label(row['type'])} · ${row['reason']}'),
+                        subtitle: Text(
+                          '${date(row['occurred_at'])}\nAuteur : ${row['actor_name'] ?? 'Utilisateur ${row['actor']}'}\n${eventLines(row['lines'])}',
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+  Future<void> detail(String kind, Map<String, dynamic> row) async {
+    await showDialog<void>(
+      context: context,
+      builder: (c) => V2AlertDialog(
+        title: Text('${row['name']}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Code : ${row['code']} · Statut : ${label(row['status'])}'),
+              if (kind == 'cohort') ...[
+                Text(
+                  'Origine : ${label((row['origin'] as Map)['type'])} · Début : ${date(row['started_at'])}',
+                ),
+                Text(
+                  'Espèce : ${row['species_name'] ?? species.where((s) => s['species'] == row['species']).map((s) => s['name']).firstOrNull ?? 'Non renseignée'} · Stade : ${row['stage_name'] ?? 'Non renseigné'}',
+                ),
+                Text('Effectif total : ${row['gross_count']} poissons'),
+                for (final p in row['positions'] as List)
+                  Text(
+                    '${installations.where((i) => i['id'] == p['installation']).map((i) => i['name']).firstOrNull ?? p['installation']} : ${p['gross_count']} poissons · disponibles ${p['available_count']}',
+                  ),
+              ] else ...[
+                Text(
+                  'Type : ${label(row['type'])} · Localisation : ${row['location']}',
+                ),
+                for (final cohort in cohorts)
+                  for (final p in cohort['positions'] as List)
+                    if (p['installation'] == row['id'])
+                      Text('${cohort['name']} : ${p['gross_count']} poissons'),
+              ],
+              const SizedBox(height: 12),
+              const Text('Biomasse, eau et alimentation : Non disponible.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+}
