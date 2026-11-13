@@ -8,6 +8,7 @@ import 'aquatic_forms.dart';
 import 'observation_panel.dart';
 import 'stock_panel.dart';
 import 'feeding_panel.dart';
+import 'health_panel.dart';
 
 class AquaticWorkspace extends StatefulWidget {
   const AquaticWorkspace({
@@ -42,6 +43,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
       species = [],
       events = [];
   String page = 'dashboard';
+  String? healthInstallation, healthCohort, healthAction;
   String? speciesFilter, installationFilter, cohortFilter;
   bool allows(String right) =>
       (widget.capabilities['write'] as List? ?? const []).contains(right);
@@ -312,6 +314,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       'rules': 'Règles',
                       'stock': 'Pertes et inventaires',
                       'feeding': 'Alimentation',
+                      'health': 'Santé',
                     }.entries)
                       OutlinedButton(
                         onPressed: () => setState(() => page = p.key),
@@ -507,6 +510,26 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                 ],
+                if (page == 'health')
+                  HealthPanel(
+                    key: ValueKey(
+                      '$healthInstallation:$healthCohort:$healthAction',
+                    ),
+                    service: widget.service,
+                    owner: widget.capabilities['can_enable'] == true,
+                    rights: List<String>.from(
+                      widget.capabilities['write'] as List? ?? [],
+                    ),
+                    installations: installations,
+                    cohorts: cohorts,
+                    species: [
+                      for (final s in species)
+                        {'id': '${s['species']}', 'name': s['name']},
+                    ],
+                    initialInstallation: healthInstallation,
+                    initialCohort: healthCohort,
+                    initialAction: healthAction,
+                  ),
                 if (page == 'feeding')
                   FeedingPanel(
                     service: widget.service,
@@ -567,6 +590,27 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
       ),
     ],
   );
+  void openHealthFrom(
+    BuildContext dialog,
+    String kind,
+    Map<String, dynamic> row,
+    String? action,
+  ) {
+    Navigator.pop(dialog);
+    setState(() {
+      healthCohort = kind == 'cohort' ? '${row['id']}' : null;
+      healthInstallation = kind == 'cohort' ? null : '${row['id']}';
+      if (kind == 'cohort') {
+        final positions = row['positions'] as List? ?? [];
+        if (positions.length == 1) {
+          healthInstallation = '${positions.first['installation']}';
+        }
+      }
+      healthAction = action;
+      page = 'health';
+    });
+  }
+
   Future<void> detail(String kind, Map<String, dynamic> row) async {
     await showDialog<void>(
       context: context,
@@ -607,6 +651,23 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
           ),
         ),
         actions: [
+          if (allows('aquatic.health.observe'))
+            TextButton.icon(
+              onPressed: () => openHealthFrom(c, kind, row, 'OBSERVATION'),
+              icon: const Icon(Icons.health_and_safety, color: V2Colors.green),
+              label: const Text('Signaler un problème'),
+            ),
+          if (allows('aquatic.health.treat'))
+            TextButton.icon(
+              onPressed: () => openHealthFrom(c, kind, row, 'TREATMENT'),
+              icon: const Icon(Icons.medical_services, color: V2Colors.green),
+              label: const Text('Enregistrer un traitement'),
+            ),
+          TextButton(
+            onPressed: () => openHealthFrom(c, kind, row, 'HISTORY'),
+            child: const Text('Historique sanitaire'),
+          ),
+
           TextButton(
             onPressed: () => Navigator.pop(c),
             child: const Text('Fermer'),
