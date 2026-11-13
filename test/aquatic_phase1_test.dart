@@ -261,7 +261,9 @@ void main() {
           );
         }
         expect(find.text('1000'), findsOneWidget);
-        expect(find.textContaining('Non disponible'), findsOneWidget);
+        expect(find.text('Finances'), findsOneWidget);
+        expect(find.text('Agenda'), findsOneWidget);
+        expect(find.textContaining('Non disponible (phases suivantes)'), findsNothing);
         expect(tester.takeException(), isNull);
         final folder = Platform.environment['ELEVAGE_AQUATIC_PROOF_DIR'];
         if (folder != null && scale == 1)
