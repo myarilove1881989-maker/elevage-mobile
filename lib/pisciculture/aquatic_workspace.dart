@@ -9,6 +9,7 @@ import 'observation_panel.dart';
 import 'stock_panel.dart';
 import 'feeding_panel.dart';
 import 'health_panel.dart';
+import 'breeding_panel.dart';
 
 class AquaticWorkspace extends StatefulWidget {
   const AquaticWorkspace({
@@ -44,11 +45,13 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
       events = [];
   String page = 'dashboard';
   String? healthInstallation, healthCohort, healthAction;
+  String? breedingInstallation, breedingCohort, breedingAction;
   String? speciesFilter, installationFilter, cohortFilter;
   bool allows(String right) =>
       (widget.capabilities['write'] as List? ?? const []).contains(right);
   String label(dynamic value) =>
       {
+        'FRY_REVERSAL': 'Annulation d’entrée d’alevins',
         'ACTIVE': 'Actif',
         'INACTIVE': 'Inactif',
         'OPEN': 'En cours',
@@ -315,6 +318,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       'stock': 'Pertes et inventaires',
                       'feeding': 'Alimentation',
                       'health': 'Santé',
+                      'breeding': 'Reproduction',
                     }.entries)
                       OutlinedButton(
                         onPressed: () => setState(() => page = p.key),
@@ -510,6 +514,27 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                 ],
+                if (page == 'breeding')
+                  BreedingPanel(
+                    key: ValueKey(
+                      '$breedingInstallation:$breedingCohort:$breedingAction',
+                    ),
+                    service: widget.service,
+                    owner: widget.capabilities['can_enable'] == true,
+                    rights: List<String>.from(
+                      widget.capabilities['write'] as List? ?? [],
+                    ),
+                    installations: installations,
+                    cohorts: cohorts,
+                    species: [
+                      for (final s in species)
+                        {'id': '${s['species']}', 'name': s['name']},
+                    ],
+                    initialInstallation: breedingInstallation,
+                    initialCohort: breedingCohort,
+                    initialAction: breedingAction,
+                    onChanged: reload,
+                  ),
                 if (page == 'health')
                   HealthPanel(
                     key: ValueKey(
@@ -611,6 +636,26 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
     });
   }
 
+  void openBreedingFrom(
+    BuildContext dialog,
+    String kind,
+    Map<String, dynamic> row,
+  ) {
+    Navigator.pop(dialog);
+    setState(() {
+      breedingCohort = kind == 'cohort' ? '${row['id']}' : null;
+      breedingInstallation = kind == 'cohort' ? null : '${row['id']}';
+      if (kind == 'cohort') {
+        final positions = row['positions'] as List? ?? [];
+        if (positions.length == 1) {
+          breedingInstallation = '${positions.first['installation']}';
+        }
+      }
+      breedingAction = 'GROUP';
+      page = 'breeding';
+    });
+  }
+
   Future<void> detail(String kind, Map<String, dynamic> row) async {
     await showDialog<void>(
       context: context,
@@ -651,6 +696,12 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
           ),
         ),
         actions: [
+          if (allows('aquatic.breeders.manage'))
+            TextButton.icon(
+              onPressed: () => openBreedingFrom(c, kind, row),
+              icon: const Icon(Icons.groups, color: V2Colors.green),
+              label: const Text('Groupe de géniteurs'),
+            ),
           if (allows('aquatic.health.observe'))
             TextButton.icon(
               onPressed: () => openHealthFrom(c, kind, row, 'OBSERVATION'),
