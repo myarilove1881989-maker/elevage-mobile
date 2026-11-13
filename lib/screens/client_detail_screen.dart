@@ -376,7 +376,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
     ]))),actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Annuler'))]));
     if(sale==null || !mounted)return;
     final text=TextEditingController(text:paymentReminder(customer:widget.nom,
-      description:sale['produit_vendu']=='OEUFS'?'${sale['nombre_oeufs']} œufs (${sale['lot_nom']??'lot'})':'${sale['quantite']} animaux (${sale['lot_nom']??sale['espece_nom']??'lot'})',
+      description:sale['produit_vendu']=='POISSONS'?'${sale['priced_quantity']??'Non renseigné'} ${sale['price_unit']=='KG'?'kg':'poissons'} (${sale['espece']??'Récolte piscicole'})':sale['produit_vendu']=='OEUFS'?'${sale['nombre_oeufs']} œufs (${sale['lot_nom']??'lot'})':'${sale['quantite']} animaux (${sale['lot_nom']??sale['espece_nom']??'lot'})',
       total:sale['montant_total'] as num,paid:sale['montant_paye'] as num? ?? 0,remaining:sale['reste'] as num,
       farm:sale['exploitation_nom']?.toString()??'Mon exploitation'));
     final reminderRoute=DialogRoute<void>(context:context,builder:(dialog)=>V2AlertDialog(title:const Text('Message de relance modifiable'),content:SizedBox(width:600,child:SingleChildScrollView(child:V2Field(child:TextField(key:const Key('payment-reminder'),controller:text,maxLines:14,decoration:const V2InputDecoration(labelText:'Message'))))),actions:[
@@ -687,7 +687,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> with MutationRe
     final quantite = v["quantite"] ?? 0;
     final eggSale = v['produit_vendu'] == 'OEUFS';
     final eggCount = (v['nombre_oeufs'] as num?)?.toInt() ?? 0;
-    final quantityLabel = eggSale
+    final quantityLabel = v['produit_vendu']=='POISSONS' ? '${v['priced_quantity']??'Non renseigné'} ${v['price_unit']=='KG'?'kg':'poissons'}' : eggSale
         ? '$eggCount ${context.tr('egg_eggs_short')} · '
               '${eggCount ~/ 30} ${context.tr('egg_trays_short')} + '
               '${eggCount % 30} ${context.tr('egg_eggs_short')}'

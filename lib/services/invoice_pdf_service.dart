@@ -20,8 +20,8 @@ class InvoicePdfService {
     return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  static String _money(dynamic value) {
-    return AppSettings.instance.formatMoney(_number(value), decimals: 0);
+  static String _money(dynamic value, [int decimals = 0]) {
+    return AppSettings.instance.formatMoney(_number(value), decimals: decimals);
   }
 
   static String _safe(dynamic value, [String fallback = '-']) {
@@ -39,6 +39,7 @@ class InvoicePdfService {
     final isPaid = _number(sale['reste']) <= 0;
     final invoicePrefix = isFr ? 'FAC' : 'INV';
     final invoiceNumber =
+        sale['invoice_reference']?.toString() ??
         '$invoicePrefix-${DateTime.now().year}-${sale['id'].toString().padLeft(5, '0')}';
     final farmName = _safe(
       sale['exploitation_nom'],
@@ -47,11 +48,20 @@ class InvoicePdfService {
     final farmId = _safe(sale['exploitation_id']);
     final total = _number(sale['montant_total']);
     final eggSale = sale['produit_vendu'] == 'OEUFS';
+    final fishSale = sale['produit_vendu'] == 'POISSONS';
+    String invoiceMoney(dynamic value) => _money(value, fishSale ? 2 : 0);
+    final fishUnit = sale['price_unit'] == 'KG'
+        ? 'kg'
+        : (isFr ? 'poissons' : 'fish');
     final eggCount = _number(sale['nombre_oeufs']).toInt();
     final eggDescription = isFr
         ? 'Œufs — ${eggCount ~/ 30} alvéoles + ${eggCount % 30} œufs'
         : 'Eggs — ${eggCount ~/ 30} trays + ${eggCount % 30} eggs';
-    final unitPriceHeader = eggSale
+    final unitPriceHeader = fishSale
+        ? (sale['price_unit'] == 'KG'
+              ? 'PRIX / kg'
+              : (isFr ? 'PRIX / POISSON' : 'PRICE / FISH'))
+        : eggSale
         ? (sale['conditionnement'] == 'COMPOSE'
               ? (isFr ? 'PRIX LOT' : 'BUNDLE PRICE')
               : (isFr ? 'PRIX COND.' : 'PACK PRICE'))
@@ -185,7 +195,7 @@ class InvoicePdfService {
               color: paleColor,
               padding: const pw.EdgeInsets.symmetric(vertical: 7),
               child: pw.Text(
-                '${isFr ? 'Montant payé' : 'Amount paid'} : ${_money(paid)}',
+                '${isFr ? 'Montant payé' : 'Amount paid'} : ${invoiceMoney(paid)}',
                 textAlign: pw.TextAlign.center,
                 style: pw.TextStyle(
                   fontSize: 9,
@@ -262,13 +272,21 @@ class InvoicePdfService {
                 pw.TableRow(
                   children: [
                     _tableValue(
-                      eggSale ? eggDescription : _safe(sale['espece']),
+                      fishSale
+                          ? '${_safe(sale['espece'])} · $fishUnit'
+                          : eggSale
+                          ? eggDescription
+                          : _safe(sale['espece']),
                     ),
                     _tableValue(_safe(sale['lot_nom'])),
                     // COMPOSE facture un lot de 608 œufs (pas 608 × le prix du lot).
-                    _tableValue(_safe(sale['quantite'])),
-                    _tableValue(_money(sale['prix_unitaire'])),
-                    _tableValue(_money(total)),
+                    _tableValue(
+                      _safe(
+                        fishSale ? sale['priced_quantity'] : sale['quantite'],
+                      ),
+                    ),
+                    _tableValue(invoiceMoney(sale['prix_unitaire'])),
+                    _tableValue(invoiceMoney(total)),
                   ],
                 ),
               ],
@@ -282,11 +300,11 @@ class InvoicePdfService {
                   children: [
                     _totalLine(
                       isFr ? 'TOTAL FACTURE' : 'INVOICE TOTAL',
-                      _money(total),
+                      invoiceMoney(total),
                     ),
                     _totalLine(
                       isFr ? 'MONTANT PAYÉ' : 'AMOUNT PAID',
-                      _money(paid),
+                      invoiceMoney(paid),
                     ),
                     pw.Container(
                       color: paleColor,
@@ -306,7 +324,7 @@ class InvoicePdfService {
                             ),
                           ),
                           pw.Text(
-                            _money(balance),
+                            invoiceMoney(balance),
                             style: pw.TextStyle(
                               fontSize: 10,
                               fontWeight: pw.FontWeight.bold,

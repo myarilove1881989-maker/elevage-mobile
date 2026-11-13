@@ -10,6 +10,7 @@ import 'stock_panel.dart';
 import 'feeding_panel.dart';
 import 'health_panel.dart';
 import 'breeding_panel.dart';
+import 'commerce_panel.dart';
 
 class AquaticWorkspace extends StatefulWidget {
   const AquaticWorkspace({
@@ -46,11 +47,14 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
   String page = 'dashboard';
   String? healthInstallation, healthCohort, healthAction;
   String? breedingInstallation, breedingCohort, breedingAction;
+  String? commerceInstallation, commerceCohort, commerceAction;
   String? speciesFilter, installationFilter, cohortFilter;
   bool allows(String right) =>
       (widget.capabilities['write'] as List? ?? const []).contains(right);
   String label(dynamic value) =>
       {
+        'HARVEST': 'Récolte',
+        'HARVEST_REVERSAL': 'Annulation de récolte',
         'FRY_REVERSAL': 'Annulation d’entrée d’alevins',
         'ACTIVE': 'Actif',
         'INACTIVE': 'Inactif',
@@ -319,6 +323,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       'feeding': 'Alimentation',
                       'health': 'Santé',
                       'breeding': 'Reproduction',
+                      'commerce': 'Récoltes et ventes',
                     }.entries)
                       OutlinedButton(
                         onPressed: () => setState(() => page = p.key),
@@ -514,6 +519,27 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                 ],
+                if (page == 'commerce')
+                  CommercePanel(
+                    key: ValueKey(
+                      '$commerceInstallation:$commerceCohort:$commerceAction',
+                    ),
+                    service: widget.service,
+                    owner: widget.capabilities['can_enable'] == true,
+                    rights: List<String>.from([
+                      ...widget.capabilities['write'] as List? ?? [],
+                      ...widget.capabilities['commerce_write'] as List? ?? [],
+                    ]),
+                    installations: installations,
+                    cohorts: cohorts,
+                    species: species
+                        .map((x) => {'id': x['species'], 'name': x['name']})
+                        .toList(),
+                    initialInstallation: commerceInstallation,
+                    initialCohort: commerceCohort,
+                    initialAction: commerceAction,
+                    onChanged: reload,
+                  ),
                 if (page == 'breeding')
                   BreedingPanel(
                     key: ValueKey(
@@ -636,6 +662,26 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
     });
   }
 
+  void openCommerceFrom(
+    BuildContext dialog,
+    String kind,
+    Map<String, dynamic> row,
+  ) {
+    Navigator.pop(dialog);
+    setState(() {
+      commerceCohort = kind == 'cohort' ? '${row['id']}' : null;
+      commerceInstallation = kind == 'cohort' ? null : '${row['id']}';
+      if (kind == 'cohort') {
+        final positions = row['positions'] as List? ?? [];
+        if (positions.length == 1) {
+          commerceInstallation = '${positions.first['installation']}';
+        }
+      }
+      commerceAction = 'HARVEST';
+      page = 'commerce';
+    });
+  }
+
   void openBreedingFrom(
     BuildContext dialog,
     String kind,
@@ -696,6 +742,12 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
           ),
         ),
         actions: [
+          if (allows('aquatic.harvest.create'))
+            OutlinedButton.icon(
+              onPressed: () => openCommerceFrom(c, kind, row),
+              icon: const Icon(Icons.set_meal, color: Colors.green),
+              label: const Text('Récolter'),
+            ),
           if (allows('aquatic.breeders.manage'))
             TextButton.icon(
               onPressed: () => openBreedingFrom(c, kind, row),
