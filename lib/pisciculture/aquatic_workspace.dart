@@ -11,6 +11,7 @@ import 'feeding_panel.dart';
 import 'health_panel.dart';
 import 'breeding_panel.dart';
 import 'commerce_panel.dart';
+import 'finance_agenda_panel.dart';
 
 class AquaticWorkspace extends StatefulWidget {
   const AquaticWorkspace({
@@ -48,6 +49,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
   String? healthInstallation, healthCohort, healthAction;
   String? breedingInstallation, breedingCohort, breedingAction;
   String? commerceInstallation, commerceCohort, commerceAction;
+  String? planningInstallation, planningCohort, planningAction;
   String? speciesFilter, installationFilter, cohortFilter;
   bool allows(String right) =>
       (widget.capabilities['write'] as List? ?? const []).contains(right);
@@ -324,6 +326,8 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       'health': 'Santé',
                       'breeding': 'Reproduction',
                       'commerce': 'Récoltes et ventes',
+                      'finances': 'Finances',
+                      'agenda': 'Agenda',
                     }.entries)
                       OutlinedButton(
                         onPressed: () => setState(() => page = p.key),
@@ -463,7 +467,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   if (dashboard?['feeding_overview'] is Map)
                     feedingOverview(dashboard!['feeding_overview'] as Map),
                   const Text(
-                    'Récoltes et finances piscicoles : Non disponible (phases suivantes).',
+                    'Consultez Récoltes et ventes, Finances et Agenda pour les opérations et leur suivi.',
                   ),
                 ],
                 if (page == 'installations') ...[
@@ -519,6 +523,28 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       ),
                     ),
                 ],
+                if (page == 'finances' || page == 'agenda')
+                  FinanceAgendaPanel(
+                    key: ValueKey(
+                      '$page:$planningInstallation:$planningCohort:$planningAction',
+                    ),
+                    service: widget.service,
+                    agenda: page == 'agenda',
+                    owner: widget.capabilities['can_enable'] == true,
+                    rights: List<String>.from([
+                      ...widget.capabilities['write'] as List? ?? [],
+                      ...widget.capabilities['finance_write'] as List? ?? [],
+                    ]),
+                    installations: installations,
+                    cohorts: cohorts,
+                    species: species
+                        .map((x) => {'id': x['species'], 'name': x['name']})
+                        .toList(),
+                    initialInstallation: planningInstallation,
+                    initialCohort: planningCohort,
+                    initialAction: planningAction,
+                    onChanged: reload,
+                  ),
                 if (page == 'commerce')
                   CommercePanel(
                     key: ValueKey(
@@ -662,6 +688,27 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
     });
   }
 
+  void openPlanningFrom(
+    BuildContext dialog,
+    String kind,
+    Map<String, dynamic> row,
+    bool agenda,
+  ) {
+    Navigator.pop(dialog);
+    setState(() {
+      planningCohort = kind == 'cohort' ? '${row['id']}' : null;
+      planningInstallation = kind == 'cohort' ? null : '${row['id']}';
+      if (kind == 'cohort') {
+        final positions = row['positions'] as List? ?? [];
+        if (positions.length == 1) {
+          planningInstallation = '${positions.first['installation']}';
+        }
+      }
+      planningAction = agenda ? 'TASK' : null;
+      page = agenda ? 'agenda' : 'finances';
+    });
+  }
+
   void openCommerceFrom(
     BuildContext dialog,
     String kind,
@@ -742,6 +789,20 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
           ),
         ),
         actions: [
+          if (allows('aquatic.agenda.plan'))
+            TextButton.icon(
+              onPressed: () => openPlanningFrom(c, kind, row, true),
+              icon: const Icon(Icons.event, color: V2Colors.green),
+              label: const Text('Planifier'),
+            ),
+          TextButton.icon(
+            onPressed: () => openPlanningFrom(c, kind, row, false),
+            icon: const Icon(
+              Icons.account_balance_wallet,
+              color: V2Colors.green,
+            ),
+            label: const Text('Finances'),
+          ),
           if (allows('aquatic.harvest.create'))
             OutlinedButton.icon(
               onPressed: () => openCommerceFrom(c, kind, row),
