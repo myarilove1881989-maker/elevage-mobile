@@ -48,7 +48,7 @@ void main() {
     await tester.tap(find.text('Se connecter'));await tester.pumpAndSettle();
     expect(find.byType(DashboardScreen),findsOneWidget);
     expect((await SharedPreferences.getInstance()).getString('session_kind'),'owner');
-    await tester.tap(find.text('Quitter').last);await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('topLogoutButton')));await tester.pumpAndSettle();
     expect(find.byType(LoginScreen),findsOneWidget);
     expect(find.text('Connexion propriétaire'),findsOneWidget);
     expect(find.text('Espace éleveur'),findsOneWidget);
@@ -67,7 +67,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(DashboardScreen),findsOneWidget);
       if(exit=='Quitter') {
-        await tester.tap(find.text('Quitter').last);
+        await tester.tap(find.byKey(const Key('topLogoutButton')));
       } else if(exit=='Android back') {
         await tester.binding.handlePopRoute();
       } else {

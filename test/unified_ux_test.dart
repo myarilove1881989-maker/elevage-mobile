@@ -163,7 +163,17 @@ void main() {
     await tester.runAsync(()=>precacheImage(const AssetImage('assets/images/elevage_logo.png'),tester.element(find.byType(LoginScreen))));
     await tester.pumpAndSettle();await capture(tester,key,'01-accueil');
     await tester.pumpWidget(MaterialApp(home:Scaffold(body:FarmNavigation(actions:{FarmDestination.agenda:(){},FarmDestination.dashboard:(){}}))));
-    expect(find.text('Agenda'),findsNothing);expect(find.text('Tableau de bord'),findsOneWidget);
+    expect(find.text('Agenda'),findsNothing);expect(find.text('Tableau de bord'),findsNothing);
+    // Published navigation uses the brand for home, without a duplicate menu row.
+    await tester.pumpWidget(testApp(Builder(builder:(context)=>Scaffold(body:TextButton(
+      onPressed:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>Scaffold(
+        appBar:FarmTopBar(actions:const {},connection:const SizedBox(),onRefresh:(){},onLogout:(){}),
+        body:const Text('Page secondaire fictive')))),child:const Text('Ouvrir une page'))))));
+    await tester.tap(find.text('Ouvrir une page'));await tester.pumpAndSettle();
+    expect(find.text('Page secondaire fictive'),findsOneWidget);
+    final brand=find.descendant(of:find.byType(FarmTopBar),matching:find.byType(TextButton)).first;
+    await tester.tap(brand);await tester.pumpAndSettle();
+    expect(find.text('Ouvrir une page'),findsOneWidget);expect(find.text('Page secondaire fictive'),findsNothing);
     await tester.pumpWidget(const SizedBox());await tester.binding.setSurfaceSize(null);api.close();
   });
   testWidgets('expense fields and history filters keep shared visual language and all inputs',(tester) async {
@@ -177,7 +187,7 @@ void main() {
     await capture(tester,key,'04-depenses');expect(tester.takeException(),isNull);
     final history=HistoryVisualApi();
     await tester.pumpWidget(testApp(RepaintBoundary(key:key,child:OperationHistoryScreen(api:history))));
-    await tester.pumpAndSettle();expect(find.text('Type d’opération'),findsOneWidget);expect(find.text('État'),findsOneWidget);
+    await tester.pumpAndSettle();await tester.tap(find.text('Filtres'));await tester.pumpAndSettle();expect(find.text('Type d’opération'),findsOneWidget);expect(find.text('État'),findsOneWidget);
     await capture(tester,key,'05-historique');expect(tester.takeException(),isNull);
     await tester.pumpWidget(testApp(RepaintBoundary(key:key,child:OwnerOperationHistoryScreen(api:HistoryVisualApiEmpty()))));
     await tester.pumpAndSettle();await capture(tester,key,'06-historique-proprietaire');expect(tester.takeException(),isNull);

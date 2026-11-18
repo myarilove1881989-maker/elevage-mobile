@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_localizations.dart';
@@ -76,27 +77,27 @@ class _MargeDetailScreenState extends State<MargeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return Scaffold(
+      return V2Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (error != null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(context.tr('error'))),
+      return V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('error'))),
         body: Center(child: Text(error!)),
       );
     }
 
     if (data.isEmpty) {
-      return Scaffold(
+      return V2Scaffold(
         body: Center(child: Text(context.tr('no_data'))),
       );
     }
 
-    return Scaffold(
+    return V2Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
-      appBar: AppBar(
+      appBar: V2AppBar(
         title: Text(context.tr('margin')),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,

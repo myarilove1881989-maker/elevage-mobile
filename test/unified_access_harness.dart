@@ -37,6 +37,7 @@ class UnifiedAccessHarness {
   bool layingFixture=false;
   int version=1;
   bool down=false,lost=false,disabled=false,refuseGrant=false;
+  bool healthAgenda=false;
   bool expiredPersonal=false;
   bool includeCredentialVersion=true,issuanceEnabled=true;
   Completer<void>? grantEntered,grantRelease;
@@ -86,7 +87,7 @@ class UnifiedAccessHarness {
       }
       grants++;
       late Map<String,dynamic> response;
-      await fineGrant(credentialVersion:1,user:user,expectedUser:user,codes:codes,rightsVersion:version,
+      await fineGrant(healthAgenda:healthAgenda,credentialVersion:1,user:user,expectedUser:user,codes:codes,rightsVersion:version,
         issuedAt:now,now:now,duration:const Duration(days:7),
         grantId:'00000000-0000-4000-8000-${(1000+grants).toString().padLeft(12,'0')}',
         issued:(value)=>response=value);
@@ -165,7 +166,7 @@ class UnifiedAccessHarness {
   Future<void> start() async {
     directory=await Directory.systemTemp.createTemp('elevage-seven-day-');
     db=openDatabase();
-    initial=await fineGrant(credentialVersion:1,codes:codes,now:now,duration:const Duration(days:7));
+    initial=await fineGrant(healthAgenda:healthAgenda,credentialVersion:1,codes:codes,now:now,duration:const Duration(days:7));
     await db.saveOperatorProfile(initial!,'synthetic');
     await enroll(initial!,'123456');
     secrets.values['tablet_context_${Uri.encodeComponent(base)}']=jsonEncode({
@@ -184,7 +185,7 @@ class UnifiedAccessHarness {
     await sessions.enroll(grant,pin);
     // Install only a verified synthetic response, as normal preparation would.
     late Map<String,dynamic> response;
-    final verified=await fineGrant(credentialVersion:1,user:grant.userId,expectedUser:grant.userId,codes:codes,
+    final verified=await fineGrant(healthAgenda:healthAgenda,credentialVersion:1,user:grant.userId,expectedUser:grant.userId,codes:codes,
       now:now,duration:const Duration(days:7),issued:(value)=>response=value);
     secrets.values['offline_grant_${Uri.encodeComponent(base)}_1_${grant.userId}']=jsonEncode({
       'token':verified.token,'public_key':response['public_key'],'key_id':response['key_id'],
@@ -224,8 +225,9 @@ class UnifiedAccessHarness {
   Future<void> reopen() async {
     tablet.dispose();api.close();await network!.close();await db.close();db=openDatabase();await controller();
   }
-  Future<FarmerRuntime> runtime() async {
-    tablet.dispose();api.close();await network!.close();
+  Future<FarmerRuntime> runtime({http.Client? onlineClient}) async {
+    if(!tablet.isDisposed) {tablet.dispose();api.close();}
+    await network!.close();
     final connection=ServerConnection(baseUrl:base,clock:()=>now,interval:const Duration(days:1),
       client:MockClient((request) async {
         if(down) throw http.ClientException('Synthetic health offline');
@@ -236,7 +238,7 @@ class UnifiedAccessHarness {
       networkChanges:connection.changes,transportClient:()=>MockClient(transport),
       cacheOpener:({required farmId,required server}) async=>db);
     return FarmerRuntime(tablet:tablet,connection:connection,tokenStore:TokenService(useSecureStorage:false),
-      onlineClient:MockClient((request) async {
+      onlineClient:onlineClient ?? MockClient((request) async {
         if(down) throw http.ClientException('Synthetic read offline');
         preparedReads.add(request.url.toString());
         if(request.url.path.endsWith('/production/pesees/')) return http.Response('{"effectif_actuel":10,"pesees":[{"id":17,"nombre_animaux_peses":10,"poids_total_kg":"18.000"}]}',200);

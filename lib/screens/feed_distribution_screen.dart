@@ -1,5 +1,9 @@
+import '../services/money_input.dart';
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
+import '../widgets/feed_distribution_fields.dart';
+import '../offline/outbox.dart' show newOperationUuid;
 
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
@@ -49,6 +53,26 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> with Mu
     _load();
   }
 
+  Future<void> correctDistribution(Map entry,bool cancel) async {
+    final physical=entry['physical_stock'] as Map;
+    final amount=TextEditingController(text:'${entry['quantite_kg']}'),reason=TextEditingController();
+    Map<String,dynamic>? pending;
+    await showDialog<void>(context:context,builder:(dialog)=>StatefulBuilder(builder:(context,update)=>V2AlertDialog(
+      title:Text(cancel?'Annuler la distribution':'Corriger la quantité'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+        if(!cancel)V2Field(child:TextField(controller:amount,enabled:pending==null,decoration:const V2InputDecoration(labelText:'Nouvelle quantité totale (kg)',))),
+        V2Field(child:TextField(controller:reason,enabled:pending==null,decoration:const V2InputDecoration(labelText:'Motif obligatoire',)))]),
+      actions:[TextButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Fermer')),
+        TextButton(onPressed:()async{
+          if(reason.text.trim().length<3)return;
+          pending??={'operation_uuid':newOperationUuid(),'expected_version':physical['distribution_version'],'reason':reason.text.trim(),if(cancel)'confirm':true,if(!cancel)'quantite_kg':amount.text.trim().replaceAll(',','.')};
+          try {
+            if(cancel)await widget.apiService.deleteForMaintenance('/alimentation/distributions/${entry['id']}/',pending!);
+            else await widget.apiService.patch('/alimentation/distributions/${entry['id']}/',pending!);
+            if(dialog.mounted)Navigator.pop(dialog);if(mounted)await _load();
+          } catch(_){if(dialog.mounted)update((){});if(mounted)ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content:Text('Résultat à vérifier : renvoyer conservera la même opération.')));}
+        },child:const Text('Confirmer'))])));
+    amount.dispose();reason.dispose();
+  }
   Future<void> _load() async {
     markDataFresh();
     setState(() {
@@ -100,8 +124,8 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> with Mu
 
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('feed_tracking'))),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('feed_tracking'))),
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 820),
@@ -152,8 +176,12 @@ class _FeedDistributionScreenState extends State<FeedDistributionScreen> with Mu
                             for (final entry in group.value)
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                leading: const Icon(Icons.grass_outlined),
-                                title: Text('${entry['aliment'] ?? ''}'),
+                                leading: entry['id'] is int && entry['local_only']!=true && entry['physical_stock'] is Map && entry['physical_stock']['distribution_version'] is String
+                                  ? BusinessCommand(api:widget.apiService,actions:const {'feed.update','feed.delete'},child:PopupMenuButton<bool>(
+                                    onSelected:(cancel)=>correctDistribution(Map<String,dynamic>.from(entry as Map),cancel),
+                                    itemBuilder:(_)=>const [PopupMenuItem(value:false,child:Text('Corriger la quantité')),PopupMenuItem(value:true,child:Text('Annuler avec motif'))]))
+                                  : const Icon(Icons.grass_outlined),
+                                title: Text('${entry['aliment'] ?? ''}${entry['local_only']==true?' - en attente':''}${entry['_review_required']==true?' - à examiner':''}'),
                                 subtitle: Text(
                                   entry['distribution_at'] == null
                                       ? context.tr('feed_time_unknown')
@@ -224,12 +252,39 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
   List<dynamic> expenses = [];
   int? selectedExpenseId;
   DateTime dateTime = DateTime.now();
-  bool saving = false;
+  bool distributionDateChosen=false;
+  bool saving = false, loadingStock=true, stockAttempted=false;
+  final stockDraft=FeedDistributionDraft();
+  final stockOperationId=newOperationUuid();
+  Map<String,dynamic>? stockCatalog, stockRequest;
+  Future<void> loadStock() async {
+    try {
+      final value=await widget.apiService.get('/feed-supplies/');
+      if(mounted && value is Map<String,dynamic> && value['stock_contract']==1)setState(()=>stockCatalog=value);
+    } catch(_) {} finally {if(mounted)setState(()=>loadingStock=false);}
+  }
+  Future<void> saveStock() async {
+    if(saving || loadingStock)return;
+    setState(()=>saving=true);
+    try {
+      stockRequest ??= {...stockDraft.payload(stockCatalog!,widget.lotId,quantity.text,note.text),
+        'operation_uuid':stockOperationId,'distribution_at':(distributionDateChosen?dateTime:DateTime.now()).toUtc().toIso8601String()};
+      if(!widget.apiService.hasUnifiedOfflineSession) {
+        stockRequest!.remove('_feed_dependencies');stockRequest!.remove('supply_parent_uuid');
+      }
+      stockAttempted=true;
+      final value=await widget.apiService.post('/alimentation/distributions/',stockRequest!);
+      if(value is! Map || (value['id']==null && value['local_only']!=true))throw StateError('Résultat non confirmé.');
+      if(mounted) {if(value['local_only']==true){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Enregistré sur l’appareil — synchronisation en attente')));}else{v2Confirmed(context,message:'Distribution enregistrée');}}
+    } catch(e) {if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(stockAttempted?'Résultat à vérifier. Renvoyer conservera la même opération, sans double sortie.':e.toString())));}
+    finally {if(mounted)setState(()=>saving=false);}
+  }
 
   @override
   void initState() {
     super.initState();
     _loadExpenses();
+    loadStock();
   }
 
   Future<void> _loadExpenses() async {
@@ -256,21 +311,22 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
 
 
   Future<void> _save() async {
-    if (saving || !formKey.currentState!.validate()) return;
+    if(stockCatalog!=null){await saveStock();return;}
+    if (saving || loadingStock || !formKey.currentState!.validate()) return;
     setState(() => saving = true);
     try {
       await widget.apiService.createFeedDistribution(
         lotId: widget.lotId,
-        distributedAt: DateTime.now(),
+        distributedAt: distributionDateChosen?dateTime:DateTime.now(),
         feedName: feedName.text.trim(),
         quantityKg: double.parse(quantity.text.trim().replaceAll(',', '.')),
         pricePerKg: price.text.trim().isEmpty
             ? null
-            : double.parse(price.text.trim().replaceAll(',', '.')),
+            : double.parse(MoneyInput.canonical(price.text)),
         expenseId: selectedExpenseId,
         note: note.text.trim(),
       );
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) {if(widget.apiService.hasUnifiedOfflineSession && widget.apiService.lastOperationMessage!=null){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(widget.apiService.lastOperationMessage!)));}else{v2Confirmed(context,message:'Distribution enregistrée');}}
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -286,74 +342,76 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
   Widget build(BuildContext context) {
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('add_feed_distribution'))),
+      child: V2Scaffold(protectDraft:true,busy:saving,
+        appBar: V2AppBar(title:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[Text(context.tr('add_feed_distribution')),Text(widget.lotName,style:const TextStyle(fontSize:14))])),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 650),
+            constraints: const BoxConstraints(maxWidth: 1080),
             child: Form(
               key: formKey,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  TerreEtOrHeader(
-                    icon: Icons.grass_outlined,
-                    title: context.tr('add_feed_distribution'),
-                    subtitle: widget.lotName,
-                  ),
-                  OutlinedButton.icon(
-                    key: const Key('feedDatePicker'),
-                    onPressed: null,
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    label: Text('${context.tr('feed_date')} : ${_feedDate(dateTime)}'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    key: const Key('feedTimePicker'),
-                    onPressed: null,
-                    icon: const Icon(Icons.access_time),
-                    label: Text('${context.tr('feed_time')} : ${_feedTime(dateTime)}'),
-                  ),
+                  V2Pair(first:V2PickerTile(key:const Key('feedDatePicker'),label:'Date de distribution *',value:_feedDate(dateTime),icon:Icons.calendar_month_outlined,
+                    onTap:saving || stockAttempted?null:()async{final day=await showDatePicker(context:context,initialDate:dateTime,firstDate:DateTime(2000),lastDate:DateTime.now());if(day!=null && mounted && context.mounted){distributionDateChosen=true;setState(()=>dateTime=DateTime(day.year,day.month,day.day,dateTime.hour,dateTime.minute,dateTime.second,dateTime.millisecond,dateTime.microsecond));V2DraftScope.maybeOf(context)?.markChanged();}}),
+                    second:V2PickerTile(key:const Key('feedTimePicker'),label:'Heure *',value:_feedTime(dateTime),icon:Icons.schedule,
+                    onTap:saving || stockAttempted?null:()async{final time=await showTimePicker(context:context,initialTime:TimeOfDay.fromDateTime(dateTime),builder:(context,child)=>MediaQuery(data:MediaQuery.of(context).copyWith(alwaysUse24HourFormat:true),child:child!));if(time!=null && mounted && context.mounted){distributionDateChosen=true;setState(()=>dateTime=DateTime(dateTime.year,dateTime.month,dateTime.day,time.hour,time.minute,dateTime.second,dateTime.millisecond,dateTime.microsecond));V2DraftScope.maybeOf(context)?.markChanged();}})),
                   const SizedBox(height: 14),
-                  TextFormField(
-                    key: const Key('feedNameField'),
-                    controller: feedName,
-                    maxLength: 120,
-                    decoration: InputDecoration(labelText: context.tr('feed_name')),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? context.tr('feed_invalid_name')
-                        : null,
-                  ),
-                  TextFormField(
+                  if(loadingStock)const LinearProgressIndicator(),
+                  if(!loadingStock && stockCatalog==null)const Text('Distribution non rattachée : aucun stock physique ne sera déduit. Rechargez le référentiel pour utiliser un stock suivi.'),
+                  if(stockCatalog!=null)FeedDistributionFields(draft:stockDraft,catalog:stockCatalog!,lotId:widget.lotId,editable:!saving && !stockAttempted,quantityField:V2Field(child:TextFormField(
                     key: const Key('feedQuantityField'),
+                    enabled:stockCatalog==null || (!stockAttempted && !saving),
                     controller: quantity,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: context.tr('feed_quantity')),
+                    decoration: V2InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined),),
                     validator: (value) {
-                      final parsed = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
+                      final parsed = MoneyInput.number(value??'')?.toDouble();
                       return parsed == null || !parsed.isFinite || parsed <= 0
                           ? context.tr('feed_invalid_quantity')
                           : null;
                     },
-                  ),
-                  TextFormField(
+                  ))),
+                  if(stockCatalog==null) V2Field(child:TextFormField(
+                    key: const Key('feedNameField'),
+                    controller: feedName,
+                    maxLength: 120,
+                    decoration: V2InputDecoration(labelText: context.tr('feed_name'),),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? context.tr('feed_invalid_name')
+                        : null,
+                  )),
+                  if(stockCatalog==null) V2Field(child:TextFormField(
+                    key: const Key('feedQuantityField'),
+                    enabled:stockCatalog==null || (!stockAttempted && !saving),
+                    controller: quantity,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: V2InputDecoration(labelText: '${context.tr('feed_quantity')} *',prefixIcon:const Icon(Icons.scale_outlined),),
+                    validator: (value) {
+                      final parsed = MoneyInput.number(value??'')?.toDouble();
+                      return parsed == null || !parsed.isFinite || parsed <= 0
+                          ? context.tr('feed_invalid_quantity')
+                          : null;
+                    },
+                  )),
+                  V2Field(child:TextFormField(
                     key: const Key('feedNoteField'),
+                    enabled:stockCatalog==null || (!stockAttempted && !saving),
                     controller: note,
                     maxLines: 2,
-                    decoration: InputDecoration(labelText: context.tr('feed_note')),
-                  ),
-                  ExpansionTile(
+                    decoration: V2InputDecoration(labelText: context.tr('feed_note'),hintText:'Ex. : distribution du jour',prefixIcon:const Icon(Icons.note_alt_outlined),),
+                  )),
+                  if(stockCatalog==null) ExpansionTile(
                     title: Text(context.tr('feed_cost_optional')),
                     children: [
                       Text(context.tr('feed_cost_hint')),
                       if (expenses.isNotEmpty)
-                        DropdownButtonFormField<int>(
+                        V2Field(child:DropdownButtonFormField<int>(
                           key: const Key('feedExpenseDropdown'),
                           isExpanded: true,
                           initialValue: selectedExpenseId ?? 0,
-                          decoration: InputDecoration(
-                            labelText: context.tr('feed_existing_expense'),
-                          ),
+                          decoration: V2InputDecoration(
+                            labelText: context.tr('feed_existing_expense'),),
                           items: [
                             DropdownMenuItem(
                               value: 0,
@@ -368,12 +426,13 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                           onChanged: (value) => setState(
                             () => selectedExpenseId = value == 0 ? null : value,
                           ),
-                        ),
-                      TextFormField(
+                        )),
+                      V2Field(child:TextFormField(
                         key: const Key('feedPriceField'),
-                        controller: price,
+                        inputFormatters: [MoneyInputFormatter()],
+                  controller: price,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: InputDecoration(labelText: context.tr('feed_price_kg')),
+                        decoration: V2InputDecoration(labelText: context.tr('feed_price_kg'),),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) return null;
                           final amount = double.tryParse(value.trim().replaceAll(',', '.'));
@@ -381,15 +440,14 @@ class _FeedDistributionFormScreenState extends State<_ClassicFeedDistributionFor
                               ? context.tr('feed_invalid_price')
                               : null;
                         },
-                      ),
+                      )),
                     ],
                   ),
                   const SizedBox(height: 18),
-                  ElevatedButton(
-                    key: const Key('saveFeedDistribution'),
-                    onPressed: saving ? null : _save,
-                    child: Text(context.tr('save')),
-                  ),
+                  V2Pair(first:OutlinedButton(onPressed:saving?null:()=>Navigator.of(context).maybePop(),child:const Text('Annuler')),
+                    second:FilledButton.icon(key:const Key('saveFeedDistribution'),onPressed:saving || loadingStock?null:_save,
+                      icon:const Icon(Icons.save_outlined),label:Text(context.tr('save')))),
+
                 ],
               ),
             ),

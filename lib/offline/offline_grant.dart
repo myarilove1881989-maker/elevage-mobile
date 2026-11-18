@@ -46,6 +46,12 @@ class VerifiedOfflineGrant {
     // V1 originals remain transportable; new writes need signed individual rights.
     if (!hasFineContract) return false;
     try {
+      // Stock protocol versions are covered by the signature. New command
+      // support must not activate extended operations for an old profile.
+      final caps = claims['capabilities'] as Map;
+      if (kind == 'VACCINATION' && (caps['vaccine_stock_contract'] is! int || caps['vaccine_stock_contract'] != 1)) return false;
+      if (kind == 'ALIMENTATION' && {'UPDATE','REVERSE'}.contains(operation) &&
+          (caps['feed_stock_contract'] is! int || caps['feed_stock_contract'] != 1)) return false;
       final action = PermissionContract.operationAction(kind,operation);
       return action != null && finePermissions!.allows(action);
     } catch (_) { return false; }

@@ -161,6 +161,13 @@ Future<void> selectDropdown(
   await tester.pumpAndSettle();
 }
 
+Future<void> openProductionV2(WidgetTester tester) async {
+  final top=find.byKey(const Key('topProductionTrackingButton'));
+  if(top.evaluate().isNotEmpty){await tester.ensureVisible(top);await tester.tap(top);}
+  else{await tester.tap(find.byIcon(Icons.menu).first);await tester.pumpAndSettle();await tester.tap(find.byKey(const ValueKey('navigation-production')));}
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -181,7 +188,7 @@ void main() {
         await tester.pumpAndSettle();
 
         if (viaTopBar) {
-          await tester.tap(find.byKey(const Key('topProductionTrackingButton')));
+          await openProductionV2(tester);
         } else {
           await tester.tap(find.byTooltip('Ouvrir le menu'));
           await tester.pumpAndSettle();
@@ -266,9 +273,8 @@ void main() {
           expect(buttonRect.left, greaterThanOrEqualTo(0));
           expect(buttonRect.right, lessThanOrEqualTo(width));
         } else {
-          expect(top, findsOneWidget);
-          await tester.ensureVisible(top);
-          expect(top.hitTestable(), findsOneWidget);
+          expect(top, findsNothing);
+          expect(find.byTooltip(menuLabel),findsOneWidget);
         }
         expect(tester.takeException(), isNull,
             reason: 'Dashboard $language à ${width.toInt()} px');
@@ -305,7 +311,7 @@ void main() {
       final api = noSpecies ? _EmptyProductionApiFake() : _EmptySpeciesLotApiFake();
       await tester.pumpWidget(testApp(DashboardScreen(apiService: api)));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('topProductionTrackingButton')));
+      await openProductionV2(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ProductionTrackingScreen), findsOneWidget);
       if (!noSpecies) {

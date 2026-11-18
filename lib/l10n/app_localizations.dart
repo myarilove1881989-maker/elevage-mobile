@@ -13,7 +13,7 @@ class AppLocalizations {
       'refresh': 'Actualiser',
       'purchases': 'Achats',
       'expenses': 'Dépenses',
-      'production_tracking': 'Suivi de production',
+      'production_tracking': 'Production',
       'production_tracking_subtitle':
           'Choisissez une espèce et un lot pour accéder à son suivi',
       'production_tracking_load_error':
@@ -207,7 +207,7 @@ class AppLocalizations {
       'login': 'Se connecter',
       'create_account': 'Créer un compte',
       'invalid_credentials': 'Identifiants invalides',
-      'server_unreachable': 'Impossible de joindre le serveur. Vérifiez que le backend local est démarré, puis réessayez.',
+      'server_unreachable': 'Impossible de joindre le serveur. Vérifiez votre connexion Internet puis réessayez.',
       'overview': 'Vue d’ensemble de votre exploitation',
       'species': 'Espèce',
       'batch': 'Lot',
@@ -488,7 +488,7 @@ class AppLocalizations {
       'login': 'Sign in',
       'create_account': 'Create an account',
       'invalid_credentials': 'Invalid username or password',
-      'server_unreachable': 'Cannot reach the server. Check that the local backend is running, then try again.',
+      'server_unreachable': 'Cannot reach the server. Check your Internet connection and try again.',
       'overview': 'Overview of your farm',
       'species': 'Species',
       'batch': 'Batch',

@@ -1,8 +1,16 @@
+import '../widgets/dashboard_task_dialog.dart';
+import '../widgets/dashboard_field.dart';
+import '../theme/design_system_v2.dart';
+import '../services/android_online_permissions.dart';
+import '../widgets/physical_stock_cards.dart';
+import '../widgets/v2_components.dart' show V2Scaffold;
+import 'health_agenda_screen.dart';
+import '../services/health_notifications.dart';
+import '../widgets/dashboard_kpi_card.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:app_elevage/services/api_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../services/financial_indicators.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,12 +29,10 @@ import '../services/farm_session.dart';
 import '../services/farmer_runtime.dart';
 import '../services/server_connection.dart';
 import '../services/permission_contract.dart';
-import '../services/user_administration_service.dart';
 import '../offline/sync_state.dart';
 import 'operation_history_screen.dart';
 
 import 'owner_operation_history_screen.dart';
-import 'user_management_screen.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import 'package:app_elevage/screens/stock_detail_screen.dart';
@@ -35,7 +41,6 @@ import 'package:app_elevage/screens/depense_detail_screen.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:app_elevage/screens/client_list_screen.dart';
 import 'package:app_elevage/screens/dettes_screen.dart';
-import 'package:app_elevage/screens/performance_screen.dart';
 import 'package:app_elevage/screens/login_screen.dart';
 import 'package:app_elevage/screens/settings_screen.dart';
 import 'package:app_elevage/l10n/app_localizations.dart';
@@ -61,6 +66,24 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   @override
   Future<void> refreshAfterMutation() async { await _reload(includeTasks: true); }
   late ApiService apiService;
+  int _readEpoch = 0;
+  late final String? _viewIdentity;
+  bool _identityExpired = false;
+  bool _acceptRead(int epoch) {
+    if (!mounted || epoch != _readEpoch) return false;
+    if (_viewIdentity == ApiService.sessionIdentity && !_identityExpired) return true;
+    setState(() {
+      _identityExpired = true;
+      data = null; lots = []; especes = []; events = {};
+      commonSession = null; commonSessionToken = null;
+      farmName = ''; username = ''; totalDettes = null;
+      selectedLotId = null; selectedEspeceId = null;
+      displayedLotId = null; displayedEspeceId = null;
+      isLoading = false; lastApiSuccess = null;
+      loadError = 'Le profil a changé. Reconnectez-vous pour afficher ses données.';
+    });
+    return false;
+  }
   String _receiptState='';
   Timer? _receiptTimer;
   String get _confirmedReceipts=>apiService.localOperations.where((r)=>r.businessStatus=='CONFIRMED')
@@ -74,7 +97,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   }
   Widget _expenseScreen()=>apiService is FarmerApiService && apiService.hasUnifiedOfflineSession
     ?AddDepenseScreen(tablet:(apiService as FarmerApiService).runtime.tablet,simple:true)
-    :AddDepenseScreen(apiService:apiService);
+    :AddDepenseScreen(apiService:apiService,stayAfterSuccess:true);
   late final ServerConnection serverConnection;
   Widget _connectionIndicator()=>AnimatedBuilder(animation:Listenable.merge([
     serverConnection,if(apiService is FarmerApiService) (apiService as FarmerApiService).runtime.tablet]),
@@ -82,6 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
       final tablet=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.tablet:null;
       return ConnectionIndicator(networkAvailable:tablet?.sync?.networkAvailable,lastSuccess:serverConnection.lastSuccess,
         serverUnavailable:serverConnection.available==false,syncing:tablet?.sync?.busy??false,
+        syncSource:tablet?.sync,syncSummary:tablet?.sync?.summary,syncUnavailable:tablet?.sync?.error!=null,
         pending:tablet?.sync?.summary.pending,conflicts:tablet?.sync?.summary.conflicts,onSummary:_openHistory);
     });
   FarmSession? commonSession;
@@ -92,14 +116,17 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     if(token==null) return;
     try {
       final result=await apiService.get('/me/capabilities/');
-      final rights=PermissionContract.decode(Map<String,dynamic>.from(result['permission_contract'] as Map),
-        userId:result['user'] as int,farmId:result['exploitation'] as int,
-        role:result['role'] as String,rightsVersion:result['membership']['version'] as int,allowHttpV2:true);
-      if(!mounted || token!=(ApiService.sessionIdentity)) return;
+      final contract=Map<String,dynamic>.from(result['permission_contract'] as Map);
+      final rights=apiService is FarmerApiService
+        ? PermissionContract.decode(contract,userId:result['user'] as int,farmId:result['exploitation'] as int,
+            role:result['role'] as String,rightsVersion:result['membership']['version'] as int,allowHttpV2:true)
+        : androidOnlinePermissions(contract,userId:result['user'] as int,farmId:result['exploitation'] as int,
+            role:result['role'] as String,rightsVersion:result['membership']['version'] as int);
+      if(!mounted || _identityExpired || token!=_viewIdentity || token!=(ApiService.sessionIdentity)) return;
       setState(() {commonSessionToken=token;commonSession=FarmSession(userId:rights.userId,farmId:rights.farmId,
         role:rights.role,permissions:rights,origin:apiService.hasUnifiedOfflineSession?SessionOrigin.tabletProfile:SessionOrigin.personalHttp,
         network:NetworkState.available,sync:const SyncSummary());});
-    } catch(_) { if(mounted) setState(()=>commonSession=null); }
+    } catch(_) { if(mounted && token==ApiService.sessionIdentity && token==_viewIdentity) setState(()=>commonSession=null); }
   }
 
   Future<bool> _cancelTask(Map<String,dynamic> task) async {
@@ -127,6 +154,12 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   Map<String, dynamic>? data;
   List lots = [];
   List especes = [];
+
+  int? get _stockSpecies {
+    if(displayedLotId==null)return displayedEspeceId;
+    for(final lot in lots){if(_intValue(lot['id'])==displayedLotId)return _intValue(lot['espece']);}
+    return null;
+  }
 
   int? _intValue(dynamic value) {
     if (value is int) return value;
@@ -163,7 +196,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final identity = ApiService.sessionIdentity;
     try {
       final profile = await apiService.get('/farm-profile/');
-      if (mounted && identity == ApiService.sessionIdentity) {
+      if (mounted && !_identityExpired && identity == _viewIdentity && identity == ApiService.sessionIdentity) {
         setState(() => farmName = profile['nom']?.toString().trim() ?? '');
       }
     } catch (_) { /* Keep the last confirmed name during a connection failure. */ }
@@ -181,7 +214,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   Future<void> loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
 
-    if (!mounted) return;
+    if (!mounted || _identityExpired || _viewIdentity != ApiService.sessionIdentity) return;
 
     setState(() {
       username = prefs.getString("username") ?? '';
@@ -211,6 +244,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   void initState() {
     super.initState();
     apiService = widget.apiService;
+    _viewIdentity = ApiService.sessionIdentity;
     _receiptState=_confirmedReceipts;
     apiService.sessionChanges?.addListener(_receiptsChanged);
     serverConnection=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.connection
@@ -221,8 +255,31 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     initData();
   }
 
+  Future<void> _syncHealthReminders(List tasks) async {
+    final coordinator=HealthReminderCoordinator.current;if(coordinator==null)return;
+    final captured=ApiService.sessionIdentity;
+    try {
+      await _loadCommonSession();final session=commonSession;
+      if(captured==null || captured!=ApiService.sessionIdentity || commonSessionToken!=captured || session?.permissions?.allows('agenda.read')!=true){await coordinator.suspend();return;}
+      final until=apiService is FarmerApiService?(apiService as FarmerApiService).runtime.grant?.expiresAt:httpReminderDeadline(ApiService.token??globalToken,DateTime.now().toUtc());
+      await coordinator.sync(farm:session!.farmId,user:session.userId,tasks:tasks,isCurrent:()=>captured==ApiService.sessionIdentity && commonSessionToken==captured && commonSession?.permissions?.allows('agenda.read')==true,validUntil:until);
+    }catch(_){try{await coordinator.suspend();}catch(_){}}
+  }
+
+  bool get _mayReadTasks => commonSessionToken == ApiService.sessionIdentity &&
+      commonSession?.permissions?.allows('agenda.read') == true;
+
   Future<void> loadTasks() async {
+    final epoch = _readEpoch;
+    await _loadCommonSession();
+    if (!_acceptRead(epoch)) return;
+    if (!_mayReadTasks) {
+      setState(() => events = {});
+      return;
+    }
     final res = await apiService.getTasks();
+    if (!_acceptRead(epoch)) return;
+    unawaited(_syncHealthReminders(res));
 
     Map<String, List<Map<String, dynamic>>> temp = {};
 
@@ -271,6 +328,11 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   Future<void> initData() async { await _reload(includeTasks: true); }
 
   Future<bool> _reload({bool includeTasks = false}) async {
+    final epoch = ++_readEpoch;
+    if (!_acceptRead(epoch)) return false;
+    if (includeTasks) await _loadCommonSession();
+    if (!_acceptRead(epoch)) return false;
+    final readTasks = includeTasks && _mayReadTasks;
     markDataFresh();
     unawaited(loadFarmName());
     final lotId = selectedLotId;
@@ -283,8 +345,9 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
         _requiredRead('liste des lots',apiService.getLots()),
         _requiredRead('liste des espèces',apiService.getEspeces()),
         _requiredRead('total des dettes',apiService.getTotalDettes()),
-        if (includeTasks) _requiredRead('liste des tâches',apiService.getTasks()),
+        if (readTasks) _requiredRead('liste des tâches',apiService.getTasks()),
       ]);
+      if (!_acceptRead(epoch)) return false;
       final nextData = Map<String, dynamic>.from(results[0] as Map);
       final allLots=results[1] as List;
       final nextLots=allLots.where((lot)=>!ApiService.isLotClosed(lot as Map)).toList();
@@ -301,7 +364,8 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
         throw StateError('Le périmètre affiché ne figure plus dans les données reçues.');
       }
       final nextDebt = results[3] as double;
-      final nextEvents = includeTasks ? _taskEvents(results[4] as List) : events;
+      if(readTasks)unawaited(_syncHealthReminders(results[4] as List));
+      final nextEvents = readTasks ? _taskEvents(results[4] as List) : _mayReadTasks && !includeTasks ? events : <String,List<Map<String,dynamic>>>{};
       if (!mounted) { return false; }
       // Commit the view snapshot only when every requested read succeeded.
       setState(() {
@@ -312,27 +376,29 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
       });
       return true;
     } catch (error) {
-      if (mounted) { setState(() => _loadFailed(error)); }
+      if (_acceptRead(epoch)) { setState(() => _loadFailed(error)); }
       return false;
     } finally {
-      if (mounted) { setState(() => isLoading = false); }
+      if (_acceptRead(epoch)) { setState(() => isLoading = false); }
     }
   }
 
   Future<void> _loadScope({int? lotId, int? speciesId}) async {
+    final epoch = ++_readEpoch;
+    if (!_acceptRead(epoch)) return;
     if (mounted) { setState(() { isLoading = true; loadError = null; }); }
     try {
       final result = lotId == null ? await apiService.getDashboard(especeId: speciesId)
           : await apiService.getLotDetail(lotId);
-      if (!mounted) { return; }
+      if (!_acceptRead(epoch)) { return; }
       setState(() {
         data = result; displayedLotId = lotId; displayedEspeceId = speciesId;
         lastApiSuccess = DateTime.now(); serverUnavailable = false;
       });
     } catch (error) {
-      if (mounted) { setState(() => _loadFailed(error)); }
+      if (_acceptRead(epoch)) { setState(() => _loadFailed(error)); }
     } finally {
-      if (mounted) { setState(() => isLoading = false); }
+      if (_acceptRead(epoch)) { setState(() => isLoading = false); }
     }
   }
 
@@ -378,115 +444,11 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final subtitle = value == null ? '' :
         unit ?? (isMoney ? AppSettings.instance.currency.symbol : '');
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
-      elevation: 0,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE4E8EC), width: 1),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x10000000),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 9,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, size: 34, color: color),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      value == null ? 'Indisponible' : isMoney
-                          ? AppSettings.instance
-                                .formatMoney(value)
-                                .replaceAll(
-                                  AppSettings.instance.currency.symbol,
-                                  '',
-                                )
-                                .trim()
-                          : value.toString(),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w400,
-                          color: Color(0xFF607080),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              // Trait coloré en bas de la card
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return DashboardKpiCard(title:title,icon:icon,color:color,onTap:onTap,content:Column(mainAxisSize:MainAxisSize.min,children:[
+      Text(value==null?'Indisponible':isMoney?AppSettings.instance.formatMoney(value).replaceAll(AppSettings.instance.currency.symbol,'').trim():value.toString(),
+        textAlign:TextAlign.center,maxLines:1,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:24,fontWeight:FontWeight.bold,color:color)),
+      if(subtitle.isNotEmpty)Text(subtitle,textAlign:TextAlign.center,style:const TextStyle(fontSize:14,color:Color(0xFF607080))),
+    ]));
   }
 
   List getFilteredLots() {
@@ -518,7 +480,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => DashboardTaskDialog(
         title: Text("${context.tr('today_tasks')} ${day.day}/${day.month}"),
         content: tasks.isEmpty
             ? Text(context.tr('no_task'))
@@ -556,6 +518,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     showModalBottomSheet<void>(context:context,builder:(sheet)=>SafeArea(child:Column(
       mainAxisSize:MainAxisSize.min,children:[
         const ListTile(title:Text('Agenda')),
+        ListTile(leading:const Icon(Icons.vaccines_outlined),title:const Text('Agenda sanitaire'),onTap:(){Navigator.pop(sheet);Navigator.push(context,MaterialPageRoute(builder:(_)=>HealthAgendaScreen(api:apiService)));}),
         ListTile(leading:const Icon(Icons.event),title:const Text('Voir les tâches du jour'),
           onTap:(){Navigator.pop(sheet);_showTasksForDay(_selectedDay??_focusedDay);}),
         if(_mayPlanTasks) ListTile(leading:const Icon(Icons.add_task),title:const Text('Attribuer une tâche'),
@@ -581,26 +544,25 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final title=TextEditingController();
     var day=_selectedDay??DateTime.now(); int? assignee; bool busy=false; String? error;
     var repeat=false; var end=day; final weekdays=<int>{1,2,3,4,5,6,7};
-    final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>AlertDialog(
+    final route=DialogRoute<bool>(context:context,builder:(dialog)=>StatefulBuilder(builder:(dialog,change)=>DashboardTaskDialog(
       title:Text(context.tr('new_task')),
       content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
-        TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const InputDecoration(labelText:'Tâche')),
-        DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const InputDecoration(labelText:'Opérateur'),
+        DashboardTaskField(child:TextField(key:const Key('agendaTaskTitle'),controller:title,decoration:const V2InputDecoration(labelText:'Tâche'))),
+        DashboardTaskField(child:DropdownButtonFormField<int>(key:const Key('agendaAssignee'),decoration:const V2InputDecoration(labelText:'Opérateur'),
           items:operators.map((r)=>DropdownMenuItem<int>(value:r['user'] as int,child:Text(r['username'].toString()))).toList(),
-          onChanged:busy?null:(v)=>change(()=>assignee=v)),
-        TextButton(onPressed:busy?null:() async {
+          onChanged:busy?null:(v)=>change(()=>assignee=v))),
+        DashboardTaskField(child:DashboardPickerTile(label:'Date prévue',value:dashboardDay(day.toIso8601String()),icon:Icons.calendar_month_outlined,onTap:busy?null:() async {
           final selected=await showDatePicker(context:dialog,initialDate:day,firstDate:DateTime(2020),lastDate:DateTime(2100));
           if(selected!=null && dialog.mounted) change(()=>day=selected);
-        },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(day))),
+        })),
         SwitchListTile(title:const Text('Répéter sur plusieurs jours'), value:repeat,
           onChanged:busy?null:(v)=>change(()=>repeat=v)),
         if(repeat) ...[
-          const Text('Date de fin (incluse)'),
-          TextButton(onPressed:busy?null:() async {
+          DashboardTaskField(child:DashboardPickerTile(label:'Date de fin (incluse)',value:dashboardDay(end.toIso8601String()),icon:Icons.calendar_month_outlined,onTap:busy?null:() async {
             final selected=await showDatePicker(context:dialog,initialDate:end,
               firstDate:DateTime(2020),lastDate:DateTime(2100));
             if(selected!=null && dialog.mounted) change(()=>end=selected);
-          },child:Text(MaterialLocalizations.of(dialog).formatMediumDate(end))),
+          })),
           const Text('Tous les jours, ou sélectionnez les jours souhaités'),
           Wrap(spacing:4,children:List.generate(7,(i)=>FilterChip(
             label:Text(['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]),
@@ -886,17 +848,10 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     final kpis = data?["kpis"] ?? {};
     final filteredLots = getFilteredLots();
 
-    return Scaffold(
+    return V2Scaffold(isDashboard:true,
       drawer: _navigationDrawer(),
-      appBar: AppBar(backgroundColor:const Color(0xFF063B63),foregroundColor:Colors.white,
-        title:const Text('Élev’Age'),centerTitle:false,toolbarHeight:56,
-        leading:Builder(builder:(menuContext)=>IconButton(tooltip:context.tr('open_menu'),icon:const Icon(Icons.menu),onPressed:()=>Scaffold.of(menuContext).openDrawer())),
-        actions:[_connectionIndicator(),IconButton(tooltip:context.tr('refresh'),
-          onPressed:isLoading?null:_refreshAll,icon:const Icon(Icons.refresh)),
-          IconButton(key:const Key('topLogoutButton'),tooltip:'Quitter',onPressed:_logout,icon:const Icon(Icons.logout))],
-        bottom:PreferredSize(preferredSize:const Size.fromHeight(52),child:Theme(
-          data:Theme.of(context).copyWith(textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:Colors.white))),
-          child:FarmNavigation(horizontal:true,session:_navigationSession,actions:_navigationActions)))),
+      appBar: FarmTopBar(actions:_navigationActions,session:_navigationSession,
+        connection:_connectionIndicator(),onRefresh:isLoading?null:_refreshAll,onLogout:_logout),
       body: LayoutBuilder(builder: (context, constraints) => Column(children: [
         if(apiService is FarmerApiService && (apiService as FarmerApiService).runtime.warning!=null)
           Container(width:double.infinity,padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),
@@ -912,7 +867,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
               : Padding(padding: const EdgeInsets.all(24), child: Column(
                   mainAxisSize: MainAxisSize.min, children: [
                     Text(loadError ?? 'Données indisponibles.', textAlign: TextAlign.center),
-                    TextButton(onPressed: _refreshAll, child: const Text('Réessayer')),
+                    TextButton(onPressed: _identityExpired ? _logout : _refreshAll, child: Text(_identityExpired ? 'Se reconnecter' : 'Réessayer')),
                   ])))
           : SingleChildScrollView(
         child: Padding(
@@ -929,12 +884,12 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                   final bool horizontal = constraints.maxWidth >= 900;
 
                   Widget especeFilter() {
-                    return DropdownButtonFormField<int>(
+                    return DashboardField(child:DropdownButtonFormField<int>(
                       key: ValueKey('dashboardSpecies:$selectedEspeceId'),
                       isExpanded: true,
 
                       value: selectedEspeceId ?? 0,
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         labelText: context.tr('species'),
                         prefixIcon: const Icon(Icons.pets, color: Colors.green),
                         filled: true,
@@ -942,25 +897,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE0E6EA),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF0B4F7C),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
+                        ),),
                       items: [
                         DropdownMenuItem<int>(
                           value: 0,
@@ -981,18 +918,18 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
                         fetchDashboardByEspece(value == 0 ? null : value);
                       },
-                    );
+                    ));
                   }
 
                   Widget lotFilter() {
-                    return DropdownButtonFormField<int?>(
+                    return DashboardField(child:DropdownButtonFormField<int?>(
                       key: ValueKey('dashboardLot:$selectedLotId'),
 
                       isExpanded: true,
 
 
                       value: selectedLotId,
-                      decoration: InputDecoration(
+                      decoration: V2InputDecoration(
                         labelText: context.tr('batch'),
                         prefixIcon: const Icon(
                           Icons.inventory_2_outlined,
@@ -1003,25 +940,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE0E6EA),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF0B4F7C),
-                            width: 1.5,
-                          ),
-                        ),
-                      ),
+                        ),),
                       items: [
                         DropdownMenuItem<int?>(
                           value: null,
@@ -1045,7 +964,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                           fetchLotDetail(value);
                         }
                       },
-                    );
+                    ));
                   }
 
                   if (horizontal) {
@@ -1078,7 +997,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                   if (constraints.maxWidth >= 1400) {
                     // Grand écran : 5 cards sur une ligne
                     columns = 5;
-                  } else if (constraints.maxWidth >= 1100) {
+                  } else if (constraints.maxWidth >= 1000) {
                     // écran moyen : 5 cards sur une ligne
                     columns = 5;
                   } else if (constraints.maxWidth >= 800) {
@@ -1171,22 +1090,6 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         isMoney: true,
                       ),
                       buildCard(
-                        'Solde / CA (hors achats)',
-                        operatingBalanceRate(kpis)?.toStringAsFixed(1),
-                        Icons.pie_chart,
-                        Colors.deepPurple,
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  PerformanceScreen(apiService: apiService),
-                            ),
-                          );
-                        },
-                        unit: '% · pas un bénéfice',
-                      ),
-                      buildCard(
                         context.tr('client_balance'),
                         totalDettes,
                         Icons.credit_card,
@@ -1202,6 +1105,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         },
                         isMoney: true,
                       ),
+                      PhysicalStockCards(api:apiService,compact:true,species:_stockSpecies,lot:displayedLotId,revision:lastApiSuccess?.millisecondsSinceEpoch??0),
                     ],
                   );
                 },
@@ -1211,6 +1115,13 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
               LayoutBuilder(
                 builder: (context, constraints) {
+                  if (!_mayReadTasks) {
+                    return const Padding(
+                      key: Key('dashboard-agenda-unavailable'),
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('L’agenda n’est pas accessible avec vos droits.'),
+                    );
+                  }
                   final bool isLargeScreen = constraints.maxWidth >= 900;
 
                   // ================= CALENDRIER =================
@@ -1218,6 +1129,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color:const Color(0xFF315D79),width:1.25),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
@@ -1271,6 +1183,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         ),
                         const SizedBox(height: 6),
                         TableCalendar(
+                          locale: AppSettings.instance.languageCode,
                           firstDay: DateTime.utc(2020, 1, 1),
                           lastDay: DateTime.utc(2030, 12, 31),
                           focusedDay: _focusedDay,
@@ -1380,6 +1293,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color:const Color(0xFF315D79),width:1.25),
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,

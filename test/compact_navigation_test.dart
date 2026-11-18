@@ -35,23 +35,18 @@ void main(){
    addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
    final api=CompactOwnerApi();final boundaryKey=GlobalKey();
    await tester.pumpWidget(testApp(RepaintBoundary(key:boundaryKey,child:DashboardScreen(apiService:api))));await tester.pumpAndSettle();
-   final horizontal=find.byWidgetPredicate((w)=>w is FarmNavigation && w.horizontal);
-   final scroll=find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView));
-   final controller=tester.widget<SingleChildScrollView>(scroll).controller!;
-   expect(tester.getSize(horizontal).height,52);
-   expect(tester.widgetList<Text>(find.descendant(of:horizontal,matching:find.byType(Text))).map((w)=>w.data),
-    ['Lots','Achats','Dépenses','Production','Mouvements','Facturation','Historique','Agenda']);
-   if(width>=1366){
-    expect(controller.position.maxScrollExtent,0);
-    final lots=tester.getRect(find.byKey(const ValueKey('navigation-lots-horizontal')));
-    final agenda=tester.getRect(find.byKey(const ValueKey('navigation-agenda-horizontal')));
-    expect(lots.left,closeTo(width-agenda.right,1));
-   }
+   expect(tester.getSize(find.byType(AppBar)).height,64);
+   if(width>=1100){
+     for(final destination in [FarmDestination.purchases,FarmDestination.expenses,FarmDestination.movements,FarmDestination.billing])expect(find.byKey(ValueKey('navigation-${destination.name}-horizontal')),findsOneWidget);
+     expect(find.byKey(const Key('topProductionTrackingButton')),findsOneWidget);
+   }else{expect(find.byKey(const Key('topProductionTrackingButton')),findsNothing);}
+   expect(find.byKey(const ValueKey('navigation-lots-horizontal')),findsNothing);
+   expect(find.byKey(const ValueKey('navigation-history-horizontal')),findsNothing);
    final wifi=tester.getRect(find.byType(ConnectionIndicator));
    final refresh=tester.getRect(find.byTooltip('Actualiser'));
    final logout=tester.getRect(find.byKey(const Key('topLogoutButton')));
    expect(wifi.right,lessThanOrEqualTo(refresh.left));expect(refresh.right,lessThanOrEqualTo(logout.left));
-   expect(logout.right,lessThanOrEqualTo(width));expect(find.text('Élev’Age'),findsOneWidget);
+   expect(logout.right,lessThanOrEqualTo(width));
    expect(tester.takeException(),isNull);
    final folder=Platform.environment['ELEVAGE_NAV_PROOF_DIR'];
    if(folder!=null)await tester.runAsync(()async{

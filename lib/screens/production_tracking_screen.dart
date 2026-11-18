@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
@@ -7,6 +8,7 @@ import '../theme/terre_et_or_theme.dart';
 import 'egg_production_screen.dart';
 import 'feed_distribution_screen.dart';
 import 'growth_tracking_screen.dart';
+import 'vaccination_screen.dart';
 
 class ProductionTrackingScreen extends StatefulWidget {
   final ApiService apiService;
@@ -131,6 +133,8 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
     );
   }
 
+  Widget _vaccinationButton(Map<String,dynamic> lot)=>ElevatedButton.icon(key:const Key('openVaccinationTrackingButton'),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>VaccinationScreen(api:widget.apiService,lotId:_asInt(lot['id'])!,lotName:'${lot['nom']}'))),icon:const Icon(Icons.vaccines_outlined),label:const Text('Suivi de vaccination'));
+
   Widget _productionContent(Map<String, dynamic> lot) {
     final type = lot['type_production']?.toString() ?? 'CHAIR';
     switch (type) {
@@ -231,8 +235,8 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
     final currentLot = selectedLot;
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('production_tracking'))),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('production_tracking'))),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
@@ -253,13 +257,12 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                         message: errorMessage!,
                       )
                     else ...[
-                      DropdownButtonFormField<int>(
+                      V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionSpeciesDropdown'),
                         initialValue: selectedSpeciesId,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText: context.tr('species'),
-                          prefixIcon: const Icon(Icons.pets_outlined),
-                        ),
+                          prefixIcon: const Icon(Icons.pets_outlined),),
                         items: species
                             .map(
                               (item) => DropdownMenuItem<int>(
@@ -274,15 +277,14 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                             selectedLotId = null;
                           });
                         },
-                      ),
+                      )),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<int>(
+                      V2Field(child:DropdownButtonFormField<int>(
                         key: const Key('productionLotDropdown'),
                         initialValue: selectedLotId,
-                        decoration: InputDecoration(
+                        decoration: V2InputDecoration(
                           labelText: context.tr('batch'),
-                          prefixIcon: const Icon(Icons.inventory_2_outlined),
-                        ),
+                          prefixIcon: const Icon(Icons.inventory_2_outlined),),
                         items: filteredLots
                             .map(
                               (item) => DropdownMenuItem<int>(
@@ -295,7 +297,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                                 filteredLots.isEmpty
                             ? null
                             : (value) => setState(() => selectedLotId = value),
-                      ),
+                      )),
                       if (selectedSpeciesId != null && filteredLots.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 10),
@@ -309,10 +311,9 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                       if (currentLot != null) ...[
                         const SizedBox(height: 14),
                         InputDecorator(
-                          decoration: InputDecoration(
+                          decoration: V2InputDecoration(
                             labelText: context.tr('production_type'),
-                            prefixIcon: const Icon(Icons.category_outlined),
-                          ),
+                            prefixIcon: const Icon(Icons.category_outlined),),
                           child: Text(
                             _productionTypeLabel(
                               context,
@@ -325,6 +326,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                         ),
                         const SizedBox(height: 18),
                         _productionContent(currentLot),
+                        _vaccinationButton(currentLot),
                       ],
                     ],
                   ],

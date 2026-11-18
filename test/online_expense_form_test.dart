@@ -1,3 +1,4 @@
+import 'vaccine_projection_test.dart' show vaccineSnapshot;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,8 @@ class OnlineExpenseServer {
       down = false,
       lost = false,
       refusePost = false;
+  int refusalStatus=403;
+  bool feed=false,vaccine=false;
   String role = 'OPERATEUR';
   int posts = 0, reads = 0;
   Map<String, dynamic>? saved;
@@ -69,20 +72,24 @@ class OnlineExpenseServer {
       if (path.endsWith('/categories-depense/')) {
         return http.Response(
           jsonEncode([
-            {'id': 3, 'nom': 'Frais fictifs', 'exploitation': 1},
+            {'id': 3, 'nom': 'Frais fictifs', 'exploitation': 1,if(feed)'stock_purpose':'FEED',if(vaccine)'stock_purpose':'VACCINE'},
           ]),
           200,
         );
       }
+      if(path.endsWith('/vaccine-supplies/'))return http.Response(jsonEncode(vaccineSnapshot()),200);
+      if(path.endsWith('/feed-supplies/'))return http.Response(jsonEncode({'confirmed':true,
+        'products':[{'id':'11111111-1111-4111-8111-111111111111','name':'Croissance test','positions':<dynamic>[]}],
+        'species':[{'id':4,'nom':'Poulet'}],'lots':[{'id':7,'nom':'Lot fictif','espece_id':4}]}),200);
       if (path.endsWith('/depenses/create/')) {
         expect(request.method, 'POST');
         posts++;
         saved = jsonDecode(request.body) as Map<String, dynamic>;
         if (lost) throw http.ClientException('Synthetic lost response');
         if (refusePost) {
-          return http.Response('{"detail":"DEVICE_PROOF_REQUIRED"}', 403);
+          return http.Response('{"detail":"DEVICE_PROOF_REQUIRED"}', refusalStatus);
         }
-        return http.Response(jsonEncode({'id': 40, ...saved!}), 201);
+        return http.Response(jsonEncode({'id': 40, ...saved!,if(feed || vaccine)'stock_confirmed':true}), 201);
       }
       throw StateError('Unexpected synthetic route $path');
     }),
@@ -127,7 +134,7 @@ void main() {
         if (condition == 'no-right') server.allowed = false;
         if (condition == 'offline') server.down = true;
         await tester.pumpWidget(
-          testApp(AddDepenseScreen(apiService: server.api)),
+          testApp(AddDepenseScreen(apiService: server.api,stayAfterSuccess:true)),
         );
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('expense-submit')), findsNothing);
@@ -152,7 +159,7 @@ void main() {
       (tester) async {
         final server = OnlineExpenseServer();
         await tester.pumpWidget(
-          testApp(AddDepenseScreen(apiService: server.api)),
+          testApp(AddDepenseScreen(apiService: server.api,stayAfterSuccess:true)),
         );
         await tester.pumpAndSettle();
         await selectExpense(tester);
@@ -161,7 +168,7 @@ void main() {
         if (condition == 'lost') server.lost = true;
         if (condition == 'server-device-refusal') server.refusePost = true;
         final submit = find.byKey(const Key('expense-submit'));
-        await tester.ensureVisible(submit);
+        await tester.scrollUntilVisible(submit,150,scrollable:find.byType(Scrollable).first);
         await tester.tap(submit);
         await tester.tap(submit);
         await tester.pumpAndSettle();
@@ -191,6 +198,7 @@ void main() {
         }
         if (condition == 'lost' || condition == 'server-device-refusal') {
           expect(find.textContaining('Résultat non confirmé'), findsOneWidget);
+          await tester.scrollUntilVisible(submit,150,scrollable:find.byType(Scrollable).first);
           expect(tester.widget<FilledButton>(submit).onPressed, isNull);
           await tester.pump(const Duration(minutes: 6));
           expect(server.posts, 1);
@@ -205,12 +213,12 @@ void main() {
     (tester) async {
       final server = OnlineExpenseServer();
       await tester.pumpWidget(
-        testApp(AddDepenseScreen(apiService: server.api)),
+        testApp(AddDepenseScreen(apiService: server.api,stayAfterSuccess:true)),
       );
       await tester.pumpAndSettle();
       await selectExpense(tester);
       await tester.enterText(find.byKey(const Key('expense-amount')), '12.345');
-      await tester.ensureVisible(find.byKey(const Key('expense-submit')));
+      await tester.scrollUntilVisible(find.byKey(const Key('expense-submit')),150,scrollable:find.byType(Scrollable).first);
       await tester.tap(find.byKey(const Key('expense-submit')));
       await tester.pumpAndSettle();
       expect(find.text('Deux décimales au maximum.'), findsOneWidget);

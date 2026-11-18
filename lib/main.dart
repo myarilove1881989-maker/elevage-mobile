@@ -1,3 +1,7 @@
+import 'widgets/v2_components.dart' show V2ScaffoldState;
+import 'dart:async';
+import 'services/health_notifications.dart';
+import 'theme/design_system_v2.dart';
 import 'widgets/mutation_refresh.dart';
 import 'widgets/android_update_notice.dart';
 
@@ -37,6 +41,7 @@ Future<void> initNotifications() async {
       >();
 
   await androidPlugin?.requestNotificationsPermission();
+  HealthReminderCoordinator.current ??= HealthReminderCoordinator(sink:PluginHealthNotificationSink(notificationsPlugin),preferences:SharedPreferences.getInstance());
 }
 
 void main() async {
@@ -134,7 +139,9 @@ class _ElevageAppState extends State<ElevageApp> {
   }
 
   void _onSessionExpired() {
+    unawaited(HealthReminderCoordinator.current?.suspend().catchError((Object _) {})??Future<void>.value());
     if (_redirectPending || ApiService.farmerSession) return;
+    V2ScaffoldState.preserveExpiredDrafts(ApiService.lastExpiredUsername);
     _redirectPending = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -178,7 +185,7 @@ class _ElevageAppState extends State<ElevageApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        theme: ThemeData(primarySwatch: Colors.green),
+        theme: designSystemV2(),
         builder: (_, child) => SafeArea(
           top: false,
           child: Config.current.isLab

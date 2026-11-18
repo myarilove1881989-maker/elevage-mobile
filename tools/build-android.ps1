@@ -1,6 +1,6 @@
-param([Parameter(Mandatory=$true)][int]$VersionCode,[string]$VersionName='1.0.0')
+param([Parameter(Mandatory=$true)][int]$VersionCode,[string]$VersionName='1.0.7')
 $ErrorActionPreference='Stop'
-if($VersionCode -le 113){throw 'A new build number greater than 113 is required; do not replace delivery 113'}
+if($VersionCode -le 119){throw 'A new build number greater than 119 is required; do not replace published APK 119'}
 $repo=Split-Path $PSScriptRoot -Parent
 $root=Split-Path $repo -Parent
 $env:TEMP=Join-Path $root 'tmp'; $env:TMP=$env:TEMP

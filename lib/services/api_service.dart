@@ -1,3 +1,4 @@
+import 'health_notifications.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -22,8 +23,11 @@ class ApiHttpException implements Exception {
   String toString() => 'Exception: $message';
 }
 
+enum ApiConnectionFailure { network, timeout }
+
 class ApiConnectionException implements Exception {
-  const ApiConnectionException();
+  const ApiConnectionException([this.failure=ApiConnectionFailure.network]);
+  final ApiConnectionFailure failure;
 
   @override
   String toString() =>
@@ -33,16 +37,33 @@ class ApiConnectionException implements Exception {
 /// Une seule tentative, bornée pendant l'envoi et la lecture de réponse.
 /// Aucune écriture n'est relancée automatiquement après un délai dépassé.
 class _ApiClient extends http.BaseClient {
-  _ApiClient(this.inner, this.requestTimeout);
+  _ApiClient(this.inner, this.requestTimeout, this.renew);
+  final Future<bool> Function(String) renew;
   final http.Client inner;
   final Duration requestTimeout;
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final identity=ApiService.sessionIdentity;
+    http.BaseRequest sent=request;
     try {
-      final response = await inner.send(request).timeout(requestTimeout);
-      final bytes = await response.stream.toBytes().timeout(requestTimeout);
+      final deadline=Stopwatch()..start();
+      Duration remaining() {final left=requestTimeout-deadline.elapsed; if(left<=Duration.zero)throw TimeoutException('request deadline');return left;}
+      var response = await inner.send(request).timeout(remaining());
+      var bytes = await response.stream.toBytes().timeout(remaining());
+      final authorization=request.headers['Authorization'] ?? request.headers['authorization'];
+      // An authentication rejection has no business effect. Only that response
+      // can be replayed, once, with identical body/operation UUID. Never timeouts.
+      if(response.statusCode==401 && {'GET','HEAD'}.contains(request.method) && authorization!=null && request is http.Request &&
+          !request.url.path.endsWith('/token/refresh/') && await renew(authorization).timeout(remaining()) && identity==ApiService.sessionIdentity) {
+        final replay=http.Request(request.method,request.url)
+          ..headers.addAll(request.headers)..bodyBytes=request.bodyBytes
+          ..followRedirects=request.followRedirects..maxRedirects=request.maxRedirects;
+        replay.headers['Authorization']='Bearer ${ApiService.token}';
+        sent=replay;
+        response=await inner.send(replay).timeout(remaining());
+        bytes=await response.stream.toBytes().timeout(remaining());
+      }
       if (response.statusCode >= 200 && response.statusCode < 300 &&
           identity == ApiService.sessionIdentity && {'POST', 'PUT', 'PATCH', 'DELETE'}.contains(request.method) &&
           !RegExp(r'/(token|login|password|register|auth)(/|$)').hasMatch(request.url.path)) {
@@ -52,12 +73,12 @@ class _ApiClient extends http.BaseClient {
         Stream.value(bytes),
         response.statusCode,
         headers: response.headers,
-        request: response.request ?? request,
+        request: sent,
         reasonPhrase: response.reasonPhrase,
         isRedirect: response.isRedirect,
       );
     } on TimeoutException {
-      throw const ApiConnectionException();
+      throw const ApiConnectionException(ApiConnectionFailure.timeout);
     } on http.ClientException {
       throw const ApiConnectionException();
     }
@@ -72,10 +93,11 @@ class ApiService {
     http.Client? client,
     TokenStore? tokenStore,
     Duration requestTimeout = const Duration(seconds: 30),
-  }) : _client = _ApiClient(GuardedApiClient(client), requestTimeout),
-       _tokenStore = tokenStore ?? TokenService();
+  }) : _tokenStore = tokenStore ?? TokenService() {
+    _client = _ApiClient(GuardedApiClient(client), requestTimeout, _renew);
+  }
 
-  final http.Client _client;
+  late final http.Client _client;
   final TokenStore _tokenStore;
   static final sessionExpired = ValueNotifier<int>(0);
   static final businessChanges = ValueNotifier<int>(0);
@@ -88,9 +110,55 @@ class ApiService {
 
   static String? token;
   static String? _localPresentationIdentity;
+  static String? _authenticatedIdentity;
+  static String? _identityAccess;
+  static String? _authenticatedUsername,lastExpiredUsername;
+  static Future<bool>? _renewal;
+  static String? _renewalIdentity;
+  static Future<void>? _expiry;
+  Future<bool> _renew(String rejected) async {
+    final current=token??globalToken;
+    if(farmerSession)return false;
+    if(current==null)return false;
+    if(rejected!='Bearer $current')return true;
+    if(_renewal!=null && _renewalIdentity==sessionIdentity)return _renewal!;
+    final store=_tokenStore;
+    if(store is! RefreshTokenStore)return false;
+    final identity=sessionIdentity;
+    final attempt=() async {
+      final refresh=await (store as RefreshTokenStore).getRefreshToken();
+      if(refresh==null || refresh.isEmpty)return false;
+      final response=await _client.post(Uri.parse('$baseUrl/token/refresh/'),
+        headers:{'Content-Type':'application/json'},body:jsonEncode({'refresh':refresh}));
+      if(sessionIdentity!=identity)return false;
+      if(response.statusCode!=200)return false;
+      final data=jsonDecode(response.body);
+      if(data is! Map || data['access'] is! String || (data['access'] as String).isEmpty)return false;
+      _authenticatedIdentity = identity;
+      await _tokenStore.saveToken(data['access'] as String);
+      if(sessionIdentity!=identity){await _tokenStore.clearToken();return false;}
+      token=data['access'] as String;globalToken=token;_identityAccess=token;
+      if(data['refresh'] is String)await (store as RefreshTokenStore).saveRefreshToken(data['refresh'] as String);
+      return true;
+    }();
+    _renewal=attempt;_renewalIdentity=identity;
+    try{return await attempt;}finally{if(identical(_renewal,attempt))_renewal=null;}
+  }
+
+  Future<void> _expire() async {
+    if(_expiry!=null)return _expiry!;
+    final hadSession=token!=null || globalToken!=null;
+    if(hadSession)lastExpiredUsername=_authenticatedUsername;
+    // Clear presentation credentials before any asynchronous cleanup: one event
+    // for simultaneous 401s, and no old request may expire a newly signed-in user.
+    token=null;globalToken=null;_authenticatedIdentity=null;
+    final cleanup=() async {await logout();if(hadSession)sessionExpired.value++;}();
+    _expiry=cleanup;
+    try{await cleanup;}finally{if(identical(_expiry,cleanup))_expiry=null;}
+  }
   static bool farmerSession=false;
   /// Identity guards use this; it is never an HTTP authorization header.
-  static String? get sessionIdentity=>token ?? globalToken ?? _localPresentationIdentity;
+  static String? get sessionIdentity=>(_identityAccess==token && token!=null ? _authenticatedIdentity : null) ?? token ?? globalToken ?? _localPresentationIdentity;
   static void setLocalPresentationIdentity(String value) {_localPresentationIdentity=value;}
   static void clearLocalPresentationIdentity() {_localPresentationIdentity=null;}
   Listenable? get sessionChanges=>null;
@@ -150,12 +218,12 @@ class ApiService {
 
     // 🔒 TOKEN EXPIRÉ
     if (response.statusCode == 401 && clearSessionOnUnauthorized) {
-      final hadSession = token != null || globalToken != null;
-      try {
-        await logout();
-      } finally {
-        if (hadSession) sessionExpired.value++;
+      final sent=response.request?.headers['Authorization'];
+      final current=token??globalToken;
+      if(current!=null && sent!=null && sent!='Bearer $current') {
+        throw const ApiHttpException(401,'Session expirée pour cette ancienne requête. Réessayez avec le compte courant.');
       }
+      await _expire();
 
       throw ApiHttpException(response.statusCode, "Session expirée, reconnectez-vous 🔒");
     }
@@ -275,6 +343,8 @@ class ApiService {
 
   // ================= LOGIN =================
   Future<bool> login(String username, String password) async {
+    if(_expiry!=null)await _expiry;
+    if(_renewal!=null){try{await _renewal;}catch(_){}}
     late final http.Response response;
     try {
       response = await _client.post(
@@ -298,6 +368,10 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     final access = data["access"] as String;
     await _tokenStore.saveToken(access);
+    if(_tokenStore is RefreshTokenStore) {
+      await (_tokenStore as RefreshTokenStore).saveRefreshToken(data['refresh'] is String?data['refresh'] as String:'');
+    }
+    _authenticatedIdentity=access;_identityAccess=access;_authenticatedUsername=username;
     token = access;
     globalToken = access;
 
@@ -308,6 +382,9 @@ class ApiService {
 
   /// Switch explicitly to an already authenticated personal online session.
   Future<void> usePersonalOnlineSession(String access, String username) async {
+    if(_expiry!=null)await _expiry;
+    if(_renewal!=null){try{await _renewal;}catch(_){}}
+    if(_tokenStore is RefreshTokenStore)await (_tokenStore as RefreshTokenStore).saveRefreshToken('');
     if (access.isEmpty || username.trim().isEmpty) {
       throw StateError('Connexion personnelle requise.');
     }
@@ -341,13 +418,16 @@ class ApiService {
     final savedToken = await _tokenStore.getToken();
     token = savedToken == null || savedToken.isEmpty ? null : savedToken;
     globalToken = token;
+    _authenticatedUsername=(await SharedPreferences.getInstance()).getString('username');
   }
 
   Future<void> logout() async {
+    _authenticatedIdentity=null;
     farmerSession = false;
     clearLocalPresentationIdentity();
     token = null;
     globalToken = null;
+    try {await HealthReminderCoordinator.current?.suspend();}catch(_){}
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('username');
     await prefs.remove('session_kind');

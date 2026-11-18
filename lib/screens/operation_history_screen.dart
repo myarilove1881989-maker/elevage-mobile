@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/operation_history.dart';
@@ -101,8 +102,8 @@ class _OperationHistoryScreenState extends State<OperationHistoryScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>Scaffold(
-    appBar: AppBar(title: const Text('Historique')),
+  Widget build(BuildContext context) => Theme(data:terreEtOrTheme(context),child:Builder(builder:(context)=>V2Scaffold(
+    appBar: V2AppBar(title: const Text('Historique')),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -110,18 +111,18 @@ class _OperationHistoryScreenState extends State<OperationHistoryScreen> {
           builder:(_)=>OwnerOperationHistoryScreen(api:widget.api))),
           child:const Text('Activité complète des tablettes — propriétaire')),
         const TerreEtOrHeader(icon:Icons.history,title:'Historique',subtitle:'Retrouvez vos opérations et leur état'),
-        TextField(decoration:const InputDecoration(labelText:'Rechercher un éleveur ou un lot',prefixIcon:Icon(Icons.search)),
-          onChanged:(value)=>setState(()=>search=value.trim().toLowerCase())),
+        V2Field(child:TextField(decoration:const V2InputDecoration(labelText:'Rechercher un éleveur ou un lot',prefixIcon:Icon(Icons.search),),
+          onChanged:(value)=>setState(()=>search=value.trim().toLowerCase()))),
         ExpansionTile(title:const Text('Filtres'),children:[
-        DropdownButtonFormField<String>(initialValue:typeFilter,decoration:const InputDecoration(labelText:'Type d’opération'),
+        V2Field(child:DropdownButtonFormField<String>(initialValue:typeFilter,decoration:const V2InputDecoration(labelText:'Type d’opération',),
           items:[const DropdownMenuItem(value:'',child:Text('Toutes les opérations')),
             for(final type in {if(typeFilter.isNotEmpty)typeFilter,...items.map((e)=>e.type),...widget.api.localOperations.map((e)=>OperationHistoryItem.local(e).type)})
-              DropdownMenuItem(value:type,child:Text(type))],onChanged:(value)=>setState(()=>typeFilter=value??'')),
+              DropdownMenuItem(value:type,child:Text(type))],onChanged:(value)=>setState(()=>typeFilter=value??''))),
         const SizedBox(height:12),
-        DropdownButtonFormField<String>(initialValue:statusFilter,decoration:const InputDecoration(labelText:'État'),
+        V2Field(child:DropdownButtonFormField<String>(initialValue:statusFilter,decoration:const V2InputDecoration(labelText:'État',),
           items:[const DropdownMenuItem(value:'',child:Text('Tous les états')),
             for(final status in ['En attente','Synchronisée','Échec'])
-              DropdownMenuItem(value:status,child:Text(status))],onChanged:(value)=>setState(()=>statusFilter=value??'')),
+              DropdownMenuItem(value:status,child:Text(status))],onChanged:(value)=>setState(()=>statusFilter=value??''))),
         Wrap(children:[TextButton(onPressed:choosePeriod,child:Text(period==null?'Choisir une période':'Période sélectionnée')),
           TextButton(onPressed:()=>setState(() {period=null;typeFilter='';statusFilter='';}),child:const Text('Effacer les filtres'))]),
         ]),

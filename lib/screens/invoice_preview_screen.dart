@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import 'dart:typed_data';
 import '../config.dart';
 import 'package:flutter/material.dart';
@@ -32,8 +33,8 @@ class _InvoicePreviewScreenState extends State<InvoicePreviewScreen> {
   );
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
+  Widget build(BuildContext context) => V2Scaffold(
+    appBar: V2AppBar(
       title: Text(widget.languageCode == 'fr' ? 'Facture PDF' : 'PDF invoice'),
     ),
     body: FutureBuilder<Uint8List>(

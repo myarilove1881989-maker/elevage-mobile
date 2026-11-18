@@ -1,3 +1,4 @@
+import 'android_online_permissions.dart';
 import 'dart:math';
 import 'api_service.dart';
 import 'permission_contract.dart';
@@ -36,13 +37,11 @@ class UserAdministrationService {
     if (raw is! Map<String, dynamic>) {
       throw StateError('Contrat de droits manquant.');
     }
-    final rights = PermissionContract.decode(
-      raw,
-      userId: data['user'] as int,
-      farmId: data['exploitation'] as int,
-      role: 'OWNER',
-      rightsVersion: data['membership']['version'] as int,allowHttpV2:true,
-    );
+    final rights = api.hasUnifiedOfflineSession
+      ? PermissionContract.decode(raw,userId:data['user'] as int,farmId:data['exploitation'] as int,
+          role:'OWNER',rightsVersion:data['membership']['version'] as int,allowHttpV2:true)
+      : androidOnlinePermissions(raw,userId:data['user'] as int,farmId:data['exploitation'] as int,
+          role:'OWNER',rightsVersion:data['membership']['version'] as int);
     if (!rights.allows('users.manage')) {
       throw StateError('Gestion des utilisateurs refusée.');
     }

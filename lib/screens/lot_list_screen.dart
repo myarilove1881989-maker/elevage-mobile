@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
@@ -62,14 +63,14 @@ class _LotListScreenState extends State<LotListScreen> with MutationRefresh<LotL
   @override
   Widget build(BuildContext context) {
     if (isLoading && !hasLoaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final visibleLots=lots.where((lot)=>ApiService.isLotClosed(lot as Map)==showClosed).toList();
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('batches'))),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text(context.tr('batches'))),
         body: Column(
           children: [
             if (isLoading) const LinearProgressIndicator(),

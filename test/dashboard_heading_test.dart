@@ -24,6 +24,8 @@ void main() {
       addTearDown(api.close);
       await tester.pumpWidget(ElevageApp(apiService: api));
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
       tester.view.viewInsets = const FakeViewPadding(bottom: 360);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -48,6 +50,8 @@ void main() {
     addTearDown(api.close);
     await tester.pumpWidget(ElevageApp(apiService: api));
     await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
     final heading = find.byWidgetPredicate(
       (widget) =>
           widget is RichText &&

@@ -1,3 +1,5 @@
+import '../widgets/v2_components.dart';
+import 'design_system_v2.dart';
 import 'package:flutter/material.dart';
 
 abstract final class TerreEtOrColors {
@@ -5,71 +7,14 @@ abstract final class TerreEtOrColors {
   static const teal = Color(0xFF167B77);
   static const green = Color(0xFF279B68);
   static const gold = Color(0xFFE4A13A);
-  static const cream = Color(0xFFFFFBF4);
+  static const cream = Color(0xFFFCF7FF);
   static const paleGold = Color(0xFFFFF1D8);
   static const ink = Color(0xFF17384D);
   static const muted = Color(0xFF6C7E78);
-  static const border = Color(0xFFE5DED0);
+  static const border = Color(0xFF315D79);
 }
 
-ThemeData terreEtOrTheme(BuildContext context) {
-  final base = Theme.of(context);
-  final outline = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: const BorderSide(color: TerreEtOrColors.border),
-  );
-
-  return base.copyWith(
-    scaffoldBackgroundColor: TerreEtOrColors.cream,
-    colorScheme: base.colorScheme.copyWith(
-      primary: TerreEtOrColors.green,
-      secondary: TerreEtOrColors.gold,
-      surface: Colors.white,
-    ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: TerreEtOrColors.navy,
-      foregroundColor: Colors.white,
-      elevation: 0,
-      centerTitle: false,
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.white,
-      border: outline,
-      enabledBorder: outline,
-      focusedBorder: outline.copyWith(
-        borderSide: const BorderSide(
-          color: TerreEtOrColors.green,
-          width: 2,
-        ),
-      ),
-      prefixIconColor: TerreEtOrColors.gold,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    ),
-    cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 2,
-      shadowColor: TerreEtOrColors.navy.withValues(alpha: 0.12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: TerreEtOrColors.green,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: TerreEtOrColors.green.withValues(alpha: 0.45),
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-    ),
-    floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: TerreEtOrColors.green,
-      foregroundColor: Colors.white,
-    ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: TerreEtOrColors.green,
-    ),
-  );
-}
+ThemeData terreEtOrTheme(BuildContext context) => designSystemV2(Theme.of(context));
 
 class TerreEtOrHeader extends StatelessWidget {
   final IconData icon;
@@ -93,10 +38,10 @@ class TerreEtOrHeader extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: TerreEtOrColors.paleGold,
+              color: V2Colors.green.withValues(alpha:0.10),
               borderRadius: BorderRadius.circular(15),
             ),
-            child: Icon(icon, color: TerreEtOrColors.gold, size: 28),
+            child: Icon(icon, color: V2Colors.green, size: 28),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -136,10 +81,8 @@ class TerreEtOrPanel extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: const Border(
-          top: BorderSide(color: TerreEtOrColors.gold, width: 5),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color:V2Colors.border,width:1.25),
         boxShadow: [
           BoxShadow(
             color: TerreEtOrColors.navy.withValues(alpha: 0.08),
@@ -165,16 +108,6 @@ class TerreEtOrDateTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: TerreEtOrColors.paleGold.withValues(alpha: 0.55),
-      borderRadius: BorderRadius.circular(14),
-      child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        leading: const Icon(Icons.calendar_month, color: TerreEtOrColors.gold),
-        title: Text(label),
-          trailing: onTap==null?null:const Icon(Icons.chevron_right, color: TerreEtOrColors.navy),
-        onTap: onTap,
-      ),
-    );
+    return V2PickerTile(label:'Date',value:label.replaceFirst(RegExp(r'^Date\s*:\s*'),''),icon:Icons.calendar_month_outlined,onTap:onTap);
   }
 }

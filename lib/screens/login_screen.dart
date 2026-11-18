@@ -1,3 +1,6 @@
+import 'package:flutter/services.dart';
+import '../services/expired_draft.dart';
+import '../widgets/farm_login_loading.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'farmer_access_screen.dart';
@@ -70,6 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
           } catch (_) {runtime.dispose();rethrow;}
           return;
         }
+        final recovered=ExpiredDraft.take(usernameController.text.trim());
+        if(recovered!=null && mounted)await showDialog<void>(context:context,builder:(dialog)=>AlertDialog(
+          title:const Text('Saisies récupérées après expiration'),
+          content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+            const Text('Ces textes n’ont pas été renvoyés. Vérifiez les opérations déjà reçues avant toute nouvelle saisie ; les références du lot et du client sont à rechoisir.'),
+            const SizedBox(height:12),SelectableText(recovered),
+          ])),actions:[TextButton(onPressed:()=>Clipboard.setData(ClipboardData(text:recovered)),child:const Text('Copier mes saisies')),
+            FilledButton(onPressed:()=>Navigator.pop(dialog),child:const Text('Continuer'))]));
+        if(!mounted)return;
         ApiService.farmerSession=false;
         final prefs=await SharedPreferences.getInstance();await prefs.setString('session_kind','owner');
         if(!mounted) return;
@@ -94,17 +106,25 @@ class _LoginScreenState extends State<LoginScreen> {
       if(mounted) {setState(() {isLoading=false;errorMessage=changed==true?
         'Mot de passe modifié. Connectez-vous avec votre nouveau mot de passe.':
         'Le changement de mot de passe est nécessaire pour vous connecter.';});}
-    } on ApiConnectionException {
+    } on ApiHttpException catch (error) {
+      if (!mounted) return;
+      setState(() {errorMessage=(error.status==400 || error.status==401)
+        ? context.tr('invalid_credentials')
+        : error.status>=500 ? 'Le serveur est temporairement indisponible. Réessayez plus tard.'
+        : 'Connexion refusée par le serveur. Vérifiez votre accès.';});
+    } on ApiConnectionException catch (error) {
       if (!mounted) return;
       setState(() {
         isLoading = false;
-        errorMessage = context.tr('server_unreachable');
+        errorMessage = error.failure==ApiConnectionFailure.timeout ? 'La connexion prend trop de temps. Vérifiez le réseau et réessayez.' : context.tr('server_unreachable');
       });
+    } on FormatException {
+      if(mounted)setState(()=>errorMessage='Réponse du serveur inattendue. Réessayez plus tard.');
     } catch (e) {
       if (!mounted) return;
       setState(() {
         isLoading = false;
-        errorMessage = context.tr('invalid_credentials');
+        errorMessage = 'Connexion impossible pour le moment. Réessayez.';
       });
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -228,17 +248,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: isLoading
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              context.tr('login'),
+                      child: Text(
+                              isLoading ? 'Connexion…' : context.tr('login'),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -246,6 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                     ),
                   ),
+                  FarmLoginLoading(active: isLoading),
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: isLoading

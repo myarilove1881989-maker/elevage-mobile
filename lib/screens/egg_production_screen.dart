@@ -1,3 +1,5 @@
+import '../services/money_input.dart';
+import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
@@ -181,7 +183,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
           final losses = (int.tryParse(broken.text.trim()) ?? 0) +
               (int.tryParse(downgraded.text.trim()) ?? 0) +
               (int.tryParse(consumed.text.trim()) ?? 0);
-          return AlertDialog(
+          return V2AlertDialog(
             title: Text(original==null?dialogContext.tr('egg_new_collection'):'Modifier la collecte'),
             content: SizedBox(
               width: 450,
@@ -190,73 +192,56 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 12,
-                      children: [
-                        TextButton.icon(
-                          key: const Key('eggCollectionDate'),
-                          icon: const Icon(Icons.calendar_today_outlined),
-                          label: Text(MaterialLocalizations.of(dialogContext)
-                              .formatMediumDate(selectedDate)),
-                          onPressed: null,
-                        ),
-                        TextButton.icon(
-                          key: const Key('eggCollectionTime'),
-                          icon: const Icon(Icons.access_time),
-                          label: Text(MaterialLocalizations.of(dialogContext)
-                              .formatTimeOfDay(selectedTime)),
-                          onPressed: null,
-                        ),
-                      ],
-                    ),
+                    V2Pair(first:V2PickerTile(key:const Key('eggCollectionDate'),label:'Date de collecte',value:v2Day(selectedDate.toIso8601String()),icon:Icons.calendar_today_outlined),
+                      second:V2PickerTile(key:const Key('eggCollectionTime'),label:'Heure',value:'${selectedTime.hour.toString().padLeft(2,'0')}:${selectedTime.minute.toString().padLeft(2,'0')}',icon:Icons.access_time)),
                     const SizedBox(height: 12),
                     Text(dialogContext.tr('egg_production_section')),
-                    TextField(
+                    V2Field(child:TextField(
                       key: const Key('eggFullTrays'),
                       controller: trays,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_full_trays')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_full_trays'),),
                       onChanged: (_) => setDialogState(() {}),
-                    ),
-                    TextField(
+                    )),
+                    V2Field(child:TextField(
                       key: const Key('eggRemaining'),
                       controller: remainder,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_remaining')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_remaining'),),
                       onChanged: (_) => setDialogState(() {}),
-                    ),
+                    )),
                     const SizedBox(height: 10),
                     Text('${dialogContext.tr('egg_collected_total')}: $collected'),
                     const SizedBox(height: 14),
                     Text(dialogContext.tr('egg_losses_section')),
-                    TextField(
+                    V2Field(child:TextField(
                       key: const Key('eggBroken'),
                       controller: broken,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_broken')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_broken'),),
                       onChanged: (_) => setDialogState(() {}),
-                    ),
-                    TextField(
+                    )),
+                    V2Field(child:TextField(
                       key: const Key('eggDowngraded'),
                       controller: downgraded,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_downgraded')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_downgraded'),),
                       onChanged: (_) => setDialogState(() {}),
-                    ),
-                    TextField(
+                    )),
+                    V2Field(child:TextField(
                       key: const Key('eggConsumed'),
                       controller: consumed,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_consumed')),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_consumed'),),
                       onChanged: (_) => setDialogState(() {}),
-                    ),
+                    )),
                     const SizedBox(height: 10),
                     Text('${dialogContext.tr('egg_commercializable')}: ${collected - losses}'),
-                    TextField(
+                    V2Field(child:TextField(
                       key: const Key('eggNote'),
                       controller: note,
-                      decoration: InputDecoration(labelText: dialogContext.tr('egg_optional_note')),
-                    ),
+                      decoration: V2InputDecoration(labelText: dialogContext.tr('egg_optional_note'),),
+                    )),
                   ],
                 ),
               ),
@@ -347,14 +332,14 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
     final dialogRoute = DialogRoute<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => V2AlertDialog(
           title: const Text('Vente d’œufs'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<int>(
-                  decoration: const InputDecoration(labelText: 'Client'),
+                V2Field(child:DropdownButtonFormField<int>(
+                  decoration: const V2InputDecoration(labelText: 'Client',),
                   items: clients.map<DropdownMenuItem<int>>((client) {
                     return DropdownMenuItem(
                       value: client['id'] as int,
@@ -362,13 +347,12 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                     );
                   }).toList(),
                   onChanged: (value) => clientId = value,
-                ),
+                )),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
+                V2Field(child:DropdownButtonFormField<String>(
                   initialValue: packaging,
-                  decoration: const InputDecoration(
-                    labelText: 'Conditionnement',
-                  ),
+                  decoration: const V2InputDecoration(
+                    labelText: 'Conditionnement',),
                   items: const [
                     DropdownMenuItem(value: 'UNITE', child: Text('Unité')),
                     DropdownMenuItem(
@@ -383,20 +367,20 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                   ],
                   onChanged: (value) =>
                       setDialogState(() => packaging = value ?? 'PLATEAU'),
-                ),
+                )),
                 _numberField(packageCount, 'Nombre de conditionnements'),
                 if (packaging == 'CARTON')
                   _numberField(cartonSize, 'Œufs par carton'),
-                TextField(
+                V2Field(child:TextField(
+                  inputFormatters: [MoneyInputFormatter()],
                   controller: packagePrice,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: InputDecoration(
+                  decoration: V2InputDecoration(
                     labelText:
-                        'Prix par conditionnement (${AppSettings.instance.currency.symbol})',
-                  ),
-                ),
+                        'Prix par conditionnement (${AppSettings.instance.currency.symbol})',),
+                )),
               ],
             ),
           ),
@@ -416,7 +400,7 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
                     packaging: packaging,
                     packageCount: int.parse(packageCount.text),
                     packagePrice: double.parse(
-                      packagePrice.text.replaceAll(',', '.'),
+                      MoneyInput.canonical(packagePrice.text),
                     ),
                     eggsPerPackage: packaging == 'CARTON'
                         ? int.parse(cartonSize.text)
@@ -461,11 +445,11 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
   }
 
   Widget _numberField(TextEditingController controller, String label) {
-    return TextField(
+    return V2Field(child:TextField(
       controller: controller,
       keyboardType: TextInputType.number,
-      decoration: InputDecoration(labelText: label),
-    );
+      decoration: V2InputDecoration(labelText: label,),
+    ));
   }
 
   Widget _datedStockPanel() {
@@ -718,8 +702,8 @@ class _EggProductionScreenState extends State<EggProductionScreen> with Mutation
   Widget build(BuildContext context) {
     return Theme(
       data: terreEtOrTheme(context),
-      child: Scaffold(
-        appBar: AppBar(title: Text('Ponte · ${widget.lotName}')),
+      child: V2Scaffold(
+        appBar: V2AppBar(title: Text('Ponte · ${widget.lotName}')),
         body: RefreshIndicator(
           onRefresh: loadData,
           child: ListView(

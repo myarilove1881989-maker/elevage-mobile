@@ -24,7 +24,7 @@ class AuthApiFake extends ApiService {
   Future<bool> login(String username, String password) async {
     if (offline) throw const ApiConnectionException();
     if (succeeds) return true;
-    throw Exception('Identifiants invalides');
+    throw const ApiHttpException(401,'Identifiants invalides');
   }
 
   @override

@@ -265,6 +265,8 @@ void main() {
     ApiService.token = 'chargé';
     await tester.pumpWidget(ElevageApp(apiService: AuthApiFake()));
     await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
     expect(find.byType(DashboardScreen), findsOneWidget);
     expect(find.byType(LoginScreen), findsNothing);
     expect(tester.takeException(), isNull);
@@ -275,6 +277,8 @@ void main() {
     (tester) async {
       ApiService.token = 'chargé';
       await tester.pumpWidget(ElevageApp(apiService: AuthApiFake()));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
       await tester.pumpAndSettle();
       final context = tester.element(find.byType(DashboardScreen));
       Navigator.of(context).push(

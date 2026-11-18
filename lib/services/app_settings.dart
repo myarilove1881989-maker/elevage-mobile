@@ -94,6 +94,7 @@ class AppSettings extends ChangeNotifier {
   String currencyCode = 'XAF';
   String countryCode = '';
   String city = '';
+  bool animationsEnabled = true;
 
   CurrencyOption get currency => currencies.firstWhere(
         (item) => item.code == currencyCode,
@@ -114,6 +115,7 @@ class AppSettings extends ChangeNotifier {
       }
     }
     city = prefs.getString('settings_city') ?? '';
+    animationsEnabled = prefs.getBool('settings_micro_animations') ?? true;
   }
 
   Future<void> save({
@@ -132,6 +134,13 @@ class AppSettings extends ChangeNotifier {
     await prefs.setString('settings_currency', currencyCode);
     await prefs.setString('settings_country', countryCode);
     await prefs.setString('settings_city', city);
+    notifyListeners();
+  }
+
+  Future<void> setAnimationsEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('settings_micro_animations', value);
+    animationsEnabled = value;
     notifyListeners();
   }
 

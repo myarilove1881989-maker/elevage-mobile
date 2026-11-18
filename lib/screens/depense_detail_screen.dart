@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -93,14 +94,14 @@ class _DepenseDetailScreenXState extends State<DepenseDetailScreenX> with Mutati
   @override
   Widget build(BuildContext context) {
     if (isLoading)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(body: Center(child: CircularProgressIndicator()));
     if (error != null)
-      return Scaffold(
-          appBar: AppBar(title: Text(context.tr('expenses'))),
+      return V2Scaffold(
+          appBar: V2AppBar(title: Text(context.tr('expenses'))),
           body: Center(child: Text(error!)));
     if (data.isEmpty)
-      return Scaffold(
-          appBar: AppBar(title: Text(context.tr('expenses'))),
+      return V2Scaffold(
+          appBar: V2AppBar(title: Text(context.tr('expenses'))),
           body: Center(child: Text(context.tr('no_data'))));
     final main = data.first;
     final mainValue = _num(main['total']);
@@ -108,8 +109,8 @@ class _DepenseDetailScreenXState extends State<DepenseDetailScreenX> with Mutati
         .whereType<String>()
         .where((value) => value.isNotEmpty)
         .join(' · ');
-    return Scaffold(
-      appBar: AppBar(
+    return V2Scaffold(
+      appBar: V2AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${context.tr('expenses')} / ${context.tr('category')}'),
           if (selection.isNotEmpty)

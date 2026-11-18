@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
 
@@ -54,10 +55,10 @@ class _StockDetailScreenState extends State<StockDetailScreen> with MutationRefr
   @override
   Widget build(BuildContext context) {
     if (isLoading)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(body: Center(child: CircularProgressIndicator()));
     if (error != null)
-      return Scaffold(
-          appBar: AppBar(title: Text(context.tr('stock'))),
+      return V2Scaffold(
+          appBar: V2AppBar(title: Text(context.tr('stock'))),
           body: Center(child: Text(error!)));
     final initial = _number('stock_initial');
     final remaining = _number('stock_restant');
@@ -68,8 +69,8 @@ class _StockDetailScreenState extends State<StockDetailScreen> with MutationRefr
     final donation = _number('don');
     final births = _number('naissances');
     final lossRate = initial == 0 ? 0.0 : lost / initial * 100;
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('stock'))),
+    return V2Scaffold(
+      appBar: V2AppBar(title: Text(context.tr('stock'))),
       body: RefreshIndicator(
         onRefresh: load,
         child: LayoutBuilder(builder: (context, constraints) {

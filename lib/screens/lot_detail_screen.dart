@@ -1,3 +1,4 @@
+import '../widgets/v2_components.dart';
 import '../widgets/owner_maintenance_actions.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../theme/terre_et_or_theme.dart';
 import '../widgets/detail_widgets.dart';
 import 'egg_production_screen.dart';
 import 'growth_tracking_screen.dart';
+import 'cycle_balance_screen.dart';
 import '../widgets/lot_lifecycle_actions.dart';
 
 class LotDetailScreen extends StatefulWidget {
@@ -75,10 +77,10 @@ class _LotDetailScreenState extends State<LotDetailScreen> with MutationRefresh<
   @override
   Widget build(BuildContext context) {
     if (isLoading && lot == null)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const V2Scaffold(body: Center(child: CircularProgressIndicator()));
     if (lot == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Lot')),
+      return V2Scaffold(
+        appBar: V2AppBar(title: const Text('Lot')),
         body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(loadError ?? 'Lot indisponible.', textAlign: TextAlign.center),
           TextButton(onPressed: fetchLot, child: const Text('Réessayer')),
@@ -106,8 +108,8 @@ class _LotDetailScreenState extends State<LotDetailScreen> with MutationRefresh<
       0,
       (s, d) => s + numValue(d['montant']),
     );
-    return Scaffold(
-      appBar: AppBar(title: Text(lot!['nom']?.toString() ?? 'Lot')),
+    return V2Scaffold(
+      appBar: V2AppBar(title: Text(lot!['nom']?.toString() ?? 'Lot')),
       body: RefreshIndicator(
         onRefresh: fetchLot,
         child: LayoutBuilder(
@@ -116,6 +118,7 @@ class _LotDetailScreenState extends State<LotDetailScreen> with MutationRefresh<
             padding: const EdgeInsets.all(16),
             children: [
               if (isLoading) const LinearProgressIndicator(),
+              TextButton.icon(key: const Key('open-cycle-balance'), icon: const Icon(Icons.assessment_outlined), label: const Text('Bilan du cycle'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CycleBalanceScreen(api: widget.apiService, lotId: widget.lotId)))),
               LotLifecycleActions(api:widget.apiService,lot:lot!,access:_ownerMaintenance,onChanged:fetchLot),
               if(lot!['type_production']=='CHAIR') TextButton.icon(icon:const Icon(Icons.monitor_weight_outlined),label:const Text('Consulter le suivi de croissance'),
                 onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>GrowthTrackingScreen(apiService:widget.apiService,lotId:widget.lotId,lotName:lot!['nom']?.toString()??'Lot',readOnly:ApiService.isLotClosed(lot!))))),

@@ -98,6 +98,7 @@ class DetailSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color:TerreEtOrColors.border,width:1.25),
         boxShadow: [
           BoxShadow(
             color: TerreEtOrColors.navy.withValues(alpha: 0.06),

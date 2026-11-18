@@ -31,6 +31,7 @@ class MobileApiFake extends ProductionTrackingApiFake {
     'gmq_g_par_jour': 20.0,
     'pesees': [
       {
+        'id': 1,
         'pesee_at': '2026-10-06T08:00:00',
         'poids_moyen_kg': 2.0,
         'nombre_animaux_peses': 10,
@@ -110,13 +111,18 @@ class MobileApiFake extends ProductionTrackingApiFake {
     },
   ];
   @override
-  Future<dynamic> get(String endpoint) async => endpoint=='/me/capabilities/'?{
+  Future<dynamic> get(String endpoint) async {
+    if(endpoint=='/feed-supplies/')return {'stock_contract':1,'confirmed':true,
+      'products':[{'id':'11111111-1111-4111-8111-111111111111','name':'Aliment fictif','positions':[{'species_id':4,'lot_id':null,'kg':'500'}]}],
+      'species':[{'id':4,'nom':'Poulet'}],'lots':[{'id':11,'nom':'Poulets de chair','espece_id':4}]};
+    return endpoint=='/me/capabilities/'?{
     'user':1,'exploitation':1,'role':'OPERATEUR','membership':{'version':1},
     'offline_policy_enabled':false,
     'permission_contract':{'version':1,'user':1,'exploitation':1,'role':'OPERATEUR',
       'rights_version':1,'permissions':['finance.read','history.read','purchases.create',
         'expenses.create','feed.create','mortality.create','animal_sales.create']},
   }:<dynamic>[];
+  }
   @override
   Future<List<dynamic>> getDepenses(int lotId) async => [];
   @override
