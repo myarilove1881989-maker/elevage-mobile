@@ -21,9 +21,11 @@ class ObservationPanel extends StatefulWidget {
     required this.rights,
     required this.installations,
     required this.cohorts,
+    this.initialTarget,
   });
   final AquaticService service;
   final String kind;
+  final String? initialTarget;
   final List<String> rights;
   final List<Map<String, dynamic>> installations, cohorts;
   @override
@@ -48,6 +50,7 @@ class _ObservationPanelState extends State<ObservationPanel> {
   @override
   void initState() {
     super.initState();
+    target=widget.initialTarget;
     load();
   }
 

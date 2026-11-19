@@ -24,17 +24,22 @@ class StockPanel extends StatefulWidget {
     required this.installations,
     required this.cohorts,
     this.onChanged,
+    this.initialInstallation,
+    this.initialCohort,
+    this.initialAction,
   });
   final AquaticService service;
   final bool owner;
   final List<String> rights;
   final List<Map<String, dynamic>> installations, cohorts;
   final Future<void> Function()? onChanged;
+  final String? initialInstallation,initialCohort,initialAction;
   @override
   State<StockPanel> createState() => _StockPanelState();
 }
 
 class _StockPanelState extends State<StockPanel> {
+  bool openedInitial=false;
   Map<String, dynamic>? data;
   List<Map<String, dynamic>> history = [];
   bool busy = true;
@@ -44,6 +49,7 @@ class _StockPanelState extends State<StockPanel> {
   @override
   void initState() {
     super.initState();
+    installation=widget.initialInstallation;cohort=widget.initialCohort;
     load();
   }
 
@@ -89,6 +95,7 @@ class _StockPanelState extends State<StockPanel> {
         history = result[1] as List<Map<String, dynamic>>;
         busy = false;
       });
+      if(widget.initialAction!=null&&!openedInitial){openedInitial=true;WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)edit(widget.initialAction!);});}
     } catch (_) {
       if (!mounted ||
           generation != epoch ||

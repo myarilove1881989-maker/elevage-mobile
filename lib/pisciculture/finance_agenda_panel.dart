@@ -62,6 +62,7 @@ class FinanceAgendaPanel extends StatefulWidget {
     this.initialInstallation,
     this.initialCohort,
     this.initialAction,
+    this.initialSection='summary',
     this.onChanged,
   });
   final AquaticService service;
@@ -69,6 +70,7 @@ class FinanceAgendaPanel extends StatefulWidget {
   final List<String> rights;
   final List<Map<String, dynamic>> installations, cohorts, species;
   final String? initialInstallation, initialCohort, initialAction;
+  final String initialSection;
   final Future<void> Function()? onChanged;
   @override
   State<FinanceAgendaPanel> createState() => _FinanceAgendaPanelState();
@@ -98,7 +100,7 @@ class _FinanceAgendaPanelState extends State<FinanceAgendaPanel> {
     end = widget.agenda
         ? DateTime.now().add(const Duration(days: 30))
         : DateTime.now();
-    section = widget.agenda ? 'tasks' : 'summary';
+    section = widget.agenda ? 'tasks' : widget.initialSection;
     load();
   }
 

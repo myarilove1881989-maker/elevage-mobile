@@ -58,6 +58,7 @@ class CommercePanel extends StatefulWidget {
     this.initialInstallation,
     this.initialCohort,
     this.initialAction,
+    this.initialSection='stock',
     this.onChanged,
   });
   final AquaticService service;
@@ -65,6 +66,7 @@ class CommercePanel extends StatefulWidget {
   final List<String> rights;
   final List<Map<String, dynamic>> installations, cohorts, species;
   final String? initialInstallation, initialCohort, initialAction;
+  final String initialSection;
   final Future<void> Function()? onChanged;
   @override
   State<CommercePanel> createState() => _CommercePanelState();
@@ -83,6 +85,7 @@ class _CommercePanelState extends State<CommercePanel> {
   @override
   void initState() {
     super.initState();
+    section = widget.initialSection;
     installation = widget.initialInstallation;
     cohort = widget.initialCohort;
     load();
@@ -340,6 +343,21 @@ class _CommercePanelState extends State<CommercePanel> {
       },
     ),
   );
+  bool get billingView=>['clients','invoices','payments','balances'].contains(section);
+  List<Map<String,dynamic>> get invoices {
+    final found=<String,Map<String,dynamic>>{};
+    for(final movement in history){final raw=movement['invoice'];if(raw is Map){final invoice=Map<String,dynamic>.from(raw);found['${invoice['id']}']=invoice;}}
+    return found.values.toList();
+  }
+  Widget invoiceCard(Map<String,dynamic> invoice)=>commerceCard(context,Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Text('${invoice['invoice_reference']} · ${invoice['client_name']}',style:Theme.of(context).textTheme.titleMedium),
+    const SizedBox(height:8),Text('Facturé : ${invoice['montant_total']} · Payé : ${invoice['montant_paye']} · Solde : ${invoice['reste']}'),
+    if(section=='payments')for(final payment in invoice['payments'] as List? ?? [])Text('Paiement ${payment['date']} : ${payment['amount']}'),
+    const SizedBox(height:12),Wrap(spacing:8,runSpacing:8,children:[
+      OutlinedButton(onPressed:()async{try{await InvoicePdfService.openInvoice(sale:invoice,customerName:'${invoice['client_name']}',customerPhone:'${invoice['client_phone']}',languageCode:'fr');}catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Ouverture de facture impossible.')));}},child:const Text('Facture')),
+      if(allows('cash.create'))OutlinedButton(onPressed:()=>edit('PAYMENT',row:invoice),child:const Text('Enregistrer un paiement')),
+    ]),
+  ]));
   @override
   Widget build(BuildContext context) => Theme(
     data: designSystemV2(Theme.of(context)),
@@ -347,13 +365,10 @@ class _CommercePanelState extends State<CommercePanel> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Récoltes et ventes',
+          {'clients':'Clients','invoices':'Factures','payments':'Paiements','balances':'Soldes clients'}[section]??'Récoltes et ventes',
           style: Theme.of(context).textTheme.titleLarge,
         ),
-        const Text(
-          'La récolte quitte le stock vivant une seule fois. Ventes et pertes suivantes concernent le stock post-récolte.',
-        ),
-        Wrap(
+        if(!billingView) Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
@@ -383,6 +398,7 @@ class _CommercePanelState extends State<CommercePanel> {
                 onPressed: loading ? null : () => edit('LOSS'),
                 child: const Text('Enregistrer une perte'),
               ),
+            OutlinedButton(onPressed:()=>setState(()=>section='clients'),child:const Text('Clients')),
             OutlinedButton(
               onPressed: () => setState(() => section = 'history'),
               child: const Text('Consulter l’historique'),
@@ -394,6 +410,7 @@ class _CommercePanelState extends State<CommercePanel> {
               ),
           ],
         ),
+        if(section=='clients' && allows('clients.create'))OutlinedButton(onPressed:loading?null:()=>edit('CLIENT'),child:const Text('Nouveau client')),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -439,6 +456,14 @@ class _CommercePanelState extends State<CommercePanel> {
         if (loading) const LinearProgressIndicator(),
         if (error != null)
           Text(error!, style: const TextStyle(color: Colors.red)),
+        if(!loading && ['invoices','payments','balances'].contains(section))...[
+          if(invoices.isEmpty)const Text('Aucune facture dans ces filtres.'),
+          for(final invoice in invoices)invoiceCard(invoice),
+        ],
+        if (!loading && section == 'clients') ...[
+          if(clients.isEmpty) const Text('Aucun client.'),
+          for(final customer in clients) commerceCard(context,ListTile(leading:const Icon(Icons.person_outline),title:Text('${customer['name']??customer['nom']??''}'))),
+        ],
         if (!loading && section == 'stock') ...[
           if (harvests.isEmpty) const Text('Aucune récolte dans ces filtres.'),
           for (final h in harvests)

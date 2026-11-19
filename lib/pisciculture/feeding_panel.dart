@@ -86,17 +86,22 @@ class FeedingPanel extends StatefulWidget {
     required this.installations,
     required this.cohorts,
     this.onChanged,
+    this.initialInstallation,
+    this.initialCohort,
+    this.initialAction,
   });
   final AquaticService service;
   final bool owner;
   final List<String> rights;
   final List<Map<String, dynamic>> installations, cohorts;
   final Future<void> Function()? onChanged;
+  final String? initialInstallation,initialCohort,initialAction;
   @override
   State<FeedingPanel> createState() => _FeedingPanelState();
 }
 
 class _FeedingPanelState extends State<FeedingPanel> {
+  bool openedInitial=false;
   Map<String, dynamic>? catalog, summary;
   List<Map<String, dynamic>> distributions = [], purchases = [], movements = [];
   bool busy = true;
@@ -108,6 +113,7 @@ class _FeedingPanelState extends State<FeedingPanel> {
   @override
   void initState() {
     super.initState();
+    installation=widget.initialInstallation;cohort=widget.initialCohort;
     load();
   }
 
@@ -158,6 +164,7 @@ class _FeedingPanelState extends State<FeedingPanel> {
         purchases = result.length > 3 ? result[3] : [];
         busy = false;
       });
+      if(widget.initialAction!=null&&!openedInitial){openedInitial=true;WidgetsBinding.instance.addPostFrameCallback((_){if(mounted)edit(widget.initialAction!);});}
     } catch (_) {
       if (!mounted ||
           epoch != generation ||

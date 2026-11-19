@@ -25,6 +25,10 @@ ThemeData designSystemV2([ThemeData? source]) {
       primary: V2Colors.green,
       secondary: V2Colors.navy,
       surface: Colors.white,
+      primaryContainer: const Color(0xFFE7F2EA),
+      onPrimaryContainer: V2Colors.green,
+      secondaryContainer: const Color(0xFFE8F2F8),
+      onSecondaryContainer: V2Colors.navy,
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: V2Colors.navy,

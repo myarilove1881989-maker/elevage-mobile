@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../husbandry/husbandry_entry.dart';
 import '../widgets/v2_components.dart';
 import '../widgets/mutation_refresh.dart';
 import 'package:flutter/material.dart';
@@ -172,7 +174,7 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
         return _statusCard(
           icon: Icons.autorenew,
           title: context.tr('reproduction_tracking'),
-          message: context.tr('reproduction_tracking_future'),
+          message: kIsWeb?'':context.tr('reproduction_tracking_future'),
         );
       case 'AUTRE':
         return _statusCard(
@@ -327,6 +329,9 @@ class _ProductionTrackingScreenState extends State<ProductionTrackingScreen> wit
                         const SizedBox(height: 18),
                         _productionContent(currentLot),
                         _vaccinationButton(currentLot),
+                        if(kIsWeb && species.any((s)=>_asInt(s['id'])==_asInt(currentLot['espece']) && {'porc','bovin','vache','lapin'}.contains('${s['nom']}'.trim().toLowerCase())))
+                          ElevatedButton.icon(key:const Key('openReproductionTrackingButton'),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>HusbandryEntry(api:widget.apiService,reproduction:true,initialSpeciesId:_asInt(currentLot['espece']),initialLotId:_asInt(currentLot['id'])))),icon:const Icon(Icons.autorenew),label:const Text('Suivi de reproduction')),
+
                       ],
                     ],
                   ],

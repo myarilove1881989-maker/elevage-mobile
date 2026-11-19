@@ -1,3 +1,4 @@
+import 'aquatic_navigation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/v2_components.dart';
 import '../widgets/dashboard_kpi_card.dart';
@@ -34,8 +35,31 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
   }
 
   void showPage(String destination) {
-    setState(() => page = destination);
+    setState(() {
+      page=destination;
+      healthInstallation=breedingInstallation=commerceInstallation=planningInstallation=installationFilter;
+      healthCohort=breedingCohort=commerceCohort=planningCohort=cohortFilter;
+      commerceAction=planningAction=stockAction=feedingAction=null;
+      commerceSection='stock';planningSection='summary';
+    });
   }
+
+  void openMenu(AquaticMenuEntry entry){
+    final target=entry.destination;
+    if(target=='new_cohort'){form('cohort');return;}
+    if(target=='transfer_form'){form('transfer');return;}
+    showPage(target);
+    setState((){
+      if(target=='new_expense'){page='finances';planningSection='expenses';if(allows('aquatic.finances.manage'))planningAction='EXPENSE';}
+      if(target=='feed_purchases'){page='feeding';if(allows('aquatic.feed.purchase'))feedingAction='PURCHASE';}
+      if(target=='stock_inventory'){page='stock';if(widget.capabilities['can_enable']==true)stockAction='INVENTORY';}
+      if(target=='commerce_sale'){page='commerce';if(allows('aquatic.sales.create'))commerceAction='SALE';}
+      if(['commerce_clients','commerce_invoices','commerce_payments','commerce_balances'].contains(target)){page='commerce';commerceSection=target.substring('commerce_'.length);}
+      if(target=='finance_revenues'){page='finances';planningSection='revenues';}
+      if(target=='finance_summary'){page='finances';planningSection='summary';}
+    });
+  }
+  Widget menuHub(List<AquaticMenuEntry> entries)=>LayoutBuilder(builder:(context,box)=>Wrap(spacing:16,runSpacing:16,children:[for(final entry in entries)SizedBox(width:box.maxWidth<280?box.maxWidth:280,height:190 * (MediaQuery.textScalerOf(context).scale(16)/16).clamp(1.0,2.5),child:DashboardKpiCard(title:entry.title,icon:entry.icon,color:V2Colors.green,onTap:loading?null:()=>openMenu(entry),content:const Icon(Icons.arrow_forward,color:V2Colors.navy)))]));
 
   int generation = 0;
   bool loading = true;
@@ -46,13 +70,15 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
       species = [],
       events = [];
   String page = 'dashboard';
+  String commerceSection='stock',planningSection='summary';
+  String? stockAction,feedingAction;
   String? healthInstallation, healthCohort, healthAction;
   String? breedingInstallation, breedingCohort, breedingAction;
   String? commerceInstallation, commerceCohort, commerceAction;
   String? planningInstallation, planningCohort, planningAction;
   String? speciesFilter, installationFilter, cohortFilter;
   bool allows(String right) =>
-      (widget.capabilities['write'] as List? ?? const []).contains(right);
+      [...widget.capabilities['write'] as List? ?? const [],...widget.capabilities['finance_write'] as List? ?? const [],...widget.capabilities['commerce_write'] as List? ?? const []].contains(right);
   String label(dynamic value) =>
       {
         'HARVEST': 'Récolte',
@@ -305,41 +331,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   'Pisciculture',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const Text(
-                  'Effectifs aquatiques séparés de l’élevage terrestre. Nouvelles opérations en ligne uniquement.',
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final p in {
-                      'dashboard': 'Tableau de bord',
-                      'installations': 'Installations',
-                      'cohorts': 'Cohortes',
-                      'history': 'Historique',
-                      'weights': 'Pesées',
-                      'water': 'Eau',
-                      'rules': 'Règles',
-                      'stock': 'Pertes et inventaires',
-                      'feeding': 'Alimentation',
-                      'health': 'Santé',
-                      'breeding': 'Reproduction',
-                      'commerce': 'Récoltes et ventes',
-                      'finances': 'Finances',
-                      'agenda': 'Agenda',
-                    }.entries)
-                      OutlinedButton(
-                        onPressed: () => setState(() => page = p.key),
-                        child: Text(p.value),
-                      ),
-                    IconButton(
-                      onPressed: reload,
-                      tooltip: 'Actualiser',
-                      icon: const Icon(Icons.refresh),
-                    ),
-                  ],
-                ),
+                const SizedBox(height:12),
+                Wrap(spacing:8,runSpacing:8,children:[TextButton.icon(onPressed:showDashboard,icon:const Icon(Icons.home_outlined),label:const Text('Tableau de bord')),if(aquaticMenuTitles.containsKey(page))Padding(padding:const EdgeInsets.all(12),child:Text(aquaticMenuTitles[page]!,style:Theme.of(context).textTheme.titleMedium))]),
+                if(aquaticMenuGroups.containsKey(page))menuHub(aquaticMenuGroups[page]!),
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -466,9 +460,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                     ),
                   if (dashboard?['feeding_overview'] is Map)
                     feedingOverview(dashboard!['feeding_overview'] as Map),
-                  const Text(
-                    'Consultez Récoltes et ventes, Finances et Agenda pour les opérations et leur suivi.',
-                  ),
+
                 ],
                 if (page == 'installations') ...[
                   action(
@@ -525,8 +517,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                 ],
                 if (page == 'finances' || page == 'agenda')
                   FinanceAgendaPanel(
+                    initialSection:planningSection,
                     key: ValueKey(
-                      '$page:$planningInstallation:$planningCohort:$planningAction',
+                      '$page:$planningSection:$planningInstallation:$planningCohort:$planningAction',
                     ),
                     service: widget.service,
                     agenda: page == 'agenda',
@@ -547,8 +540,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   ),
                 if (page == 'commerce')
                   CommercePanel(
+                    initialSection:commerceSection,
                     key: ValueKey(
-                      '$commerceInstallation:$commerceCohort:$commerceAction',
+                      '$commerceSection:$commerceInstallation:$commerceCohort:$commerceAction',
                     ),
                     service: widget.service,
                     owner: widget.capabilities['can_enable'] == true,
@@ -609,6 +603,8 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   ),
                 if (page == 'feeding')
                   FeedingPanel(
+                    key:ValueKey('feeding:$feedingAction'),
+                    initialInstallation:installationFilter,initialCohort:cohortFilter,initialAction:feedingAction,
                     service: widget.service,
                     owner: widget.capabilities['can_enable'] == true,
                     rights: List<String>.from(
@@ -620,6 +616,8 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   ),
                 if (page == 'stock')
                   StockPanel(
+                    key:ValueKey('stock:$stockAction'),
+                    initialInstallation:installationFilter,initialCohort:cohortFilter,initialAction:stockAction,
                     service: widget.service,
                     owner: widget.capabilities['can_enable'] == true,
                     rights: List<String>.from(
@@ -633,6 +631,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                   ObservationPanel(
                     key: ValueKey(page),
                     service: widget.service,
+                    initialTarget:page=='weights'?(cohortFilter??installationFilter):installationFilter,
                     kind: page == 'weights'
                         ? 'WEIGHT'
                         : page == 'water'

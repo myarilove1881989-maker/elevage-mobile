@@ -11,6 +11,7 @@ import '../screens/add_depense_screen.dart';
 import '../screens/feed_distribution_screen.dart';
 import '../screens/vaccination_screen.dart';
 import 'dashboard_kpi_card.dart';
+import '../theme/design_system_v2.dart';
 
 class PhysicalStockCards extends StatefulWidget {
   const PhysicalStockCards({
@@ -21,12 +22,14 @@ class PhysicalStockCards extends StatefulWidget {
     this.revision = 0,
     this.compact = false,
     this.trackingKind,
+    this.onReproduction,
   });
   final ApiService api;
   final int? species, lot;
   final int revision;
   final bool compact;
   final bool? trackingKind;
+  final VoidCallback? onReproduction;
   @override
   State<PhysicalStockCards> createState() => _PhysicalStockCardsState();
 }
@@ -682,7 +685,7 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
               Icon(
                 isFeed ? Icons.shopping_bag_outlined : Icons.vaccines_outlined,
                 size: 22,
-                color: Colors.deepPurple,
+                color: widget.onReproduction==null?Colors.deepPurple:V2Colors.navy,
               ),
               const SizedBox(width: 5),
               Container(
@@ -702,14 +705,15 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
 
     return DashboardKpiCard(
       key: const Key('consumables-kpi'),
-      title: 'Consommables',
+      title: widget.onReproduction==null?'Consommables':'Gestion',
       icon: Icons.category_outlined,
-      color: Colors.deepPurple,
+      color: widget.onReproduction==null?Colors.deepPurple:V2Colors.green,
       onTap: () async {
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ConsumablesScreen(
+              onReproduction: widget.onReproduction,
               api: widget.api,
               species: selectedSpecies,
               lot: selectedLot,
@@ -723,9 +727,12 @@ class _PhysicalStockCardsState extends State<PhysicalStockCards> {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [level(true), const SizedBox(width: 22), level(false)],
+            children: widget.onReproduction==null?[level(true),const SizedBox(width:22),level(false)]:[
+              for(final isFeed in [true,false]) Expanded(child:Tooltip(message:isFeed?'Alimentation':'Vaccination',child:InkWell(onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ConsumableTrackingScreen(api:widget.api,isFeed:isFeed,species:selectedSpecies,lot:selectedLot))),child:Padding(padding:const EdgeInsets.symmetric(vertical:12),child:Center(child:level(isFeed)))))),
+              Expanded(child:IconButton(tooltip:'Reproduction',onPressed:widget.onReproduction,icon:Badge(isLabelVisible:[feed,vaccine].any((d)=>(d?['review_operations'] as List? ?? []).isNotEmpty),label:const Text('!'),child:const Icon(Icons.autorenew,color:V2Colors.navy)))),
+            ],
           ),
-          if ([
+          if (widget.onReproduction==null && [
             feed,
             vaccine,
           ].any((d) => (d?['review_operations'] as List? ?? []).isNotEmpty))
@@ -1403,12 +1410,14 @@ class ConsumablesScreen extends StatelessWidget {
     required this.api,
     this.species,
     this.lot,
+    this.onReproduction,
   });
+  final VoidCallback? onReproduction;
   final ApiService api;
   final int? species, lot;
   @override
   Widget build(BuildContext context) => V2Scaffold(
-    appBar: V2AppBar(title: const Text('Suivi des consommables')),
+    appBar: V2AppBar(title: Text(onReproduction==null?'Suivi des consommables':'Gestion')),
     body: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1000),
@@ -1442,7 +1451,7 @@ class ConsumablesScreen extends StatelessWidget {
                               ? Icons.shopping_bag_outlined
                               : Icons.vaccines_outlined,
                           size: 42,
-                          color: feed ? Colors.green : Colors.deepPurple,
+                          color: onReproduction==null?(feed ? Colors.green : Colors.deepPurple):V2Colors.green,
                         ),
                         const SizedBox(height: 20),
                         Text(
@@ -1465,6 +1474,11 @@ class ConsumablesScreen extends StatelessWidget {
                   ),
                 ),
               );
+              if(onReproduction!=null) return Wrap(spacing:16,runSpacing:16,children:[
+                SizedBox(width:c.maxWidth>=650?(c.maxWidth-16)/2:c.maxWidth,child:option(true)),
+                SizedBox(width:c.maxWidth>=650?(c.maxWidth-16)/2:c.maxWidth,child:option(false)),
+                SizedBox(width:c.maxWidth>=650?(c.maxWidth-16)/2:c.maxWidth,child:Card(child:InkWell(key:const Key('management-reproduction'),onTap:onReproduction,child:Padding(padding:const EdgeInsets.all(28),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Icon(Icons.autorenew,size:42,color:V2Colors.navy),const SizedBox(height:20),Text('Suivi des reproductions',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:20),const Align(alignment:Alignment.centerRight,child:Icon(Icons.arrow_forward))]))))),
+              ]);
               return c.maxWidth >= 650
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

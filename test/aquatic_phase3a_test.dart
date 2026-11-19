@@ -682,6 +682,8 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
+    t.state<AquaticWorkspaceState>(find.byType(AquaticWorkspace)).showPage('technical_hub');
+    await t.pumpAndSettle();
     await click(t, 'Santé');
     expect(find.text('Signaler un problème'), findsOneWidget);
     expect(find.text('Enregistrer un traitement'), findsOneWidget);

@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../husbandry/husbandry_entry.dart';
+import '../widgets/dashboard_metric_grid.dart';
 import '../widgets/v2_components.dart';
 import '../pisciculture/aquatic_workspace.dart';
 import '../pisciculture/aquatic_service.dart';
@@ -777,17 +780,27 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
               );
   }
 
+  Future<void> _openHusbandry({bool reproduction=false}) async {
+    await Navigator.push(context,MaterialPageRoute(builder:(_)=>HusbandryEntry(api:apiService,reproduction:reproduction,initialSpeciesId:selectedEspeceId,initialLotId:selectedLotId)));
+    if(mounted)await _refreshAll();
+  }
+
   Map<FarmDestination,VoidCallback> get _navigationActions=>{
     FarmDestination.lots:_openLots,FarmDestination.purchases:_openAchat,FarmDestination.expenses:_openDepense,
-    FarmDestination.production:_openProductionTracking,FarmDestination.movements:_openMouvement,
+    FarmDestination.production:_openProductionTracking,if(kIsWeb)FarmDestination.technical:()=>_openHusbandry(),FarmDestination.movements:_openMouvement,
     FarmDestination.billing:_openClients,FarmDestination.history:_openHistory,FarmDestination.agenda:_showAgenda,
     FarmDestination.settings:_openSettings,FarmDestination.tutorial:_chooseTutorialLanguage,FarmDestination.logout:_logout};
   FarmSession? get _navigationSession=>commonSessionToken==ApiService.sessionIdentity?commonSession:null;
   Map<FarmDestination,VoidCallback> get _workspaceNavigationActions=>_aquatic?{
     ..._navigationActions,
     FarmDestination.lots:()=>_aquaticKey.currentState?.showPage('cohorts'),
-    FarmDestination.production:()=>_aquaticKey.currentState?.showDashboard(),
-    FarmDestination.movements:()=>_aquaticKey.currentState?.form('transfer'),
+    FarmDestination.purchases:()=>_aquaticKey.currentState?.showPage('purchases_hub'),
+    FarmDestination.expenses:()=>_aquaticKey.currentState?.showPage('expenses_hub'),
+    FarmDestination.billing:()=>_aquaticKey.currentState?.showPage('billing_hub'),
+    FarmDestination.production:()=>_aquaticKey.currentState?.showPage('production_hub'),
+    FarmDestination.technical:()=>_aquaticKey.currentState?.showPage('technical_hub'),
+    FarmDestination.movements:()=>_aquaticKey.currentState?.showPage('movements_hub'),
+    FarmDestination.agenda:()=>_aquaticKey.currentState?.showPage('agenda'),
     FarmDestination.history:()=>_aquaticKey.currentState?.showPage('history'),
   }:_navigationActions;
   Widget _navigationDrawer()=>Drawer(child:SafeArea(child:ListView(children:[
@@ -965,36 +978,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
 
 
 
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  int columns;
-
-                  if (constraints.maxWidth >= 1400) {
-                    // Grand écran : 5 cards sur une ligne
-                    columns = 5;
-                  } else if (constraints.maxWidth >= 1000) {
-                    // écran moyen : 5 cards sur une ligne
-                    columns = 5;
-                  } else if (constraints.maxWidth >= 800) {
-                    // écran réduit : 3 cards par ligne
-                    columns = 3;
-                  } else if (constraints.maxWidth >= 550) {
-                    // Tablette : 2 cards par ligne
-                    columns = 2;
-                  } else {
-                    // Téléphone : 1 card par ligne
-                    columns = 1;
-                  }
-
-                  return GridView.count(
-                    crossAxisCount: columns,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: ((constraints.maxWidth - 16 * (columns - 1)) / columns / 190) /
-                        (MediaQuery.textScalerOf(context).scale(24) / 24).clamp(1.0, 2.0),
-                    children: [
+              DashboardMetricGrid(children: [
                       buildCard(
                         context.tr('stock_total'),
                         kpis["stock"] ?? kpis["stock_total"],
@@ -1080,11 +1064,8 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
                         },
                         isMoney: true,
                       ),
-                      PhysicalStockCards(api:apiService,species:_stockSpecies,lot:displayedLotId,revision:lastApiSuccess?.millisecondsSinceEpoch??0,compact:true),
-                    ],
-                  );
-                },
-              ),
+                      PhysicalStockCards(api:apiService,species:_stockSpecies,lot:displayedLotId,revision:lastApiSuccess?.millisecondsSinceEpoch??0,compact:true,onReproduction:kIsWeb?()=>_openHusbandry(reproduction:true):null),
+              ]),
 
               const SizedBox(height: 40),
 

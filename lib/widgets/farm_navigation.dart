@@ -4,29 +4,29 @@ import 'package:flutter/material.dart';
 import '../services/farm_session.dart';
 import '../l10n/app_localizations.dart';
 
-enum FarmDestination {dashboard,billing,lots,purchases,sales,expenses,movements,history,agenda,production,settings,users,tutorial,logout}
+enum FarmDestination {dashboard,billing,lots,purchases,sales,expenses,movements,history,agenda,production,technical,settings,users,tutorial,logout}
 const farmNavigationOrder=[FarmDestination.users,FarmDestination.lots,FarmDestination.purchases,FarmDestination.expenses,
-  FarmDestination.production,FarmDestination.movements,FarmDestination.billing,FarmDestination.history,
+  FarmDestination.production,FarmDestination.technical,FarmDestination.movements,FarmDestination.billing,FarmDestination.history,
   FarmDestination.agenda,FarmDestination.settings,FarmDestination.tutorial,FarmDestination.logout];
 const farmDestinationLabels={FarmDestination.dashboard:'Tableau de bord',FarmDestination.lots:'Lots',
-  FarmDestination.purchases:'Achats',FarmDestination.expenses:'Dépenses',FarmDestination.production:'Production',
+  FarmDestination.purchases:'Achats',FarmDestination.expenses:'Dépenses',FarmDestination.production:'Production',FarmDestination.technical:'Technique',
   FarmDestination.movements:'Mouvements',FarmDestination.billing:'Facturation',FarmDestination.history:'Historique',
   FarmDestination.agenda:'Agenda',FarmDestination.settings:'Paramètres',FarmDestination.tutorial:'Tuto',
   FarmDestination.logout:'Quitter',FarmDestination.sales:'Ventes',FarmDestination.users:'Gestion des utilisateurs'};
 const farmDestinationIcons={FarmDestination.dashboard:Icons.home_outlined,FarmDestination.users:Icons.manage_accounts_outlined,FarmDestination.lots:Icons.inventory_2_outlined,FarmDestination.purchases:Icons.shopping_bag_outlined,
-  FarmDestination.expenses:Icons.shopping_cart_outlined,FarmDestination.production:Icons.layers_outlined,
+  FarmDestination.expenses:Icons.shopping_cart_outlined,FarmDestination.production:Icons.layers_outlined,FarmDestination.technical:Icons.tune,
   FarmDestination.movements:Icons.swap_horiz,FarmDestination.billing:Icons.request_quote_outlined,
   FarmDestination.history:Icons.history,FarmDestination.agenda:Icons.event_note_outlined,
   FarmDestination.settings:Icons.settings_outlined,FarmDestination.tutorial:Icons.menu_book_outlined,FarmDestination.logout:Icons.logout};
 String navigationLabel(BuildContext context,FarmDestination destination){
   if(AppLocalizations.of(context).languageCode!='en')return farmDestinationLabels[destination]!;
   return {FarmDestination.dashboard:'Dashboard',FarmDestination.users:'User management',FarmDestination.lots:'Batches',FarmDestination.purchases:'Purchases',FarmDestination.expenses:'Expenses',
-    FarmDestination.production:'Production',FarmDestination.movements:'Movements',FarmDestination.billing:'Billing',
+    FarmDestination.production:'Production',FarmDestination.technical:'Technical',FarmDestination.movements:'Movements',FarmDestination.billing:'Billing',
     FarmDestination.history:'History',FarmDestination.agenda:'Tasks',FarmDestination.settings:'Settings',
     FarmDestination.tutorial:'Tutorial',FarmDestination.logout:'Log out'}[destination]!;
 }
 
-const farmHorizontalNavigationOrder=[FarmDestination.purchases,FarmDestination.expenses,FarmDestination.production,FarmDestination.movements,FarmDestination.billing];
+const farmHorizontalNavigationOrder=[FarmDestination.purchases,FarmDestination.expenses,FarmDestination.production,FarmDestination.technical,FarmDestination.movements,FarmDestination.billing];
 
 /// Both menus share icons, access rules and callbacks; utilities stay in the drawer.
 class FarmNavigation extends StatefulWidget {

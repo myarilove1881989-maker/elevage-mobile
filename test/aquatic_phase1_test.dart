@@ -261,8 +261,8 @@ void main() {
           );
         }
         expect(find.text('1000'), findsOneWidget);
-        expect(find.text('Finances'), findsOneWidget);
-        expect(find.text('Agenda'), findsOneWidget);
+        expect(find.text('Tableau de bord'), findsWidgets);
+        expect(find.byKey(const ValueKey('activity-aquatic')), findsOneWidget); // Utilities now open from the common navigation.
         expect(find.textContaining('Non disponible (phases suivantes)'), findsNothing);
         expect(tester.takeException(), isNull);
         final folder = Platform.environment['ELEVAGE_AQUATIC_PROOF_DIR'];
