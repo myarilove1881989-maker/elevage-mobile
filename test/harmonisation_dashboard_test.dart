@@ -1,3 +1,5 @@
+import 'package:app_elevage/services/app_settings.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -6,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app_elevage/pisciculture/aquatic_workspace.dart';
-import 'package:app_elevage/pisciculture/finance_agenda_panel.dart';
+import 'package:app_elevage/pisciculture/aquatic_revenue_screen.dart';
 import 'package:app_elevage/pisciculture/aquatic_forms.dart';
 import 'package:app_elevage/widgets/dashboard_kpi_card.dart';
 import 'package:app_elevage/screens/user_management_screen.dart';
@@ -27,19 +29,21 @@ class DashboardService extends FakeAquatic {
         'client_balance_as_of': '0.00',
       };
     }
+    if(path.startsWith('finance-detail/'))return {'cohorts':[],'categories':[]};
     return super.read(path);
   }
 }
 
 void main() {
   setUpAll(()async {
+    await initializeDateFormatting('fr_FR');
     await (FontLoader('Roboto')..addFont(rootBundle.load('assets/fonts/Roboto-Regular.ttf'))).load();
     await (FontLoader('MaterialIcons')..addFont(File('${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf').readAsBytes().then((b)=>ByteData.sublistView(b)))).load();
   });
   setUp(() => SharedPreferences.setMockInitialValues({}));
   for (final size in [
-    const Size(1440, 1000),
-    const Size(1100, 800),
+    const Size(1910, 1000),
+    const Size(1366, 900),
     const Size(768, 1024),
     const Size(390, 844),
   ]) {
@@ -82,8 +86,8 @@ void main() {
         'Solde clients',
         'Gestion',
       ]);
-      expect(find.textContaining('12345.67'), findsOneWidget);
-      expect(find.text('Exploitation de recette'), findsOneWidget);
+      expect(find.text(AppSettings.instance.formatMoney('12345.67',decimals:2)), findsOneWidget);
+      expect(find.textContaining('Exploitation de recette',findRichText:true), findsOneWidget);
       expect(t.takeException(), isNull);
       await t.runAsync(() async {
       final image =
@@ -92,7 +96,7 @@ void main() {
               .toImage(pixelRatio: 1);
       final data = await image.toByteData(format: ui.ImageByteFormat.png);
       await File(
-        'D:/ElevAge-Integration-Technique-Reproduction-20261119/qualification/harmonisation-dashboard-${size.width.toInt()}.png',
+        'D:/ElevAge-Final-20261120/screenshots/dashboard-${size.width.toInt()}.png',
       ).writeAsBytes(data!.buffer.asUint8List());
       image.dispose();
       });
@@ -171,8 +175,8 @@ void main() {
      expect(query['species'],'42');expect(query['installation'],'10000000-0000-4000-8000-000000000001');expect(query['cohort'],'30000000-0000-4000-8000-000000000001');
    }
    await t.ensureVisible(find.text("Chiffre d'affaires"));await t.tap(find.text("Chiffre d'affaires"));await t.pumpAndSettle();
-   final panel=t.widget<FinanceAgendaPanel>(find.byType(FinanceAgendaPanel));
-   expect(panel.initialSpecies,'42');expect(panel.initialInstallation,'10000000-0000-4000-8000-000000000001');expect(service.writes,isEmpty);
+   final panel=t.widget<AquaticRevenueScreen>(find.byType(AquaticRevenueScreen));
+   expect(panel.filters['species'],'42');expect(panel.filters['installation'],'10000000-0000-4000-8000-000000000001');expect(service.writes,isEmpty);
  });
  testWidgets('purchases open the existing cohort form directly without a write',(t)async{
    final service=DashboardService(),key=GlobalKey<AquaticWorkspaceState>();

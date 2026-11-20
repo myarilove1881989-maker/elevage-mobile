@@ -34,19 +34,19 @@ void main(){
    await tester.binding.setSurfaceSize(Size(width,900));var exits=0;
    final actions={for(final d in farmNavigationOrder.where((d)=>d!=FarmDestination.dashboard && d!=FarmDestination.users))d:(){if(d==FarmDestination.logout)exits++;}};
    await tester.pumpWidget(MaterialApp(locale:const Locale('fr'),supportedLocales:const [Locale('fr'),Locale('en')],localizationsDelegates:const [GlobalMaterialLocalizations.delegate,GlobalWidgetsLocalizations.delegate,GlobalCupertinoLocalizations.delegate],home:Scaffold(body:Column(children:[
-    SizedBox(height:52,child:FarmNavigation(key:const Key('horizontal'),horizontal:true,session:session(),actions:actions)),
+    SizedBox(height:64,child:FarmNavigation(key:const Key('horizontal'),horizontal:true,session:session(),actions:actions)),
     Expanded(child:SingleChildScrollView(child:FarmNavigation(key:const Key('vertical'),session:session(),actions:actions)))
    ]))));await tester.pumpAndSettle();
    final horizontal=find.byKey(const Key('horizontal'));final vertical=find.byKey(const Key('vertical'));
-   final expected=['Lots','Achats','Dépenses','Production','Mouvements','Facturation','Historique','Agenda','Paramètres','Tuto','Quitter'];
+   final expected=['Lots','Achats','Dépenses','Production','Technique','Mouvements','Facturation','Historique','Agenda','Paramètres','Tuto','Quitter'];
    expect(tester.widgetList<ListTile>(find.descendant(of:vertical,matching:find.byType(ListTile))).map((x)=>(x.title as Text).data),expected);
-   expect(tester.widgetList<Text>(find.descendant(of:horizontal,matching:find.byType(Text))).map((x)=>x.data),['Achats','Dépenses','Production','Mouvements','Facturation']);
+   expect(tester.widgetList<Text>(find.descendant(of:horizontal,matching:find.byType(Text))).map((x)=>x.data),['Achats','Dépenses','Production','Technique','Mouvements','Facturation']);
    final verticalIcons=tester.widgetList<Icon>(find.descendant(of:vertical,matching:find.byType(Icon))).map((x)=>x.icon).toList();
-   final horizontalIcons=tester.widgetList<Icon>(find.descendant(of:horizontal,matching:find.byType(Icon))).map((x)=>x.icon).toList();expect(horizontalIcons,[1,2,3,4,5].map((i)=>verticalIcons[i]));
+   final horizontalIcons=tester.widgetList<Icon>(find.descendant(of:horizontal,matching:find.byType(Icon))).map((x)=>x.icon).toList();expect(horizontalIcons,[1,2,3,4,5,6].map((i)=>verticalIcons[i]));
    expect(find.text('Tableau de bord'),findsNothing);expect(find.text('Gestion des utilisateurs'),findsNothing);
    final horizontalScroll=tester.widget<SingleChildScrollView>(find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView)));
    if(width>=1366 && !kIsWeb)expect(horizontalScroll.controller!.position.maxScrollExtent,0);
-   expect(tester.getSize(find.descendant(of:horizontal,matching:find.byType(LayoutBuilder)).first).height,52);
+   expect(tester.getSize(find.descendant(of:horizontal,matching:find.byType(LayoutBuilder)).first).height,64);
    await tester.dragUntilVisible(find.byKey(const ValueKey('navigation-billing-horizontal')),find.descendant(of:horizontal,matching:find.byType(SingleChildScrollView)),const Offset(-300,0));
    final agendaRect=tester.getRect(find.byKey(const ValueKey('navigation-billing-horizontal')));
    expect(agendaRect.right,lessThanOrEqualTo(width));

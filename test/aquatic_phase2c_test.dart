@@ -424,18 +424,20 @@ void main() {
   });
   for (final width in [360.0, 1080.0]) {
     for (final scale in [1.0, 2.0]) {
-      testWidgets('dashboard feeding overview $width scale$scale', (t) async {
+      testWidgets('feeding page preserves overview $width scale$scale', (t) async {
         t.view.physicalSize = Size(width, 1100);
         t.view.devicePixelRatio = 1;
         addTearDown(t.view.resetPhysicalSize);
         addTearDown(t.view.resetDevicePixelRatio);
         final f = FakeFeeding();
+        final workspace=GlobalKey<AquaticWorkspaceState>();
         await t.pumpWidget(
           testApp(
             MediaQuery(
               data: MediaQueryData(textScaler: TextScaler.linear(scale)),
               child: Scaffold(
                 body: AquaticWorkspace(
+                  key:workspace,
                   service: f,
                   capabilities: const {'write': <String>[], 'can_enable': true},
                 ),
@@ -444,6 +446,7 @@ void main() {
           ),
         );
         await t.pumpAndSettle();
+        workspace.currentState!.showPage('feeding');await t.pumpAndSettle();
         expect(find.textContaining('35.000 kg distribués'), findsOneWidget);
         expect(
           find.textContaining('Stock commun actuel : 65.000 kg'),

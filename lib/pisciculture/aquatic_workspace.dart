@@ -1,3 +1,7 @@
+import 'aquatic_revenue_screen.dart';
+import 'aquatic_expense_screen.dart';
+import 'aquatic_clients_screen.dart';
+import 'aquatic_dashboard_agenda.dart';
 import 'aquatic_navigation.dart';
 import 'package:flutter/material.dart';
 import '../widgets/v2_components.dart';
@@ -73,6 +77,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
       form('cohort');
       return;
     }
+    if(['commerce_clients','commerce_balances'].contains(target)){financialDetail(target=='commerce_clients'?'customers':'clients');return;}
     if (target == 'transfer_form') {
       form('transfer');
       return;
@@ -329,7 +334,10 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
         ),
       ),
     );
-    if (changed == true && mounted) await reload();
+    if (changed == true && mounted) {
+      await reload();
+      if(mounted && ['cohort','installation'].contains(kind))ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:const Text('Enregistré'),action:SnackBarAction(label:kind=='cohort'?'Créer une autre cohorte':'Créer une autre installation',onPressed:()=>form(kind))));
+    }
   }
 
   Widget action(String text, String kind, String permission) => OutlinedButton(
@@ -375,21 +383,32 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
             },
     ),
   );
-  Widget amount(Object? value, {bool money = false}) => FittedBox(
+  Widget amount(Object? value, {bool money = false,Color color=V2Colors.navy}) => FittedBox(
     fit: BoxFit.scaleDown,
     child: Text(
       value == null
           ? 'Indisponible'
           : money
-          ? '$value ${AppSettings.instance.currencyCode}'
+          ? AppSettings.instance.formatMoney(value,decimals:RegExp(r'\.0+$').hasMatch('$value')?0:2)
           : '$value',
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.bold,
-        color: V2Colors.navy,
+        color: color,
       ),
     ),
   );
+
+  Map<String,String> get financialFilters=>{
+    'species':?speciesFilter,'installation':?installationFilter,'cohort':?cohortFilter,
+    'from':DateTime(DateTime.now().year,DateTime.now().month,1).toIso8601String().substring(0,10),
+    'to':DateTime.now().toIso8601String().substring(0,10),
+  };
+  Future<void> financialDetail(String kind)async {
+    final identity=ApiService.sessionIdentity;
+    await Navigator.push(context,MaterialPageRoute(builder:(_)=>kind=='revenue'?AquaticRevenueScreen(service:widget.service,filters:financialFilters,onHistory:(){if(!mounted)return;Navigator.pop(context);showPage('finances');setState(()=>planningSection='revenues');}):kind=='expenses'?AquaticExpenseScreen(service:widget.service,filters:financialFilters,onHistory:(){if(!mounted)return;Navigator.pop(context);showPage('finances');setState(()=>planningSection='expenses');},lotNom:cohorts.where((c)=>c['id']==cohortFilter).map((c)=>'${c['name']}').firstOrNull):AquaticClientsScreen(service:widget.service,filters:financialFilters,canPay:allows('cash.create'),includeAllClients:kind=='customers',canCreate:kind=='customers' && allows('clients.create'))));
+    if(mounted && identity==ApiService.sessionIdentity)await reload();
+  }
 
   Widget dashboardCards() {
     final metrics = dashboard?['metrics'] as Map? ?? {};
@@ -422,7 +441,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(child: amount(live['value'])),
+              Expanded(child: amount(live['value'],color:V2Colors.green)),
               const Text('Poissons vivants', style: TextStyle(fontSize: 12,height:1)),
               Text("Installations actives : ${metric('active_installations')['value'] ?? '—'}",style:const TextStyle(fontSize:12,height:1)),
               Text("Cohortes actives : ${metric('active_cohorts')['value'] ?? '—'}",style:const TextStyle(fontSize:12,height:1)),
@@ -433,32 +452,24 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
         card(
           "Chiffre d'affaires",
           Icons.trending_up,
-          amount(financialSummary?['billed_revenue'], money: true),
-          () {
-            showPage('finances');
-          },
+          amount(financialSummary?['billed_revenue'], money: true,color:Colors.blue),
+          () => financialDetail('revenue'),
         ),
         card(
           'Dépenses',
           Icons.account_balance_wallet,
-          amount(financialSummary?['aquatic_expenses'], money: true),
-          () {
-            showPage('finances');
-            setState(() => planningSection = 'expenses');
-          },
+          amount(financialSummary?['aquatic_expenses'], money: true,color:Colors.orange),
+          () => financialDetail('expenses'),
         ),
         card(
           'Solde clients',
           Icons.credit_card,
-          amount(financialSummary?['client_balance_as_of'], money: true),
-          () {
-            showPage('commerce');
-            setState(() => commerceSection = 'balances');
-          },
+          amount(financialSummary?['client_balance_as_of'], money: true,color:Colors.teal),
+          () => financialDetail('clients'),
         ),
         card(
           'Gestion',
-          Icons.dashboard_customize_outlined,
+          Icons.category_outlined,
           Row(mainAxisAlignment:MainAxisAlignment.spaceEvenly,children:[
             IconButton(tooltip:'Alimentation',onPressed:loading?null:()=>showPage('feeding'),icon:const Icon(Icons.grass_outlined,color:V2Colors.navy)),
             IconButton(tooltip:'Santé',onPressed:loading?null:()=>showPage('health'),icon:const Icon(Icons.health_and_safety_outlined,color:V2Colors.navy)),
@@ -471,7 +482,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) => Material(type:MaterialType.transparency,child:Column(
     children: [
       if (loading) const LinearProgressIndicator(),
       Expanded(
@@ -481,17 +492,9 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (widget.farmName.isNotEmpty)
-                  Text(
-                    widget.farmName,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                Text(
-                  'Pisciculture',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                if(page=='dashboard')Center(child:Padding(padding:const EdgeInsets.symmetric(vertical:24),child:Text.rich(TextSpan(children:[const TextSpan(text:'Tableau de bord ',style:TextStyle(color:V2Colors.navy)),TextSpan(text:widget.farmName,style:const TextStyle(color:V2Colors.green))]),textAlign:TextAlign.center,style:const TextStyle(fontFamily:'Roboto',fontSize:42,fontWeight:FontWeight.bold)))),
                 const SizedBox(height: 12),
-                Wrap(
+                if(page!='dashboard')Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
@@ -504,7 +507,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                     TextButton.icon(
                       onPressed: showDashboard,
                       icon: const Icon(Icons.home_outlined),
-                      label: const Text('Tableau de bord'),
+                      label: const Text('Accueil'),
                     ),
                     if (aquaticMenuTitles.containsKey(page))
                       Padding(
@@ -569,94 +572,22 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                       const Text('Brut non rapproché'),
                       Text("Plage ${dashboard?['metrics']['live_count']['lower']} à ${dashboard?['metrics']['live_count']['upper']}"),
                     ]),
-                  if (dashboard?['unassigned_losses'] != null)
+                  if ((dashboard?['unassigned_losses'] as num? ?? 0)>0 || (dashboard?['unassigned_credits'] as num? ?? 0)>0)
                     Text(
                       'Pertes à rapprocher : ${dashboard?['unassigned_losses']} · Crédits non affectés : ${dashboard?['unassigned_credits'] ?? 0}',
                     ),
-                  const SizedBox(height: 20),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      action(
-                        'Premier démarrage',
-                        'onboarding',
-                        'aquatic.cohorts.manage',
-                      ),
-                      action(
-                        'Créer une installation',
-                        'installation',
-                        'aquatic.installations.manage',
-                      ),
-                      action(
-                        'Créer une cohorte',
-                        'cohort',
-                        'aquatic.cohorts.manage',
-                      ),
-                      action(
-                        'Transférer des poissons',
-                        'transfer',
-                        'aquatic.transfers.create',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  if (cohorts.isEmpty && !loading)
-                    const Text(
-                      'Aucune cohorte. Commencez par une installation, une espèce et sa première affectation.',
-                    ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Répartition par espèce',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  for (final row in (dashboard?['by_species'] as List? ?? []))
-                    ListTile(
-                      title: Text('${row['cohort__species__nom']}'),
-                      trailing: Text(
-                        '${row['count']} poissons${row['quality'] == 'UNRECONCILED' ? ' (brut non rapproché)' : ''}',
-                      ),
-                    ),
-                  const Text(
-                    'Répartition par installation',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  for (final row
-                      in (dashboard?['by_installation'] as List? ?? []))
-                    ListTile(
-                      title: Text('${row['installation__name']}'),
-                      trailing: Text(
-                        '${row['count']} poissons${row['quality'] == 'UNRECONCILED' ? ' (brut non rapproché)' : ''}',
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-                  if (dashboard?['feeding_unavailable_reason'] != null)
-                    const Text(
-                      'Alimentation par espèce : Données insuffisantes. Consultez les distributions par bassin ou cohorte dans Alimentation.',
-                    ),
-                  if (dashboard?['feeding_overview'] is Map)
-                    feedingOverview(dashboard!['feeding_overview'] as Map),
+                  const SizedBox(height:20),
+                  AquaticDashboardAgenda(key:ValueKey('agenda:$speciesFilter:$installationFilter:$cohortFilter'),service:widget.service,filters:{'species':?speciesFilter,'installation':?installationFilter,'cohort':?cohortFilter},canPlan:allows('aquatic.agenda.plan'),openAgenda:()=>showPage('agenda'),addTask:(){showPage('agenda');setState(()=>planningAction='TASK');}),
                 ],
-                if (page == 'stock_detail') ...[
-                  const Text(
-                    'Stock piscicole',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  for (final row in dashboard?['by_species'] as List? ?? [])
-                    ListTile(
-                      title: Text('${row['cohort__species__nom']}'),
-                      trailing: Text('${row['count']} poissons'),
-                    ),
-                  for (final row
-                      in dashboard?['by_installation'] as List? ?? [])
-                    ListTile(
-                      title: Text('${row['installation__name']}'),
-                      trailing: Text('${row['count']} poissons'),
-                    ),
-                  TextButton(
-                    onPressed: () => showPage('stock'),
-                    child: const Text('Mouvements et rapprochements'),
-                  ),
+                if(page=='stock_detail')...[
+                  const Text('Stock piscicole',style:TextStyle(fontWeight:FontWeight.bold)),
+                  if(dashboard?['metrics']?['live_count'] is Map)Text('${dashboard?['metrics']['live_count']['value']??'—'} poissons vivants'),
+                  Text('${dashboard?['metrics']?['active_installations']?['value']??'—'} installations actives · ${dashboard?['metrics']?['active_cohorts']?['value']??'—'} cohortes actives'),
+                  if(dashboard?['metrics']?['live_count']?['quality']=='UNRECONCILED')Text('Brut non rapproché · plage ${dashboard?['metrics']['live_count']['lower']} à ${dashboard?['metrics']['live_count']['upper']}'),
+                  if(dashboard?['unassigned_losses']!=null)Text('Pertes à rapprocher : ${dashboard?['unassigned_losses']}'),
+                  for(final group in ['by_species','by_installation'])for(final row in dashboard?[group] as List? ?? [])ListTile(title:Text('${row['cohort__species__nom']??row['installation__name']}'),trailing:Text('${row['count']} poissons${row['quality']=='UNRECONCILED'?' · brut non rapproché':''}')),
+                  for(final c in cohorts.where((c)=>(cohortFilter==null || c['id']==cohortFilter) && (speciesFilter==null || '${c['species']}'==speciesFilter) && (installationFilter==null || (c['positions'] as List? ?? []).any((p)=>p['installation']==installationFilter))))ListTile(title:Text('${c['name']}'),onTap:()=>detail('cohort',c)),
+                  Wrap(spacing:12,runSpacing:12,children:[TextButton(onPressed:()=>showPage('stock'),child:const Text('Mouvements et rapprochements')),TextButton(onPressed:()=>showPage('cohorts'),child:const Text('Cohortes')),TextButton(onPressed:()=>showPage('installations'),child:const Text('Installations'))]),
                 ],
                 if (page == 'installations') ...[
                   action(
@@ -799,6 +730,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
                     initialCohort: healthCohort,
                     initialAction: healthAction,
                   ),
+                if (page=='feeding' && dashboard?['feeding_overview'] is Map)ExpansionTile(title:const Text('Bilan des distributions'),children:[feedingOverview(dashboard!['feeding_overview'] as Map)]),
                 if (page == 'feeding')
                   FeedingPanel(
                     key: ValueKey('feeding:$feedingAction'),
@@ -869,7 +801,7 @@ class AquaticWorkspaceState extends State<AquaticWorkspace> {
         ),
       ),
     ],
-  );
+  ));
   void openHealthFrom(
     BuildContext dialog,
     String kind,

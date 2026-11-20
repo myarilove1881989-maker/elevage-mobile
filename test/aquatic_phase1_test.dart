@@ -261,7 +261,7 @@ void main() {
           );
         }
         expect(find.text('1000'), findsOneWidget);
-        expect(find.text('Tableau de bord'), findsWidgets);
+        expect(find.textContaining('Tableau de bord',findRichText:true), findsWidgets);
         expect(find.byKey(const ValueKey('activity-aquatic')), findsOneWidget); // Utilities now open from the common navigation.
         expect(find.textContaining('Non disponible (phases suivantes)'), findsNothing);
         expect(tester.takeException(), isNull);
@@ -308,10 +308,12 @@ void main() {
   });
   testWidgets('offline workspace never claims a save', (tester) async {
     final fake = FakeAquatic()..offline = true;
+    final key=GlobalKey<AquaticWorkspaceState>();
     await tester.pumpWidget(
       testApp(
         Scaffold(
           body: AquaticWorkspace(
+            key:key,
             service: fake,
             capabilities: {'write': rights},
           ),
@@ -321,14 +323,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Connexion indisponible'), findsOneWidget);
     expect(fake.writes, isEmpty);
-    expect(
-      tester
-          .widget<OutlinedButton>(
-            find.widgetWithText(OutlinedButton, 'Créer une cohorte'),
-          )
-          .onPressed,
-      isNull,
-    );
+    await key.currentState!.form('cohort');
+    await tester.pumpAndSettle();
+    expect(find.text('Actualisez les données avec une connexion avant cette opération.'),findsOneWidget);
+    expect(fake.writes,isEmpty);
     await tester.pumpWidget(const SizedBox());
     fake.api.close();
   });

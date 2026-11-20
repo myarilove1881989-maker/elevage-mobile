@@ -110,6 +110,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.pop(context, true);
   }
 
+  Future<void> resetPreferences() async {
+    final confirmed = await showDialog<bool>(context:context,builder:(dialog)=>V2AlertDialog(
+      title:const Text('Configurations initiales'),
+      content:const Text('Rétablir la langue, la devise, le pays, la ville et les micro-animations ? Les données et les réglages hors ligne sont conservés.'),
+      actions:[TextButton(onPressed:()=>Navigator.pop(dialog,false),child:const Text('Annuler')),FilledButton(onPressed:()=>Navigator.pop(dialog,true),child:const Text('Rétablir'))]));
+    if(confirmed!=true || !mounted)return;
+    await settings.save(language:'fr',currency:'XAF',selectedCountryCode:'',selectedCity:'');
+    await settings.setAnimationsEnabled(true);
+    if(!mounted)return;
+    setState(() {language='fr';currency='XAF';countryCode='';cityController.clear();});
+  }
+
   @override
   Widget build(BuildContext context) {
     return V2Scaffold(protectDraft:true,
@@ -206,6 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           const SizedBox(height: 24),
+          OutlinedButton(onPressed:saving?null:resetPreferences,child:const Text('Configurations initiales')),
           FilledButton.icon(
             onPressed: saving ? null : save,
             icon: const Icon(Icons.save_outlined),

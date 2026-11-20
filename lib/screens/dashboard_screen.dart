@@ -3,6 +3,7 @@ import '../husbandry/husbandry_entry.dart';
 import '../widgets/dashboard_metric_grid.dart';
 import '../widgets/v2_components.dart';
 import '../pisciculture/aquatic_workspace.dart';
+import '../pisciculture/aquatic_navigation.dart';
 import '../pisciculture/aquatic_service.dart';
 import '../pisciculture/activity_selector.dart';
 import '../widgets/mutation_refresh.dart';
@@ -795,7 +796,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
     ..._navigationActions,
     FarmDestination.lots:()=>_aquaticKey.currentState?.showPage('cohorts'),
     FarmDestination.purchases:()=>_aquaticKey.currentState?.showPage('purchases_hub'),
-    FarmDestination.expenses:()=>_aquaticKey.currentState?.showPage('expenses_hub'),
+    FarmDestination.expenses:()=>_aquaticKey.currentState?.openMenu(const AquaticMenuEntry('Nouvelle dépense',Icons.account_balance_wallet_outlined,'new_expense')),
     FarmDestination.billing:()=>_aquaticKey.currentState?.showPage('billing_hub'),
     FarmDestination.production:()=>_aquaticKey.currentState?.showPage('production_hub'),
     FarmDestination.technical:()=>_aquaticKey.currentState?.showPage('technical_hub'),
