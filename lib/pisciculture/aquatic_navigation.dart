@@ -7,6 +7,11 @@ class AquaticMenuEntry {
 }
 
 const aquaticMenuGroups = <String, List<AquaticMenuEntry>>{
+  'management_hub': [
+    AquaticMenuEntry('Alimentation', Icons.grass_outlined, 'feeding'),
+    AquaticMenuEntry('Santé', Icons.health_and_safety_outlined, 'health'),
+    AquaticMenuEntry('Reproduction', Icons.autorenew, 'breeding'),
+  ],
   'purchases_hub': [
     AquaticMenuEntry(
       'Poissons et alevins',
@@ -73,6 +78,7 @@ const aquaticMenuGroups = <String, List<AquaticMenuEntry>>{
   ],
 };
 const aquaticMenuTitles = {
+  'management_hub': 'Gestion',
   'purchases_hub': 'Achats',
   'expenses_hub': 'Dépenses',
   'production_hub': 'Production',

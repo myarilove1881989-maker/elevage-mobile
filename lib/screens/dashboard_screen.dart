@@ -781,7 +781,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
   }
 
   Future<void> _openHusbandry({bool reproduction=false}) async {
-    await Navigator.push(context,MaterialPageRoute(builder:(_)=>HusbandryEntry(api:apiService,reproduction:reproduction,initialSpeciesId:selectedEspeceId,initialLotId:selectedLotId)));
+    await Navigator.push(context,MaterialPageRoute(builder:(_)=>HusbandryEntry(api:apiService,reproduction:reproduction,initialSpeciesId:reproduction?selectedEspeceId:null,initialLotId:reproduction?selectedLotId:null)));
     if(mounted)await _refreshAll();
   }
 
@@ -830,7 +830,7 @@ class _DashboardScreenState extends State<DashboardScreen> with MutationRefresh<
         onRefresh:_aquatic?()=>_aquaticKey.currentState?.reload():isLoading?null:_refreshAll,onLogout:_logout),
       body:_aquatic?Column(children:[
         ActivitySelector(aquatic:true,onSelect:_selectActivity),
-        Expanded(child:AquaticWorkspace(key:_aquaticKey,service:AquaticService(apiService),capabilities:_aquaticCapabilities!)),
+        Expanded(child:AquaticWorkspace(key:_aquaticKey,service:AquaticService(apiService),capabilities:_aquaticCapabilities!,farmName:farmName)),
       ]):_terrestrialBody(kpis,filteredLots),
     );
   }

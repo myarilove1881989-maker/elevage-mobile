@@ -39,6 +39,11 @@ class PermissionEditor extends StatelessWidget {
     required this.selected,
     required this.onChanged,
   });
+  static final selectable = <String>{
+    for(final group in permissionGroups.keys)
+      for(final action in PermissionContract.domains[group]!)
+        if(action != 'read' || group == 'agenda') '$group.$action',
+  };
   final Set<String> selected;
   final void Function(String, bool) onChanged;
   @override
@@ -47,6 +52,11 @@ class PermissionEditor extends StatelessWidget {
     children: [
       const Text(
         'Tous les employés actifs peuvent consulter les données et finances de leur exploitation. Ces lectures communes ne sont pas révocables individuellement.',
+      ),
+      CheckboxListTile(
+        key:const Key('permissions-select-all'), title:const Text('Tout sélectionner'),
+        value:selectable.every(selected.contains),
+        onChanged:(value){for(final code in selectable){onChanged(code,value ?? false);}},
       ),
       for (final group in permissionGroups.entries)
         ExpansionTile(

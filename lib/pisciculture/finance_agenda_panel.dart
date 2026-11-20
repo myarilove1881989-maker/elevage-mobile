@@ -59,6 +59,7 @@ class FinanceAgendaPanel extends StatefulWidget {
     required this.installations,
     required this.cohorts,
     required this.species,
+    this.initialSpecies,
     this.initialInstallation,
     this.initialCohort,
     this.initialAction,
@@ -69,7 +70,7 @@ class FinanceAgendaPanel extends StatefulWidget {
   final bool agenda, owner;
   final List<String> rights;
   final List<Map<String, dynamic>> installations, cohorts, species;
-  final String? initialInstallation, initialCohort, initialAction;
+  final String? initialInstallation, initialCohort, initialAction, initialSpecies;
   final String initialSection;
   final Future<void> Function()? onChanged;
   @override
@@ -92,6 +93,7 @@ class _FinanceAgendaPanelState extends State<FinanceAgendaPanel> {
   @override
   void initState() {
     super.initState();
+    species = widget.initialSpecies;
     cohort = widget.initialCohort;
     site = widget.initialInstallation;
     start = widget.agenda

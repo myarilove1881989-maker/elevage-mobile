@@ -55,6 +55,7 @@ class CommercePanel extends StatefulWidget {
     required this.installations,
     required this.cohorts,
     required this.species,
+    this.initialSpecies,
     this.initialInstallation,
     this.initialCohort,
     this.initialAction,
@@ -65,7 +66,7 @@ class CommercePanel extends StatefulWidget {
   final bool owner;
   final List<String> rights;
   final List<Map<String, dynamic>> installations, cohorts, species;
-  final String? initialInstallation, initialCohort, initialAction;
+  final String? initialInstallation, initialCohort, initialAction, initialSpecies;
   final String initialSection;
   final Future<void> Function()? onChanged;
   @override
@@ -87,6 +88,7 @@ class _CommercePanelState extends State<CommercePanel> {
     super.initState();
     section = widget.initialSection;
     installation = widget.initialInstallation;
+    species = widget.initialSpecies;
     cohort = widget.initialCohort;
     load();
   }

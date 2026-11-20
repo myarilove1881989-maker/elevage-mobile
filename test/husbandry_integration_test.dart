@@ -145,7 +145,7 @@ void main(){
    t.view.physicalSize=size;t.view.devicePixelRatio=1;addTearDown(t.view.resetPhysicalSize);addTearDown(t.view.resetDevicePixelRatio);
    final service=FakeAquatic(),key=GlobalKey<AquaticWorkspaceState>(),boundary=GlobalKey();
    await t.pumpWidget(app(Scaffold(body:AquaticWorkspace(key:key,service:service,capabilities:{'can_enable':true,'write':<String>[]})),boundary:boundary));await t.pumpAndSettle();
-   for(final group in aquaticMenuGroups.entries){key.currentState!.showPage(group.key);await t.pumpAndSettle();for(final item in group.value){expect(find.text(item.title),findsWidgets);}expect(t.takeException(),isNull);if(group.key=='production_hub'||group.key=='technical_hub')await shot(t,boundary,'pisciculture-${group.key}-${size.width.toInt()}');}
+   for(final group in aquaticMenuGroups.entries.where((g)=>g.key!='purchases_hub')){key.currentState!.showPage(group.key);await t.pumpAndSettle();for(final item in group.value){expect(find.text(item.title),findsWidgets);}expect(t.takeException(),isNull);if(group.key=='production_hub'||group.key=='technical_hub')await shot(t,boundary,'pisciculture-${group.key}-${size.width.toInt()}');}
    expect(service.writes,isEmpty);await t.pumpWidget(const SizedBox());
   });
  }

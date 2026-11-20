@@ -9,12 +9,14 @@ class DashboardKpiCard extends StatelessWidget {
     required this.color,
     required this.content,
     this.onTap,
+    this.contentHeight = 56,
   });
   final String title;
   final IconData icon;
   final Color color;
   final Widget content;
   final VoidCallback? onTap;
+  final double contentHeight;
   @override
   Widget build(BuildContext context) => Material(
     color: Colors.white,
@@ -67,7 +69,7 @@ class DashboardKpiCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   SizedBox(
                     height:
-                        56 * (MediaQuery.textScalerOf(context).scale(14) / 14),
+                        contentHeight * (MediaQuery.textScalerOf(context).scale(14) / 14),
                     child: Center(child: content),
                   ),
                 ],
