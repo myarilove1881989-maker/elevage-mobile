@@ -22,7 +22,7 @@ class GuardedApiClient extends http.BaseClient {
        _configuration = configuration ?? Config.current,
        _restrictProduction = kReleaseMode || enforceProductionForTesting,
        _labGate = labGate ?? LabNetworkGate.instance {
-    if (_guardedProduction) _configuration.validate(release: true);
+    if (_guardedProduction) _configuration.validate(web: kIsWeb, release: true);
     if (_configuration.isLab) _labGate.attach(_inner.close);
   }
   final bool _restrictProduction;
@@ -33,7 +33,7 @@ class GuardedApiClient extends http.BaseClient {
   final EnvironmentConfig _configuration;
 
   void validateBaseUrl(String value) {
-    if (_guardedProduction && value != EnvironmentConfig.productionApi) {
+    if (_guardedProduction && value != _configuration.apiUrl) {
       throw const NetworkDestinationException();
     }
     if (_configuration.isLab && value != _configuration.apiUrl) {

@@ -10,6 +10,7 @@ class EnvironmentConfig {
     this.labTransport = '',
   });
   static const productionApi = 'https://backend-elevage.onrender.com/api';
+  static const officialWebApi = 'https://api.elevage-app.com/api';
   static const pilotApi = 'https://backend-elevage-pilot.onrender.com/api';
   final String environment, apiOverride, flavor, labHost, labTransport;
   bool get isWifiLab => isLab && labTransport == 'wifi';
@@ -85,7 +86,8 @@ class EnvironmentConfig {
     if (web && isPilot) {
       throw StateError('Ce pilote exige Android.');
     }
-    if (release && !isLab && !isPilot && apiUrl != productionApi) {
+    final requiredProductionApi = web ? officialWebApi : productionApi;
+    if (release && !isLab && !isPilot && apiUrl != requiredProductionApi) {
       throw StateError('La production release exige son API HTTPS exacte.');
     }
     Config.validatedApiUrl(apiUrl, release: release);
@@ -103,7 +105,10 @@ class EnvironmentConfig {
 class Config {
   static const current = EnvironmentConfig(
     environment: String.fromEnvironment('APP_ENV', defaultValue: 'production'),
-    apiOverride: String.fromEnvironment('API_URL'),
+    apiOverride: String.fromEnvironment(
+      'API_URL',
+      defaultValue: kIsWeb ? EnvironmentConfig.officialWebApi : '',
+    ),
     flavor: String.fromEnvironment('FLUTTER_APP_FLAVOR'),
     labHost: String.fromEnvironment('LAB_API_HOST'),
     labTransport: String.fromEnvironment('LAB_TRANSPORT'),
