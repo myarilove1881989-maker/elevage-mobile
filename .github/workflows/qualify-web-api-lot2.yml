@@ -1,0 +1,26 @@
+name: Qualification Web API officielle
+on:
+  push:
+    branches: [release/qualification-web-api-lot2]
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+      - run: test "$(git -C "$FLUTTER_ROOT" rev-parse HEAD)" = 5fc346839b5d0eef006ed8404392afb4dfae428d
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter test --no-pub --concurrency=1 test/compiled_environment_safety_test.dart test/production_network_safety_test.dart test/lab_android_configuration_test.dart test/auth_connection_test.dart test/financial_indicators_test.dart
+      - run: flutter build web --release --no-web-resources-cdn --no-pub --no-wasm-dry-run --dart-define=APP_ENV=production --dart-define=API_URL=https://api.elevage-app.com/api
+      - run: |
+          grep -aqF 'https://api.elevage-app.com/api' build/web/main.dart.js
+          echo 'bb720c90b87c238af136febc347255eae1d2f46239b70186932b8c7ece95f082  build/web/android-version.json' | sha256sum -c -
+          echo '63621ab2fae8dde408c2918adf3c676dd8df1c2a627b0f4afed6b8a48e2e50b0  build/web/telecharger/index.html' | sha256sum -c -
